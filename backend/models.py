@@ -71,6 +71,7 @@ class PackageRequest(db.Model):
     
     # Relationships
     packages = db.relationship('Package', backref='package_request', lazy=True)
+    package_references = db.relationship('PackageReference', backref='package_request', lazy=True)
     
     def to_dict(self):
         return {
@@ -119,6 +120,35 @@ class Package(db.Model):
             'security_score': self.security_score,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+class PackageReference(db.Model):
+    __tablename__ = 'package_references'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    package_request_id = db.Column(db.Integer, db.ForeignKey('package_requests.id'), nullable=False)
+    name = db.Column(db.String(255), nullable=False)
+    version = db.Column(db.String(100), nullable=False)
+    npm_url = db.Column(db.String(500))
+    integrity = db.Column(db.String(255))
+    status = db.Column(db.String(50), default='referenced')  # referenced, already_validated, needs_validation
+    existing_package_id = db.Column(db.Integer, db.ForeignKey('packages.id'), nullable=True)  # If already exists
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    existing_package = db.relationship('Package', foreign_keys=[existing_package_id])
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'package_request_id': self.package_request_id,
+            'name': self.name,
+            'version': self.version,
+            'npm_url': self.npm_url,
+            'integrity': self.integrity,
+            'status': self.status,
+            'existing_package_id': self.existing_package_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
 class PackageValidation(db.Model):

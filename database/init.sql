@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS package_requests (
     application_id INTEGER REFERENCES applications(id),
     requestor_id INTEGER REFERENCES users(id),
     package_lock_file TEXT NOT NULL,
-    status VARCHAR(50) DEFAULT 'requested' CHECK (status IN ('requested', 'validating', 'validated', 'approved', 'published', 'rejected')),
+    status VARCHAR(50) DEFAULT 'requested' CHECK (status IN ('requested', 'validating', 'validated', 'approved', 'published', 'rejected', 'validation_failed', 'partially_validated')),
     total_packages INTEGER DEFAULT 0,
     validated_packages INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -46,12 +46,25 @@ CREATE TABLE IF NOT EXISTS packages (
     local_path VARCHAR(500),
     file_size BIGINT,
     checksum VARCHAR(255),
-    status VARCHAR(50) DEFAULT 'requested' CHECK (status IN ('requested', 'downloading', 'downloaded', 'validating', 'validated', 'approved', 'published', 'rejected')),
+    status VARCHAR(50) DEFAULT 'requested' CHECK (status IN ('requested', 'downloading', 'downloaded', 'validating', 'validated', 'approved', 'published', 'rejected', 'validation_failed', 'already_validated')),
     validation_errors TEXT[],
     security_score INTEGER CHECK (security_score >= 0 AND security_score <= 100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(name, version, package_request_id)
+);
+
+-- Create package_references table
+CREATE TABLE IF NOT EXISTS package_references (
+    id SERIAL PRIMARY KEY,
+    package_request_id INTEGER REFERENCES package_requests(id),
+    name VARCHAR(255) NOT NULL,
+    version VARCHAR(100) NOT NULL,
+    npm_url VARCHAR(500),
+    integrity VARCHAR(255),
+    status VARCHAR(50) DEFAULT 'referenced' CHECK (status IN ('referenced', 'already_validated', 'needs_validation')),
+    existing_package_id INTEGER REFERENCES packages(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create package_validations table
@@ -79,6 +92,8 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE INDEX IF NOT EXISTS idx_packages_status ON packages(status);
 CREATE INDEX IF NOT EXISTS idx_package_requests_status ON package_requests(status);
 CREATE INDEX IF NOT EXISTS idx_packages_name_version ON packages(name, version);
+CREATE INDEX IF NOT EXISTS idx_package_references_status ON package_references(status);
+CREATE INDEX IF NOT EXISTS idx_package_references_name_version ON package_references(name, version);
 CREATE INDEX IF NOT EXISTS idx_audit_log_user_id ON audit_log(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
 

@@ -1,15 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import {
   Box,
   Typography,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Button,
   Chip,
   CircularProgress,
@@ -20,7 +13,8 @@ import {
   DialogActions,
   Snackbar,
 } from "@mui/material";
-import { CheckCircle, Publish, Warning } from "@mui/icons-material";
+import { MaterialReactTable, type MRT_ColumnDef } from "material-react-table";
+import { CheckCircle, Warning } from "@mui/icons-material";
 import { api, endpoints } from "../services/api";
 
 interface ValidatedPackage {
@@ -39,10 +33,11 @@ interface ValidatedPackage {
 }
 
 export default function AdminDashboard() {
-  const [selectedPackage, setSelectedPackage] =
-    useState<ValidatedPackage | null>(null);
+  const [selectedPackages, setSelectedPackages] = useState<ValidatedPackage[]>(
+    []
+  );
+  const [rowSelection, setRowSelection] = useState({});
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
-  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
@@ -61,72 +56,55 @@ export default function AdminDashboard() {
   });
 
   const approveMutation = useMutation(
-    async (packageId: number) => {
-      await api.post(endpoints.admin.approvePackage(packageId));
+    async (packageIds: number[]) => {
+      // Approve multiple packages
+      await Promise.all(
+        packageIds.map((id) => api.post(endpoints.admin.approvePackage(id)))
+      );
     },
     {
       onSuccess: () => {
         queryClient.invalidateQueries("validatedPackages");
         setSnackbar({
           open: true,
-          message: "Package approved successfully!",
+          message: `${selectedPackages.length} package(s) approved successfully! Publishing will happen automatically.`,
           severity: "success",
         });
         setApproveDialogOpen(false);
+        setSelectedPackages([]);
       },
       onError: () => {
         setSnackbar({
           open: true,
-          message: "Failed to approve package",
+          message: "Failed to approve packages",
           severity: "error",
         });
       },
     }
   );
 
-  const publishMutation = useMutation(
-    async (packageId: number) => {
-      await api.post(endpoints.admin.publishPackage(packageId));
-    },
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries("validatedPackages");
-        setSnackbar({
-          open: true,
-          message: "Package published successfully!",
-          severity: "success",
-        });
-        setPublishDialogOpen(false);
-      },
-      onError: () => {
-        setSnackbar({
-          open: true,
-          message: "Failed to publish package",
-          severity: "error",
-        });
-      },
-    }
-  );
-
-  const handleApprove = (pkg: ValidatedPackage) => {
-    setSelectedPackage(pkg);
-    setApproveDialogOpen(true);
-  };
-
-  const handlePublish = (pkg: ValidatedPackage) => {
-    setSelectedPackage(pkg);
-    setPublishDialogOpen(true);
-  };
-
-  const confirmApprove = () => {
-    if (selectedPackage) {
-      approveMutation.mutate(selectedPackage.id);
+  const handleBulkApprove = () => {
+    if (selectedPackages.length > 0) {
+      setApproveDialogOpen(true);
     }
   };
 
-  const confirmPublish = () => {
-    if (selectedPackage) {
-      publishMutation.mutate(selectedPackage.id);
+  const confirmBulkApprove = () => {
+    const packageIds = selectedPackages.map((pkg) => pkg.id);
+    approveMutation.mutate(packageIds);
+  };
+
+  // Handle row selection changes
+  const handleRowSelectionChange = (updaterOrValue: any) => {
+    setRowSelection(updaterOrValue);
+
+    // Convert row selection to selected packages
+    if (packages) {
+      const selectedRows = Object.keys(updaterOrValue).filter(
+        (key) => updaterOrValue[key]
+      );
+      const selected = selectedRows.map((index) => packages[parseInt(index)]);
+      setSelectedPackages(selected);
     }
   };
 
@@ -142,6 +120,59 @@ export default function AdminDashboard() {
       </Box>
     );
   }
+
+  // Define columns
+  const columns = useMemo<MRT_ColumnDef<ValidatedPackage>[]>(
+    () => [
+      {
+        accessorKey: "name",
+        header: "Package",
+        size: 200,
+      },
+      {
+        accessorKey: "version",
+        header: "Version",
+        size: 120,
+      },
+      {
+        accessorKey: "request.application.name",
+        header: "Application",
+        size: 200,
+        Cell: ({ row }) =>
+          `${row.original.request.application.name} v${row.original.request.application.version}`,
+      },
+      {
+        accessorKey: "security_score",
+        header: "Security Score",
+        size: 140,
+        Cell: ({ row }) => (
+          <Chip
+            label={`${row.original.security_score}/100`}
+            color={getScoreColor(row.original.security_score)}
+            size="small"
+          />
+        ),
+      },
+      {
+        accessorKey: "validation_errors",
+        header: "Validation Errors",
+        size: 150,
+        Cell: ({ row }) =>
+          row.original.validation_errors &&
+          row.original.validation_errors.length > 0 ? (
+            <Chip
+              icon={<Warning />}
+              label={`${row.original.validation_errors.length} errors`}
+              color="warning"
+              size="small"
+            />
+          ) : (
+            <Chip label="No errors" color="success" size="small" />
+          ),
+      },
+    ],
+    []
+  );
 
   if (error) {
     return (
@@ -162,77 +193,51 @@ export default function AdminDashboard() {
         workflow.
       </Typography>
 
+      {packages && packages.length > 0 && (
+        <Box sx={{ mb: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<CheckCircle />}
+            onClick={handleBulkApprove}
+            disabled={
+              selectedPackages.length === 0 || approveMutation.isLoading
+            }
+            sx={{ mb: 2 }}
+          >
+            Approve Selected ({selectedPackages.length})
+          </Button>
+        </Box>
+      )}
+
       {packages && packages.length > 0 ? (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Package</TableCell>
-                <TableCell>Version</TableCell>
-                <TableCell>Application</TableCell>
-                <TableCell>Security Score</TableCell>
-                <TableCell>Validation Errors</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {packages.map((pkg) => (
-                <TableRow key={pkg.id}>
-                  <TableCell>{pkg.name}</TableCell>
-                  <TableCell>{pkg.version}</TableCell>
-                  <TableCell>
-                    {pkg.request.application.name} v
-                    {pkg.request.application.version}
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={`${pkg.security_score}/100`}
-                      color={getScoreColor(pkg.security_score)}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    {pkg.validation_errors &&
-                    pkg.validation_errors.length > 0 ? (
-                      <Chip
-                        icon={<Warning />}
-                        label={`${pkg.validation_errors.length} errors`}
-                        color="warning"
-                        size="small"
-                      />
-                    ) : (
-                      <Chip label="No errors" color="success" size="small" />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Box display="flex" gap={1}>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<CheckCircle />}
-                        onClick={() => handleApprove(pkg)}
-                        disabled={approveMutation.isLoading}
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        variant="contained"
-                        size="small"
-                        startIcon={<Publish />}
-                        onClick={() => handlePublish(pkg)}
-                        disabled={publishMutation.isLoading}
-                      >
-                        Publish
-                      </Button>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <MaterialReactTable
+          columns={columns}
+          data={packages}
+          enableColumnFilters
+          enableGlobalFilter
+          enableRowSelection
+          enableSorting
+          enableColumnResizing
+          enableRowVirtualization
+          onRowSelectionChange={handleRowSelectionChange}
+          state={{ rowSelection }}
+          muiTableProps={{
+            sx: {
+              tableLayout: "fixed",
+            },
+          }}
+          muiTableContainerProps={{
+            sx: {
+              maxHeight: "70vh",
+            },
+          }}
+          initialState={{
+            density: "compact",
+            pagination: { pageSize: 25, pageIndex: 0 },
+          }}
+        />
       ) : (
-        <Paper sx={{ p: 3, textAlign: "center" }}>
+        <Box sx={{ p: 3, textAlign: "center" }}>
           <Typography variant="h6" color="textSecondary">
             No validated packages found
           </Typography>
@@ -240,67 +245,45 @@ export default function AdminDashboard() {
             Packages will appear here after they have been validated and are
             ready for review.
           </Typography>
-        </Paper>
+        </Box>
       )}
 
-      {/* Approve Dialog */}
+      {/* Bulk Approve Dialog */}
       <Dialog
         open={approveDialogOpen}
         onClose={() => setApproveDialogOpen(false)}
       >
-        <DialogTitle>Approve Package</DialogTitle>
+        <DialogTitle>Approve Packages</DialogTitle>
         <DialogContent>
           <Typography>
             Are you sure you want to approve{" "}
-            <strong>
-              {selectedPackage?.name}@{selectedPackage?.version}
-            </strong>
-            ?
+            <strong>{selectedPackages.length} package(s)</strong>?
           </Typography>
           <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-            This will mark the package as approved and ready for publishing.
+            Selected packages will be approved and automatically published to
+            the secure repository.
           </Typography>
+          {selectedPackages.length > 0 && (
+            <Box sx={{ mt: 2, maxHeight: 200, overflow: "auto" }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Packages to be approved:
+              </Typography>
+              {selectedPackages.map((pkg) => (
+                <Typography key={pkg.id} variant="body2" sx={{ ml: 2 }}>
+                  • {pkg.name}@{pkg.version}
+                </Typography>
+              ))}
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setApproveDialogOpen(false)}>Cancel</Button>
           <Button
-            onClick={confirmApprove}
+            onClick={confirmBulkApprove}
             variant="contained"
             disabled={approveMutation.isLoading}
           >
-            {approveMutation.isLoading ? "Approving..." : "Approve"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Publish Dialog */}
-      <Dialog
-        open={publishDialogOpen}
-        onClose={() => setPublishDialogOpen(false)}
-      >
-        <DialogTitle>Publish Package</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Are you sure you want to publish{" "}
-            <strong>
-              {selectedPackage?.name}@{selectedPackage?.version}
-            </strong>{" "}
-            to the secure repository?
-          </Typography>
-          <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-            This action cannot be undone. The package will be available in the
-            secure repository.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPublishDialogOpen(false)}>Cancel</Button>
-          <Button
-            onClick={confirmPublish}
-            variant="contained"
-            color="primary"
-            disabled={publishMutation.isLoading}
-          >
-            {publishMutation.isLoading ? "Publishing..." : "Publish"}
+            {approveMutation.isLoading ? "Approving..." : "Approve All"}
           </Button>
         </DialogActions>
       </Dialog>

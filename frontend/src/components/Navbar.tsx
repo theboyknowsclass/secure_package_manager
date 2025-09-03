@@ -11,7 +11,7 @@ import {
   MenuItem,
 } from "@mui/material";
 import { AccountCircle } from "@mui/icons-material";
-import { useAuth } from "../hooks/useAuth.tsx";
+import { useAuth } from "../hooks/useAuth";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -57,26 +57,26 @@ export default function Navbar() {
 
           <Button
             color="inherit"
-            onClick={() => navigate("/upload")}
+            onClick={() => navigate("/request")}
             sx={{
-              backgroundColor: isActive("/upload")
+              backgroundColor: isActive("/request")
                 ? "rgba(255, 255, 255, 0.1)"
                 : "transparent",
             }}
           >
-            Upload Package
+            Request
           </Button>
 
           <Button
             color="inherit"
-            onClick={() => navigate("/requests")}
+            onClick={() => navigate("/status")}
             sx={{
-              backgroundColor: isActive("/requests")
+              backgroundColor: isActive("/status")
                 ? "rgba(255, 255, 255, 0.1)"
                 : "transparent",
             }}
           >
-            Package Requests
+            Status
           </Button>
 
           {user?.is_admin && (

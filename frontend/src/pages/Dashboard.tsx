@@ -10,7 +10,7 @@ import {
   CircularProgress,
   Alert,
 } from "@mui/material";
-import { useAuth } from "../hooks/useAuth.tsx";
+import { useAuth } from "../hooks/useAuth";
 import { api, endpoints } from "../services/api";
 
 interface PackageRequest {

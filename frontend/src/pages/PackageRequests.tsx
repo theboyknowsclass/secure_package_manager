@@ -1,22 +1,7 @@
-import React, { useState } from "react";
+import React, { useMemo } from "react";
 import { useQuery } from "react-query";
-import {
-  Box,
-  Typography,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip,
-  IconButton,
-  Collapse,
-  CircularProgress,
-  Alert,
-} from "@mui/material";
-import { KeyboardArrowDown, KeyboardArrowUp } from "@mui/icons-material";
+import { Box, Typography, CircularProgress, Alert, Chip } from "@mui/material";
+import { MaterialReactTable, type MRT_ColumnDef } from "material-react-table";
 import { api, endpoints } from "../services/api";
 
 interface Package {
@@ -26,6 +11,7 @@ interface Package {
   status: string;
   security_score: number | null;
   validation_errors: string[];
+  type?: "new" | "existing";
 }
 
 interface PackageRequest {
@@ -41,106 +27,6 @@ interface PackageRequest {
   packages: Package[];
 }
 
-function Row({ request }: { request: PackageRequest }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <>
-      <TableRow sx={{ "& > *": { borderBottom: "unset" } }}>
-        <TableCell>
-          <IconButton size="small" onClick={() => setOpen(!open)}>
-            {open ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
-          </IconButton>
-        </TableCell>
-        <TableCell>{request.id}</TableCell>
-        <TableCell>{request.application.name}</TableCell>
-        <TableCell>{request.application.version}</TableCell>
-        <TableCell>
-          <Chip
-            label={request.status}
-            color={getStatusColor(request.status)}
-            size="small"
-          />
-        </TableCell>
-        <TableCell>
-          {request.validated_packages}/{request.total_packages}
-        </TableCell>
-        <TableCell>
-          {new Date(request.created_at).toLocaleDateString()}
-        </TableCell>
-      </TableRow>
-
-      <TableRow>
-        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
-          <Collapse in={open} timeout="auto" unmountOnExit>
-            <Box sx={{ margin: 1 }}>
-              <Typography variant="h6" gutterBottom component="div">
-                Packages
-              </Typography>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Version</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Security Score</TableCell>
-                    <TableCell>Errors</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {request.packages.map((pkg) => (
-                    <TableRow key={pkg.id}>
-                      <TableCell>{pkg.name}</TableCell>
-                      <TableCell>{pkg.version}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={pkg.status}
-                          color={getStatusColor(pkg.status)}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {pkg.security_score !== null ? (
-                          <Chip
-                            label={`${pkg.security_score}/100`}
-                            color={getScoreColor(pkg.security_score)}
-                            size="small"
-                          />
-                        ) : (
-                          "N/A"
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {pkg.validation_errors &&
-                        pkg.validation_errors.length > 0 ? (
-                          <Box>
-                            {pkg.validation_errors.map((error, index) => (
-                              <Typography
-                                key={index}
-                                variant="caption"
-                                color="error"
-                                display="block"
-                              >
-                                {error}
-                              </Typography>
-                            ))}
-                          </Box>
-                        ) : (
-                          "None"
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Box>
-          </Collapse>
-        </TableCell>
-      </TableRow>
-    </>
-  );
-}
-
 export default function PackageRequests() {
   const {
     data: requests,
@@ -150,6 +36,98 @@ export default function PackageRequests() {
     const response = await api.get(endpoints.packages.requests);
     return response.data.requests;
   });
+
+  // Transform data for the table
+  const tableData = useMemo(() => {
+    if (!requests) return [];
+
+    return requests.flatMap(
+      (request) =>
+        request.packages?.map((pkg) => ({
+          id: `${request.id}-${pkg.id}`,
+          requestId: request.id,
+          applicationName: request.application.name,
+          applicationVersion: request.application.version,
+          packageName: pkg.name,
+          packageVersion: pkg.version,
+          status: pkg.status,
+          securityScore: pkg.security_score,
+          validationErrors: pkg.validation_errors || [],
+          type: pkg.type,
+          createdAt: request.created_at,
+          updatedAt: request.updated_at,
+          requestorName:
+            request.requestor?.full_name ||
+            request.requestor?.username ||
+            "Unknown",
+          progress: `${request.validated_packages}/${request.total_packages}`,
+          requestStatus: request.status,
+        })) || []
+    );
+  }, [requests]);
+
+  // Define columns for package rows only
+  const columns = useMemo<MRT_ColumnDef<any>[]>(
+    () => [
+      {
+        accessorKey: "requestId",
+        header: "Request ID",
+        size: 100,
+        enableHiding: true,
+      },
+      {
+        accessorKey: "packageName",
+        header: "Package",
+        size: 200,
+        Cell: ({ row }) => (
+          <Box display="flex" alignItems="center" gap={1}>
+            {row.original.packageName}
+            {row.original.type === "existing" && (
+              <Chip
+                label="Already Validated"
+                size="small"
+                color="success"
+                variant="outlined"
+              />
+            )}
+          </Box>
+        ),
+      },
+      {
+        accessorKey: "packageVersion",
+        header: "Package Version",
+        size: 120,
+      },
+      {
+        accessorKey: "status",
+        header: "Status",
+        size: 120,
+        Cell: ({ row }) => (
+          <Chip
+            label={row.original.status}
+            color={getStatusColor(row.original.status)}
+            size="small"
+          />
+        ),
+      },
+      {
+        accessorKey: "securityScore",
+        header: "Security Score",
+        size: 120,
+        Cell: ({ row }) =>
+          row.original.securityScore !== null ? (
+            <Chip
+              label={`${row.original.securityScore}/100`}
+              color={getScoreColor(row.original.securityScore)}
+              size="small"
+            />
+          ) : (
+            "N/A"
+          ),
+      },
+    ],
+    []
+  );
 
   if (isLoading) {
     return (
@@ -175,7 +153,7 @@ export default function PackageRequests() {
   return (
     <Box>
       <Typography variant="h4" gutterBottom>
-        Package Requests
+        Package Status
       </Typography>
 
       <Typography variant="body1" color="textSecondary" paragraph>
@@ -183,29 +161,143 @@ export default function PackageRequests() {
         information about each package.
       </Typography>
 
-      {requests && requests.length > 0 ? (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell />
-                <TableCell>ID</TableCell>
-                <TableCell>Application</TableCell>
-                <TableCell>Version</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Progress</TableCell>
-                <TableCell>Created</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {requests.map((request) => (
-                <Row key={request.id} request={request} />
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+      {tableData.length > 0 ? (
+        <MaterialReactTable
+          columns={columns}
+          data={tableData}
+          enableColumnFilters
+          enableGlobalFilter
+          enableRowSelection
+          enableSorting
+          enableColumnResizing
+          enableRowVirtualization
+          enableGrouping={false}
+          enableExpanding
+          getRowCanExpand={(row) => row.depth === 0}
+          muiTableProps={{
+            sx: {
+              tableLayout: "fixed",
+            },
+          }}
+          muiTableContainerProps={{
+            sx: {
+              maxHeight: "70vh",
+            },
+          }}
+          initialState={{
+            density: "compact",
+            pagination: { pageSize: 25, pageIndex: 0 },
+            grouping: ["requestId"],
+            expanded: true,
+            columnVisibility: { requestId: false },
+          }}
+          displayColumnDefOptions={{
+            "mrt-row-expand": {
+              size: 40,
+            },
+          }}
+          renderGroupRow={({ row }) => {
+            const firstRow = row.subRows?.[0];
+            if (firstRow) {
+              return (
+                <Box sx={{ p: 2, width: "100%" }}>
+                  <Typography
+                    variant="h6"
+                    gutterBottom
+                    sx={{ fontWeight: "bold" }}
+                  >
+                    Request #{firstRow.original.requestId}
+                  </Typography>
+
+                  {/* Summary Table */}
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(5, 1fr)",
+                      gap: 2,
+                      mt: 1,
+                      p: 2,
+                      bgcolor: "grey.50",
+                      borderRadius: 1,
+                      border: "1px solid",
+                      borderColor: "grey.300",
+                    }}
+                  >
+                    <Box>
+                      <Typography
+                        variant="caption"
+                        color="textSecondary"
+                        display="block"
+                      >
+                        Application
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: "medium" }}>
+                        {firstRow.original.applicationName}
+                      </Typography>
+                    </Box>
+
+                    <Box>
+                      <Typography
+                        variant="caption"
+                        color="textSecondary"
+                        display="block"
+                      >
+                        Version
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: "medium" }}>
+                        {firstRow.original.applicationVersion}
+                      </Typography>
+                    </Box>
+
+                    <Box>
+                      <Typography
+                        variant="caption"
+                        color="textSecondary"
+                        display="block"
+                      >
+                        Created
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: "medium" }}>
+                        {new Date(
+                          firstRow.original.createdAt
+                        ).toLocaleDateString()}
+                      </Typography>
+                    </Box>
+
+                    <Box>
+                      <Typography
+                        variant="caption"
+                        color="textSecondary"
+                        display="block"
+                      >
+                        Requestor
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: "medium" }}>
+                        {firstRow.original.requestorName}
+                      </Typography>
+                    </Box>
+
+                    <Box>
+                      <Typography
+                        variant="caption"
+                        color="textSecondary"
+                        display="block"
+                      >
+                        Progress
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: "medium" }}>
+                        {firstRow.original.progress}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+              );
+            }
+            return null;
+          }}
+        />
       ) : (
-        <Paper sx={{ p: 3, textAlign: "center" }}>
+        <Box sx={{ p: 3, textAlign: "center" }}>
           <Typography variant="h6" color="textSecondary">
             No package requests found
           </Typography>
@@ -213,7 +305,7 @@ export default function PackageRequests() {
             Start by uploading a package-lock.json file to create your first
             request.
           </Typography>
-        </Paper>
+        </Box>
       )}
     </Box>
   );
@@ -235,6 +327,8 @@ function getStatusColor(
     case "validating":
       return "warning";
     case "validated":
+      return "success";
+    case "already_validated":
       return "success";
     case "approved":
       return "info";

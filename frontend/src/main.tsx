@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "react-query";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import App from "./App";
-import { AuthProvider } from "./hooks/useAuth.tsx";
+import { AuthProvider } from "./hooks/useAuth";
 
 const queryClient = new QueryClient();
 

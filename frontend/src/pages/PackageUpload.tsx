@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -10,13 +11,15 @@ import {
   Card,
   CardContent,
 } from "@mui/material";
-import { CloudUpload, Description } from "@mui/icons-material";
+import { CloudUpload } from "@mui/icons-material";
 import { api, endpoints } from "../services/api";
 
 export default function PackageUpload() {
+  const navigate = useNavigate();
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<any>(null);
   const [error, setError] = useState("");
+  const [errorDetails, setErrorDetails] = useState("");
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
@@ -42,8 +45,15 @@ export default function PackageUpload() {
       });
 
       setUploadResult(response.data);
+
+      // Auto-redirect to status page after successful upload
+      setTimeout(() => {
+        navigate("/status");
+      }, 1500); // 1.5 second delay to show success message
     } catch (err: any) {
-      setError(err.response?.data?.error || "Upload failed. Please try again.");
+      const errorData = err.response?.data;
+      setError(errorData?.error || "Upload failed. Please try again.");
+      setErrorDetails(errorData?.details || "");
     } finally {
       setUploading(false);
     }
@@ -60,7 +70,7 @@ export default function PackageUpload() {
   return (
     <Box>
       <Typography variant="h4" gutterBottom>
-        Upload Package Lock File
+        Request Package Validation
       </Typography>
 
       <Typography variant="body1" color="textSecondary" paragraph>
@@ -104,7 +114,14 @@ export default function PackageUpload() {
 
       {error && (
         <Alert severity="error" sx={{ mt: 2 }}>
-          {error}
+          <Typography variant="body1" gutterBottom>
+            {error}
+          </Typography>
+          {errorDetails && (
+            <Typography variant="body2" color="error.light">
+              {errorDetails}
+            </Typography>
+          )}
         </Alert>
       )}
 
@@ -133,8 +150,8 @@ export default function PackageUpload() {
 
             <Typography variant="body2" color="textSecondary">
               Your package-lock.json file has been uploaded and is being
-              processed. You can track the progress in the Package Requests
-              section.
+              processed. You will be redirected to the Status page in a few
+              seconds.
             </Typography>
           </CardContent>
         </Card>

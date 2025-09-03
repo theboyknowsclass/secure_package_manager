@@ -1,7 +1,7 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Box, Container } from "@mui/material";
-import { useAuth } from "./hooks/useAuth.tsx";
+import { useAuth } from "./hooks/useAuth";
 import Navbar from "./components/Navbar";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -44,7 +44,7 @@ function App() {
             }
           />
           <Route
-            path="/upload"
+            path="/request"
             element={
               <ProtectedRoute>
                 <PackageUpload />
@@ -52,7 +52,7 @@ function App() {
             }
           />
           <Route
-            path="/requests"
+            path="/status"
             element={
               <ProtectedRoute>
                 <PackageRequests />

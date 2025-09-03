@@ -9,7 +9,7 @@ import {
   Alert,
   Container,
 } from "@mui/material";
-import { useAuth } from "../hooks/useAuth.tsx";
+import { useAuth } from "../hooks/useAuth";
 
 export default function Login() {
   const [username, setUsername] = useState("");
