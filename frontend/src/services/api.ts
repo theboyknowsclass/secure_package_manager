@@ -12,7 +12,8 @@ export const api = axios.create({
 // Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
+    // Try OAuth2 token first, then fallback to legacy token
+    const token = localStorage.getItem('access_token') || localStorage.getItem('token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -29,6 +30,9 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Token expired or invalid, redirect to login
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('id_token')
+      localStorage.removeItem('user')
       localStorage.removeItem('token')
       window.location.href = '/login'
     }
@@ -50,5 +54,8 @@ export const endpoints = {
     validatedPackages: '/api/admin/packages/validated',
     approvePackage: (id: number) => `/api/admin/packages/approve/${id}`,
     publishPackage: (id: number) => `/api/admin/packages/publish/${id}`,
+    licenses: (status?: string) => 
+      status ? `/api/admin/licenses?status=${status}` : "/api/admin/licenses",
+    license: (id: number) => `/api/admin/licenses/${id}`,
   },
 }

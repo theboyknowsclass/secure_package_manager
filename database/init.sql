@@ -6,9 +6,10 @@ CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(255) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     full_name VARCHAR(255) NOT NULL,
-    is_admin BOOLEAN DEFAULT FALSE,
+    role VARCHAR(20) DEFAULT 'user' NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT users_role_check CHECK (role IN ('user', 'approver', 'admin'))
 );
 
 -- Create applications table
@@ -21,6 +22,17 @@ CREATE TABLE IF NOT EXISTS applications (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(name, version)
+);
+
+-- Create supported_licenses table
+CREATE TABLE IF NOT EXISTS supported_licenses (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL,
+    identifier VARCHAR(100) UNIQUE NOT NULL, -- SPDX identifier (e.g., 'MIT', 'Apache-2.0')
+    status VARCHAR(20) DEFAULT 'allowed' CHECK (status IN ('always_allowed', 'allowed', 'avoid', 'blocked')), -- license status
+    created_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create package_requests table
@@ -46,9 +58,18 @@ CREATE TABLE IF NOT EXISTS packages (
     local_path VARCHAR(500),
     file_size BIGINT,
     checksum VARCHAR(255),
+    license_identifier VARCHAR(100), -- SPDX license identifier from package.json
+    license_text TEXT, -- Full license text if available
     status VARCHAR(50) DEFAULT 'requested' CHECK (status IN ('requested', 'downloading', 'downloaded', 'validating', 'validated', 'approved', 'published', 'rejected', 'validation_failed', 'already_validated')),
     validation_errors TEXT[],
     security_score INTEGER CHECK (security_score >= 0 AND security_score <= 100),
+    license_score INTEGER CHECK (license_score >= 0 AND license_score <= 100), -- License compliance score
+    security_scan_status VARCHAR(50) DEFAULT 'pending' CHECK (security_scan_status IN ('pending', 'scanning', 'completed', 'failed', 'skipped')),
+    vulnerability_count INTEGER DEFAULT 0,
+    critical_vulnerabilities INTEGER DEFAULT 0,
+    high_vulnerabilities INTEGER DEFAULT 0,
+    medium_vulnerabilities INTEGER DEFAULT 0,
+    low_vulnerabilities INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(name, version, package_request_id)
@@ -77,6 +98,26 @@ CREATE TABLE IF NOT EXISTS package_validations (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Create security_scans table
+CREATE TABLE IF NOT EXISTS security_scans (
+    id SERIAL PRIMARY KEY,
+    package_id INTEGER REFERENCES packages(id) ON DELETE CASCADE,
+    scan_type VARCHAR(50) NOT NULL DEFAULT 'trivy' CHECK (scan_type IN ('trivy', 'snyk', 'npm_audit')),
+    status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'completed', 'failed', 'skipped')),
+    scan_result JSONB, -- Store the full Trivy scan result
+    vulnerability_count INTEGER DEFAULT 0,
+    critical_count INTEGER DEFAULT 0,
+    high_count INTEGER DEFAULT 0,
+    medium_count INTEGER DEFAULT 0,
+    low_count INTEGER DEFAULT 0,
+    info_count INTEGER DEFAULT 0,
+    scan_duration_ms INTEGER, -- Scan duration in milliseconds
+    trivy_version VARCHAR(50), -- Version of Trivy used for the scan
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP
+);
+
 -- Create audit_log table
 CREATE TABLE IF NOT EXISTS audit_log (
     id SERIAL PRIMARY KEY,
@@ -88,6 +129,16 @@ CREATE TABLE IF NOT EXISTS audit_log (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Create repository_config table
+CREATE TABLE IF NOT EXISTS repository_config (
+    id SERIAL PRIMARY KEY,
+    config_key VARCHAR(100) UNIQUE NOT NULL,
+    config_value TEXT NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_packages_status ON packages(status);
 CREATE INDEX IF NOT EXISTS idx_package_requests_status ON package_requests(status);
@@ -96,11 +147,43 @@ CREATE INDEX IF NOT EXISTS idx_package_references_status ON package_references(s
 CREATE INDEX IF NOT EXISTS idx_package_references_name_version ON package_references(name, version);
 CREATE INDEX IF NOT EXISTS idx_audit_log_user_id ON audit_log(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_security_scans_package_id ON security_scans(package_id);
+CREATE INDEX IF NOT EXISTS idx_security_scans_status ON security_scans(status);
+CREATE INDEX IF NOT EXISTS idx_security_scans_scan_type ON security_scans(scan_type);
+CREATE INDEX IF NOT EXISTS idx_security_scans_created_at ON security_scans(created_at);
+CREATE INDEX IF NOT EXISTS idx_packages_security_scan_status ON packages(security_scan_status);
 
 -- Insert default admin user
-INSERT INTO users (username, email, full_name, is_admin) 
-VALUES ('admin', 'admin@example.com', 'System Administrator', TRUE)
+INSERT INTO users (username, email, full_name, role) 
+VALUES ('admin', 'admin@example.com', 'System Administrator', 'admin')
 ON CONFLICT (username) DO NOTHING;
+
+-- Insert default supported licenses with 4-tier status system
+INSERT INTO supported_licenses (name, identifier, status, created_by) VALUES
+-- Always Acceptable (highest priority, no restrictions)
+('MIT License', 'MIT', 'always_allowed', 1),
+('BSD License', 'BSD', 'always_allowed', 1),
+('Apache License 2.0', 'Apache-2.0', 'always_allowed', 1),
+
+-- Acceptable (standard approval, may have minor restrictions)
+('GNU Lesser General Public License', 'LGPL', 'allowed', 1),
+('Mozilla Public License', 'MPL', 'allowed', 1),
+
+-- Avoid (discouraged but not blocked, may have significant restrictions)
+('Do What The F*ck You Want To Public License', 'WTFPL', 'avoid', 1),
+
+-- Blocked (explicitly prohibited)
+('GNU General Public License', 'GPL', 'blocked', 1),
+('GNU General Public License v2.0', 'GPL-2.0', 'blocked', 1),
+('GNU Affero General Public License', 'AGPL', 'blocked', 1)
+ON CONFLICT (identifier) DO NOTHING;
+
+-- Insert default repository configuration
+INSERT INTO repository_config (config_key, config_value, description) VALUES
+('source_repository_url', 'https://registry.npmjs.org/', 'Source repository URL for package downloads'),
+('target_repository_url', 'http://localhost:8080/', 'Target repository URL for package publishing')
+ON CONFLICT (config_key) DO NOTHING;
 
 -- Create function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -114,5 +197,8 @@ $$ language 'plpgsql';
 -- Create triggers for updated_at
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_applications_updated_at BEFORE UPDATE ON applications FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_supported_licenses_updated_at BEFORE UPDATE ON supported_licenses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_package_requests_updated_at BEFORE UPDATE ON package_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_packages_updated_at BEFORE UPDATE ON packages FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_repository_config_updated_at BEFORE UPDATE ON repository_config FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_security_scans_updated_at BEFORE UPDATE ON security_scans FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

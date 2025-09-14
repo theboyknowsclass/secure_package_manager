@@ -79,17 +79,33 @@ export default function Navbar() {
             Status
           </Button>
 
-          {user?.is_admin && (
+          {/* Approve section - for approvers and admins */}
+          {(user?.role === 'approver' || user?.role === 'admin') && (
             <Button
               color="inherit"
-              onClick={() => navigate("/admin")}
+              onClick={() => navigate("/approve")}
               sx={{
-                backgroundColor: isActive("/admin")
+                backgroundColor: isActive("/approve")
                   ? "rgba(255, 255, 255, 0.1)"
                   : "transparent",
               }}
             >
-              Admin
+              Approve
+            </Button>
+          )}
+
+          {/* Settings section - for admins only */}
+          {user?.role === 'admin' && (
+            <Button
+              color="inherit"
+              onClick={() => navigate("/settings")}
+              sx={{
+                backgroundColor: isActive("/settings")
+                  ? "rgba(255, 255, 255, 0.1)"
+                  : "transparent",
+              }}
+            >
+              Settings
             </Button>
           )}
 
@@ -121,7 +137,7 @@ export default function Navbar() {
           >
             <MenuItem disabled>
               <Typography variant="body2">
-                {user?.full_name} ({user?.username})
+                {user?.full_name} ({user?.role})
               </Typography>
             </MenuItem>
             <MenuItem onClick={handleLogout}>Logout</MenuItem>

@@ -1,42 +1,45 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Box,
   Paper,
-  TextField,
   Button,
   Typography,
   Alert,
   Container,
+  CircularProgress,
 } from "@mui/material";
 import { useAuth } from "../hooks/useAuth";
+import { oauthService } from "../services/oauth";
 
 export default function Login() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
-  const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = () => {
     setError("");
-    setLoading(true);
-
-    try {
-      const success = await login(username, password);
-      if (success) {
-        navigate("/");
-      } else {
-        setError("Invalid username or password");
-      }
-    } catch (err) {
-      setError("Login failed. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+    login();
   };
+
+  if (loading) {
+    return (
+      <Container maxWidth="sm">
+        <Box
+          sx={{
+            marginTop: 8,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}
+        >
+          <CircularProgress />
+          <Typography variant="h6" sx={{ mt: 2 }}>
+            Processing authentication...
+          </Typography>
+        </Box>
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="sm">
@@ -67,7 +70,7 @@ export default function Login() {
             color="textSecondary"
             gutterBottom
           >
-            Sign in to your account
+            Sign in with your enterprise account
           </Typography>
 
           {error && (
@@ -76,48 +79,30 @@ export default function Login() {
             </Alert>
           )}
 
-          <Box
-            component="form"
-            onSubmit={handleSubmit}
-            sx={{ mt: 1, width: "100%" }}
-          >
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="username"
-              label="Username"
-              name="username"
-              autoComplete="username"
-              autoFocus
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Password"
-              type="password"
-              id="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+          <Box sx={{ mt: 1, width: "100%" }}>
             <Button
-              type="submit"
               fullWidth
               variant="contained"
-              sx={{ mt: 3, mb: 2 }}
+              size="large"
+              onClick={handleLogin}
               disabled={loading}
+              sx={{ mt: 3, mb: 2, py: 1.5 }}
             >
-              {loading ? "Signing in..." : "Sign In"}
+              Sign In with Enterprise ID
             </Button>
           </Box>
 
-          <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
-            Demo credentials: admin / admin
+          <Typography variant="body2" color="textSecondary" sx={{ mt: 2, textAlign: 'center' }}>
+            This will redirect you to your organization's identity provider for secure authentication.
+            <br />
+            <br />
+            <strong>Demo users available:</strong>
+            <br />
+            • Admin (admin/admin)
+            <br />
+            • Approver (approver/approver)  
+            <br />
+            • User (user/user)
           </Typography>
         </Paper>
       </Box>

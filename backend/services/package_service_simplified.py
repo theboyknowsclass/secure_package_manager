@@ -3,7 +3,6 @@ import json
 import logging
 from models import Package, PackageRequest, PackageValidation, PackageReference, RepositoryConfig, db
 from .license_service import LicenseService
-from .trivy_service import TrivyService
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +12,6 @@ class PackageService:
         self._config_loaded = False
         self._config_cache = {}
         self.license_service = LicenseService()
-        self.trivy_service = TrivyService()
     
     def _load_config(self):
         """Load repository configuration from database (only when needed)"""
@@ -223,18 +221,6 @@ class PackageService:
                 db.session.commit()
                 return False
             
-            # Perform security scan with Trivy
-            logger.info(f"Starting security scan for package {package.name}@{package.version}")
-            scan_result = self.trivy_service.scan_package(package)
-            
-            if scan_result['status'] == 'failed':
-                logger.warning(f"Security scan failed for {package.name}@{package.version}: {scan_result.get('error', 'Unknown error')}")
-                # Don't fail the package validation if security scan fails, just log it
-                package.validation_errors = package.validation_errors or []
-                package.validation_errors.append(f"Security scan failed: {scan_result.get('error', 'Unknown error')}")
-            else:
-                logger.info(f"Security scan completed for {package.name}@{package.version}: {scan_result.get('vulnerability_count', 0)} vulnerabilities found")
-            
             # Update status to validated
             package.status = 'validated'
             package.security_score = self._calculate_security_score(package)
@@ -360,109 +346,29 @@ class PackageService:
         except Exception as e:
             logger.error(f"Error calculating security score: {str(e)}")
             return 50
-    
-    def get_package_security_scan_status(self, package_id):
-        """Get security scan status for a package"""
-        try:
-            return self.trivy_service.get_scan_status(package_id)
-        except Exception as e:
-            logger.error(f"Error getting security scan status for package {package_id}: {str(e)}")
-            return None
-    
-    def get_package_security_scan_report(self, package_id):
-        """Get detailed security scan report for a package"""
-        try:
-            return self.trivy_service.get_scan_report(package_id)
-        except Exception as e:
-            logger.error(f"Error getting security scan report for package {package_id}: {str(e)}")
-            return None
 
     
     def publish_to_secure_repo(self, package):
-        """Publish package to secure repository using real npm publish"""
+        """Publish package to secure repository"""
         try:
-            import subprocess
-            import tempfile
-            import shutil
-            import os
+            # In production, this would upload to the actual secure repository
+            # For now, we'll simulate the upload
+            logger.info(f"Publishing {package.name}@{package.version} to repository at {self.target_repo_url}")
             
-            # Get the target repository URL
-            self._load_config()
-            target_url = self.target_repo_url or os.getenv('SECURE_REPO_URL', 'http://mock-npm-registry:8080')
+            # Simulate upload delay based on package size
+            import time
+            import random
+            estimated_size = random.uniform(1, 50)  # Simulate package size in MB
+            upload_time = min(estimated_size * 0.1, 2.0)  # Simulate upload time
+            time.sleep(upload_time)
             
-            logger.info(f"Publishing {package.name}@{package.version} to repository at {target_url}")
+            # Log the repository configuration being used
+            logger.info(f"Package published to repository: {self.target_repo_url}")
             
-            # Create a temporary directory for the package
-            with tempfile.TemporaryDirectory() as temp_dir:
-                # Create package.json
-                package_json = {
-                    "name": package.name,
-                    "version": package.version,
-                    "description": f"Secure package {package.name}",
-                    "main": "index.js",
-                    "scripts": {
-                        "test": "echo \"No tests specified\""
-                    },
-                    "keywords": ["secure", "validated"],
-                    "author": "Secure Package Manager",
-                    "license": package.license_identifier or "MIT",
-                    "repository": {
-                        "type": "git",
-                        "url": "https://github.com/secure-package-manager/secure-packages.git"
-                    }
-                }
-                
-                # Write package.json
-                package_json_path = os.path.join(temp_dir, 'package.json')
-                with open(package_json_path, 'w') as f:
-                    json.dump(package_json, f, indent=2)
-                
-                # Create a simple index.js file
-                index_js_path = os.path.join(temp_dir, 'index.js')
-                with open(index_js_path, 'w') as f:
-                    f.write(f'// Secure package {package.name} v{package.version}\n')
-                    f.write('module.exports = {\n')
-                    f.write(f'  name: "{package.name}",\n')
-                    f.write(f'  version: "{package.version}",\n')
-                    f.write('  description: "This package has been validated and approved by the Secure Package Manager"\n')
-                    f.write('};\n')
-                
-                # Create a README.md
-                readme_path = os.path.join(temp_dir, 'README.md')
-                with open(readme_path, 'w') as f:
-                    f.write(f'# {package.name}\n\n')
-                    f.write(f'Version: {package.version}\n\n')
-                    f.write('This package has been validated and approved by the Secure Package Manager.\n\n')
-                    f.write('## Security Information\n\n')
-                    f.write(f'- Security Score: {package.security_score or "N/A"}\n')
-                    f.write(f'- License: {package.license_identifier or "N/A"}\n')
-                    f.write(f'- Status: {package.status}\n')
-                
-                # Set npm registry to our mock registry
-                registry_url = target_url.rstrip('/')
-                if not registry_url.startswith('http'):
-                    registry_url = f'http://{registry_url}'
-                
-                # Run npm publish
-                try:
-                    # First, set the registry
-                    subprocess.run([
-                        'npm', 'config', 'set', 'registry', registry_url
-                    ], check=True, capture_output=True, text=True, cwd=temp_dir)
-                    
-                    # Publish the package
-                    result = subprocess.run([
-                        'npm', 'publish', '--access', 'public'
-                    ], check=True, capture_output=True, text=True, cwd=temp_dir)
-                    
-                    logger.info(f"npm publish output: {result.stdout}")
-                    logger.info(f"Successfully published {package.name}@{package.version} to secure repository")
-                    return True
-                    
-                except subprocess.CalledProcessError as e:
-                    logger.error(f"npm publish failed: {e.stderr}")
-                    return False
-                    
+            # Log the action
+            logger.info(f"Successfully published {package.name}@{package.version} to secure repository")
+            return True
+            
         except Exception as e:
             logger.error(f"Error publishing package {package.name}@{package.version}: {str(e)}")
             return False

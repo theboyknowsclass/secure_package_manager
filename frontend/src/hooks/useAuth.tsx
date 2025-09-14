@@ -1,19 +1,13 @@
-import { useState, useEffect, createContext, useContext } from "react";
-import { api, endpoints } from "../services/api";
-
-interface User {
-  id: number;
-  username: string;
-  email: string;
-  full_name: string;
-  is_admin: boolean;
-}
+import React, { createContext, useContext } from "react";
+import { useAuthStore } from "../stores/authStore";
+import { oauthService } from "../services/oauth";
 
 interface AuthContextType {
-  user: User | null;
+  user: any;
   loading: boolean;
-  login: (username: string, password: string) => Promise<boolean>;
+  login: () => void;
   logout: () => void;
+  isAuthenticated: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,47 +21,23 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading, logout: storeLogout, checkAuth } = useAuthStore();
 
-  useEffect(() => {
-    // Check if user is already logged in (check localStorage for token)
-    const token = localStorage.getItem("token");
-    if (token) {
-      // Validate token with backend
-      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-      // You could add a token validation endpoint here
-      setLoading(false);
-    } else {
-      setLoading(false);
-    }
-  }, []);
+  // Initialize authentication check on mount
+  React.useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
-  const login = async (
-    username: string,
-    password: string
-  ): Promise<boolean> => {
-    try {
-      const response = await api.post(endpoints.auth.login, {
-        username,
-        password,
-      });
-      const { token, user: userData } = response.data;
-
-      localStorage.setItem("token", token);
-      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-      setUser(userData);
-      return true;
-    } catch (error) {
-      console.error("Login failed:", error);
-      return false;
-    }
+  const login = () => {
+    oauthService.initiateLogin();
   };
 
   const logout = () => {
-    localStorage.removeItem("token");
-    delete api.defaults.headers.common["Authorization"];
-    setUser(null);
+    oauthService.logout();
+  };
+
+  const isAuthenticated = () => {
+    return useAuthStore.getState().isAuthenticated;
   };
 
   const value: AuthContextType = {
@@ -75,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     login,
     logout,
+    isAuthenticated,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
