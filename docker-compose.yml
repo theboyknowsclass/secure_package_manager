@@ -1,3 +1,8 @@
+# Production Docker Compose Configuration
+# Base configuration for production deployment
+
+version: '3.8'
+
 services:
   # PostgreSQL Database
   db:
@@ -18,6 +23,7 @@ services:
       retries: 5
     networks:
       - app-network
+    restart: unless-stopped
 
   # Flask API Backend
   api:
@@ -26,19 +32,18 @@ services:
       dockerfile: Dockerfile
     environment:
       - FLASK_APP=app.py
-      - FLASK_ENV=development
+      - FLASK_ENV=production
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/secure_package_manager
       - NPM_PROXY_URL=${NPM_PROXY_URL:-https://registry.npmjs.org}
-      - SECURE_REPO_URL=${SECURE_REPO_URL:-http://localhost:8080}
-      - ADFS_ENTITY_ID=${ADFS_ENTITY_ID:-http://localhost:3000}
-      - ADFS_SSO_URL=${ADFS_SSO_URL:-http://localhost:8081/sso}
+      - SECURE_REPO_URL=${SECURE_REPO_URL:-https://your-secure-registry.com}
+      - ADFS_ENTITY_ID=${ADFS_ENTITY_ID}
+      - ADFS_SSO_URL=${ADFS_SSO_URL}
       - ADFS_CERT_PATH=${ADFS_CERT_PATH:-/app/certs/adfs.crt}
       - TRIVY_URL=${TRIVY_URL:-http://trivy:4954}
       - TRIVY_TIMEOUT=${TRIVY_TIMEOUT:-300}
       - TRIVY_MAX_RETRIES=${TRIVY_MAX_RETRIES:-3}
     volumes:
-      - ./backend:/app
-      - ./certs:/app/certs
+      - ./certs:/app/certs:ro
       - package_cache:/app/package_cache
     ports:
       - "5000:5000"
@@ -63,45 +68,16 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     environment:
-      - VITE_API_URL=http://localhost:5000
-      - VITE_ADFS_ENTITY_ID=${ADFS_ENTITY_ID:-http://localhost:3000}
-      - VITE_ADFS_SSO_URL=${ADFS_SSO_URL:-http://localhost:8081/sso}
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - VITE_API_URL=${FRONTEND_API_URL:-http://localhost:5000}
+      - VITE_ADFS_ENTITY_ID=${ADFS_ENTITY_ID}
+      - VITE_ADFS_SSO_URL=${ADFS_SSO_URL}
     ports:
       - "3000:3000"
     depends_on:
       - api
     networks:
       - app-network
-
-  # Mock IDP for Development
-  mock-idp:
-    build:
-      context: ./mock-idp
-      dockerfile: Dockerfile
-    environment:
-      - IDP_ENTITY_ID=${ADFS_ENTITY_ID:-http://localhost:3000}
-      - IDP_SSO_URL=http://localhost:8081/sso
-    ports:
-      - "8081:8081"
-    networks:
-      - app-network
-
-  # Mock Secure NPM Registry
-  mock-npm-registry:
-    build:
-      context: ./mock-npm-registry
-      dockerfile: Dockerfile
-    environment:
-      - PORT=8080
-    ports:
-      - "8080:8080"
-    volumes:
-      - npm_storage:/app/storage
-    networks:
-      - app-network
+    restart: unless-stopped
 
   # Trivy Security Scanner
   trivy:
@@ -121,11 +97,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    restart: unless-stopped
 
 volumes:
   postgres_data:
   package_cache:
-  npm_storage:
   trivy_cache:
 
 networks:

@@ -1,0 +1,85 @@
+# Development Docker Compose Configuration
+# Extends base config with dev-specific services and settings
+
+version: '3.8'
+
+services:
+  # Override database for development
+  db:
+    environment:
+      - POSTGRES_DB=secure_package_manager_dev
+    volumes:
+      # Use dev-specific init script
+      - ./database/init-dev.sql:/docker-entrypoint-initdb.d/01-init-dev.sql:ro
+    ports:
+      # Expose database port for direct access
+      - "5432:5432"
+
+  # Override API for development
+  api:
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/secure_package_manager_dev
+      - LOG_LEVEL=DEBUG
+      # Use mock services for development
+      - ADFS_ENTITY_ID=http://localhost:3000
+      - ADFS_SSO_URL=http://localhost:8081/sso
+    volumes:
+      # Mount source code for hot reloading
+      - ./backend:/app
+    ports:
+      # Expose API port
+      - "5000:5000"
+
+  # Override frontend for development
+  frontend:
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:5000
+      - VITE_ADFS_ENTITY_ID=http://localhost:3000
+      - VITE_ADFS_SSO_URL=http://localhost:8081/sso
+    volumes:
+      # Mount source code for hot reloading
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      # Expose frontend port
+      - "3000:3000"
+
+  # Mock IDP for Development (DEV ONLY)
+  mock-idp:
+    build:
+      context: ./mock-idp
+      dockerfile: Dockerfile
+    environment:
+      - IDP_ENTITY_ID=http://localhost:3000
+      - IDP_SSO_URL=http://localhost:8081/sso
+    ports:
+      - "8081:8081"
+    networks:
+      - app-network
+
+  # Mock Secure NPM Registry (DEV ONLY)
+  mock-npm-registry:
+    build:
+      context: ./mock-npm-registry
+      dockerfile: Dockerfile
+    environment:
+      - PORT=8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - npm_storage:/app/storage
+    networks:
+      - app-network
+
+  # Override Trivy for development
+  trivy:
+    ports:
+      # Expose trivy port for direct access (different from mock registry)
+      - "4954:4954"
+
+volumes:
+  # Add dev-specific volumes
+  npm_storage:

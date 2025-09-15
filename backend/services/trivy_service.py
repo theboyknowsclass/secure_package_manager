@@ -72,8 +72,52 @@ class TrivyService:
             # Create temporary directory for package
             temp_dir = tempfile.mkdtemp(prefix=f"trivy_scan_{package.name}_{package.version}_")
             
-            # For now, we'll create a mock package structure
-            # In production, you would download the actual package from npm registry
+            # Try to download the actual package from NPM registry
+            npm_proxy_url = os.getenv('NPM_PROXY_URL', 'https://registry.npmjs.org')
+            
+            try:
+                # Get package metadata from NPM
+                package_url = f"{npm_proxy_url}/{package.name}"
+                response = requests.get(package_url, timeout=30)
+                
+                if response.status_code == 200:
+                    package_metadata = response.json()
+                    
+                    # Get the specific version
+                    if package.version in package_metadata.get('versions', {}):
+                        version_data = package_metadata['versions'][package.version]
+                        
+                        # Download the tarball
+                        dist_url = version_data.get('dist', {}).get('tarball')
+                        if dist_url:
+                            logger.info(f"Downloading package tarball from {dist_url}")
+                            tarball_response = requests.get(dist_url, timeout=60)
+                            
+                            if tarball_response.status_code == 200:
+                                # Extract tarball to temp directory
+                                import tarfile
+                                import io
+                                
+                                tarball_buffer = io.BytesIO(tarball_response.content)
+                                with tarfile.open(fileobj=tarball_buffer, mode='r:gz') as tar:
+                                    tar.extractall(temp_dir)
+                                
+                                logger.info(f"Successfully downloaded and extracted {package.name}@{package.version}")
+                                return temp_dir
+                            else:
+                                logger.warning(f"Failed to download tarball: {tarball_response.status_code}")
+                        else:
+                            logger.warning(f"No tarball URL found for {package.name}@{package.version}")
+                    else:
+                        logger.warning(f"Version {package.version} not found for {package.name}")
+                else:
+                    logger.warning(f"Failed to get package metadata: {response.status_code}")
+                    
+            except Exception as e:
+                logger.warning(f"Failed to download real package, creating mock structure: {str(e)}")
+            
+            # Fallback: Create a mock package structure
+            logger.info(f"Creating mock package structure for {package.name}@{package.version}")
             package_json_path = os.path.join(temp_dir, 'package.json')
             package_json = {
                 "name": package.name,
@@ -124,31 +168,162 @@ class TrivyService:
                 logger.warning("Trivy server not available, using mock scan results")
                 return self._generate_mock_scan_result(package)
             
-            # For now, we'll use mock results since we need to implement
-            # the actual Trivy API integration
             logger.info(f"Performing Trivy scan on {package_path}")
             
-            # Simulate scan delay
-            time.sleep(2)
+            # Use Trivy filesystem scanning via subprocess
+            # This is more reliable than trying to use the server API for file uploads
+            import subprocess
+            import json
             
-            return self._generate_mock_scan_result(package)
+            try:
+                # Run Trivy filesystem scan
+                cmd = [
+                    'trivy', 'fs', 
+                    '--format', 'json',
+                    '--severity', 'CRITICAL,HIGH,MEDIUM,LOW',
+                    '--timeout', str(self.timeout) + 's',
+                    package_path
+                ]
+                
+                logger.info(f"Running Trivy command: {' '.join(cmd)}")
+                
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=self.timeout
+                )
+                
+                if result.returncode == 0:
+                    scan_result = json.loads(result.stdout)
+                    logger.info(f"Trivy scan completed successfully for {package.name}")
+                    return self._format_trivy_result(scan_result, package)
+                else:
+                    logger.error(f"Trivy scan failed with return code {result.returncode}: {result.stderr}")
+                    return None
+                    
+            except subprocess.TimeoutExpired:
+                logger.error(f"Trivy scan timed out after {self.timeout} seconds")
+                return None
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse Trivy output as JSON: {str(e)}")
+                return None
+            except Exception as e:
+                logger.error(f"Error running Trivy subprocess: {str(e)}")
+                return None
             
         except Exception as e:
             logger.error(f"Error performing Trivy scan: {str(e)}")
             return None
     
-    def _is_trivy_server_available(self) -> bool:
+    def _format_trivy_result(self, trivy_response: Dict, package: Package) -> Dict:
         """
-        Check if Trivy server is available
+        Format Trivy scan response to our expected format
         
+        Args:
+            trivy_response: Raw response from Trivy server
+            package: Package object
+            
         Returns:
-            True if server is available, False otherwise
+            Formatted scan result dictionary
         """
         try:
-            response = requests.get(f"{self.trivy_url}/health", timeout=5)
-            return response.status_code == 200
+            # Extract vulnerabilities from Trivy response
+            vulnerabilities = []
+            summary = {
+                'total': 0,
+                'critical': 0,
+                'high': 0,
+                'medium': 0,
+                'low': 0,
+                'info': 0
+            }
+            
+            # Trivy response structure may vary, handle different formats
+            if 'Results' in trivy_response:
+                # Standard Trivy format
+                for result in trivy_response.get('Results', []):
+                    for vuln in result.get('Vulnerabilities', []):
+                        severity = vuln.get('Severity', 'UNKNOWN').upper()
+                        vulnerability = {
+                            "vulnerability_id": vuln.get('VulnerabilityID', 'UNKNOWN'),
+                            "severity": severity,
+                            "title": vuln.get('Title', 'Unknown vulnerability'),
+                            "description": vuln.get('Description', 'No description available'),
+                            "package_name": vuln.get('PkgName', package.name),
+                            "installed_version": vuln.get('InstalledVersion', package.version),
+                            "fixed_version": vuln.get('FixedVersion'),
+                            "references": vuln.get('References', [])
+                        }
+                        vulnerabilities.append(vulnerability)
+                        
+                        # Update summary counts
+                        summary['total'] += 1
+                        if severity in summary:
+                            summary[severity.lower()] += 1
+                        else:
+                            summary['info'] += 1
+            
+            elif 'vulnerabilities' in trivy_response:
+                # Alternative format
+                for vuln in trivy_response.get('vulnerabilities', []):
+                    severity = vuln.get('severity', 'UNKNOWN').upper()
+                    vulnerability = {
+                        "vulnerability_id": vuln.get('id', 'UNKNOWN'),
+                        "severity": severity,
+                        "title": vuln.get('title', 'Unknown vulnerability'),
+                        "description": vuln.get('description', 'No description available'),
+                        "package_name": vuln.get('package', package.name),
+                        "installed_version": vuln.get('version', package.version),
+                        "fixed_version": vuln.get('fix_version'),
+                        "references": vuln.get('references', [])
+                    }
+                    vulnerabilities.append(vulnerability)
+                    
+                    # Update summary counts
+                    summary['total'] += 1
+                    if severity in summary:
+                        summary[severity.lower()] += 1
+                    else:
+                        summary['info'] += 1
+            
+            return {
+                "trivy_version": trivy_response.get('trivy_version', 'unknown'),
+                "scan_duration_ms": trivy_response.get('scan_duration_ms', 0),
+                "vulnerabilities": vulnerabilities,
+                "summary": summary
+            }
+            
         except Exception as e:
-            logger.warning(f"Trivy server not available: {str(e)}")
+            logger.error(f"Error formatting Trivy result: {str(e)}")
+            # Return empty result on formatting error
+            return {
+                "trivy_version": "unknown",
+                "scan_duration_ms": 0,
+                "vulnerabilities": [],
+                "summary": {
+                    'total': 0,
+                    'critical': 0,
+                    'high': 0,
+                    'medium': 0,
+                    'low': 0,
+                    'info': 0
+                }
+            }
+    
+    def _is_trivy_server_available(self) -> bool:
+        """
+        Check if Trivy binary is available
+        
+        Returns:
+            True if Trivy is available, False otherwise
+        """
+        try:
+            import subprocess
+            result = subprocess.run(['trivy', '--version'], capture_output=True, text=True, timeout=10)
+            return result.returncode == 0
+        except Exception as e:
+            logger.warning(f"Trivy binary not available: {str(e)}")
             return False
     
     def _generate_mock_scan_result(self, package: Package) -> Dict:
