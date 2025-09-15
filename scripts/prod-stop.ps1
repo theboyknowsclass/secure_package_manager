@@ -8,4 +8,5 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml down
 
 Write-Host "✅ Production environment stopped!" -ForegroundColor Green
 Write-Host "💡 To start again, run: .\scripts\prod-start.ps1" -ForegroundColor Cyan
+Write-Host "💡 To completely reset (including database), run: .\scripts\prod-reset.ps1" -ForegroundColor Cyan
 Write-Host "⚠️  Note: Database data is preserved. Use 'docker-compose down -v' to remove volumes." -ForegroundColor Yellow

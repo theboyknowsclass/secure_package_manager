@@ -35,6 +35,8 @@ interface Package {
   license_identifier: string | null;
   validation_errors: string[];
   type?: "new" | "existing";
+  vulnerability_count?: number;
+  critical_vulnerabilities?: number;
 }
 
 interface PackageRequest {
@@ -56,7 +58,135 @@ interface PackageRequest {
   packages: Package[];
 }
 
-export default function PackageRequests() {
+// Define columns for package details table
+const packageColumns: MRT_ColumnDef<Package>[] = [
+  {
+    accessorKey: "name",
+    header: "Package",
+    size: 200,
+    Cell: ({ row }) => (
+      <Typography variant="body2" sx={{ fontWeight: "medium" }}>
+        {row.original.name}
+      </Typography>
+    ),
+  },
+  {
+    accessorKey: "version",
+    header: "Version",
+    size: 120,
+    Cell: ({ row }) => (
+      <Typography variant="body2">
+        {row.original.version}
+      </Typography>
+    ),
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+    size: 120,
+    Cell: ({ row }) => (
+      <Chip
+        label={getPackageStatusLabel(row.original.status)}
+        color={getPackageStatusColor(row.original.status)}
+        size="small"
+      />
+    ),
+  },
+  {
+    accessorKey: "license_identifier",
+    header: "License",
+    size: 120,
+    Cell: ({ row }) => {
+      const pkg = row.original;
+      return pkg.license_identifier ? (
+        <Tooltip title={`${pkg.license_identifier} - ${getLicenseCategory(pkg.license_identifier)}`}>
+          <Chip
+            label={pkg.license_identifier}
+            color={getLicenseStatusColor(pkg.license_identifier)}
+            size="small"
+          />
+        </Tooltip>
+      ) : (
+        <Tooltip title="Unknown License - No license information available">
+          <Chip
+            label="Unknown"
+            color="default"
+            size="small"
+          />
+        </Tooltip>
+      );
+    },
+  },
+  {
+    accessorKey: "security_score",
+    header: "Security Score",
+    size: 120,
+    Cell: ({ row }) => {
+      const score = row.original.security_score;
+      return score !== null ? (
+        <Chip
+          label={`${score}/100`}
+          color={getScoreColor(score)}
+          size="small"
+        />
+      ) : (
+        "N/A"
+      );
+    },
+  },
+  {
+    accessorKey: "vulnerability_count",
+    header: "Vulnerabilities",
+    size: 120,
+    Cell: ({ row }) => {
+      const pkg = row.original;
+      const vulnerabilityCount = pkg.vulnerability_count || 0;
+      const criticalCount = pkg.critical_vulnerabilities || 0;
+      
+      return vulnerabilityCount > 0 ? (
+        <Box>
+          <Typography variant="body2" color="error">
+            {vulnerabilityCount} total
+          </Typography>
+          {criticalCount > 0 && (
+            <Typography variant="caption" color="error">
+              {criticalCount} critical
+            </Typography>
+          )}
+        </Box>
+      ) : (
+        <Typography variant="body2" color="success">
+          None
+        </Typography>
+      );
+    },
+  },
+  {
+    accessorKey: "type",
+    header: "Type",
+    size: 120,
+    Cell: ({ row }) => {
+      const type = row.original.type;
+      return type === "existing" ? (
+        <Chip
+          label="Already Processed"
+          color="success"
+          size="small"
+          variant="outlined"
+        />
+      ) : (
+        <Chip
+          label="New"
+          color="primary"
+          size="small"
+          variant="outlined"
+        />
+      );
+    },
+  },
+];
+
+export default function RequestStatus() {
   const [selectedRequest, setSelectedRequest] = useState<PackageRequest | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -70,10 +200,16 @@ export default function PackageRequests() {
   });
 
   const handleViewDetails = (requestId: number) => {
+    // Open modal immediately
+    setDetailsOpen(true);
+    
+    // Find and set the request data
     const request = requests?.find(r => r.id === requestId);
     if (request) {
       setSelectedRequest(request);
-      setDetailsOpen(true);
+    } else {
+      // If request not found, close modal
+      setDetailsOpen(false);
     }
   };
 
@@ -113,7 +249,7 @@ export default function PackageRequests() {
     () => [
       {
         accessorKey: "requestId",
-        header: "Request ID",
+        header: "ID",
         size: 100,
         Cell: ({ row }) => (
           <Typography variant="body2" sx={{ fontWeight: "medium" }}>
@@ -157,7 +293,7 @@ export default function PackageRequests() {
         size: 120,
         Cell: ({ row }) => (
           <Chip
-            label={row.original.status}
+            label={getRequestStatusLabel(row.original.status)}
             color={getRequestStatusColor(row.original.status)}
             size="small"
           />
@@ -167,16 +303,22 @@ export default function PackageRequests() {
         accessorKey: "progress",
         header: "Progress",
         size: 120,
-        Cell: ({ row }) => (
-          <Box>
-            <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-              {row.original.progress}
-            </Typography>
-            <Typography variant="caption" color="textSecondary">
-              packages validated
-            </Typography>
-          </Box>
-        ),
+        Cell: ({ row }) => {
+          const { validatedPackages, totalPackages } = row.original;
+          const isComplete = validatedPackages === totalPackages;
+          const progressColor = isComplete ? "success.main" : "warning.main";
+          
+          return (
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: "medium", color: progressColor }}>
+                {row.original.progress}
+              </Typography>
+              <Typography variant="caption" color="textSecondary">
+                packages processed
+              </Typography>
+            </Box>
+          );
+        },
       },
       {
         accessorKey: "createdAt",
@@ -259,11 +401,11 @@ export default function PackageRequests() {
   return (
     <Box>
       <Typography variant="h4" gutterBottom>
-        Package Status
+        Request Status
       </Typography>
 
       <Typography variant="body1" color="textSecondary" paragraph>
-        Track the status of your package validation requests and view detailed
+        Track the status of your package processing requests and view detailed
         information about each package.
       </Typography>
 
@@ -276,6 +418,7 @@ export default function PackageRequests() {
           enableRowSelection
           enableSorting
           enableColumnResizing
+          enablePagination={false}
           muiTableProps={{
             sx: {
               tableLayout: "fixed",
@@ -288,18 +431,18 @@ export default function PackageRequests() {
           }}
           initialState={{
             density: "compact",
-            pagination: { pageSize: 10, pageIndex: 0 },
+            showColumnFilters: true,
             sorting: [{ id: "createdAt", desc: true }], // Sort by newest first
           }}
         />
       ) : (
         <Box sx={{ p: 3, textAlign: "center" }}>
           <Typography variant="h6" color="textSecondary">
-            No package requests found
+            No requests found
           </Typography>
           <Typography variant="body2" color="textSecondary">
             Start by uploading a package-lock.json file to create your first
-            request.
+            processing request.
           </Typography>
         </Box>
       )}
@@ -310,11 +453,12 @@ export default function PackageRequests() {
         onClose={handleCloseDetails}
         maxWidth="lg"
         fullWidth
+        sx={{ zIndex: 9999 }}
       >
         <DialogTitle>
           <Box display="flex" justifyContent="space-between" alignItems="center">
             <Typography variant="h6">
-              Package Details - Request #{selectedRequest?.id}
+              Package Details {selectedRequest ? `- ID #${selectedRequest.id}` : '- Loading...'}
             </Typography>
             <IconButton onClick={handleCloseDetails} size="small">
               <Close />
@@ -323,7 +467,7 @@ export default function PackageRequests() {
         </DialogTitle>
         
         <DialogContent>
-          {selectedRequest && (
+          {selectedRequest ? (
             <Box>
               {/* Request Summary */}
               <Box sx={{ mb: 3, p: 2, bgcolor: "grey.50", borderRadius: 1 }}>
@@ -351,11 +495,13 @@ export default function PackageRequests() {
                     <Typography variant="caption" color="textSecondary">
                       Status
                     </Typography>
-                    <Chip
-                      label={selectedRequest.status}
-                      color={getRequestStatusColor(selectedRequest.status)}
-                      size="small"
-                    />
+                    <Box sx={{ mt: 0.5 }}>
+                      <Chip
+                        label={getRequestStatusLabel(selectedRequest.status)}
+                        color={getRequestStatusColor(selectedRequest.status)}
+                        size="small"
+                      />
+                    </Box>
                   </Box>
                   <Box>
                     <Typography variant="caption" color="textSecondary">
@@ -388,109 +534,51 @@ export default function PackageRequests() {
                 Packages ({selectedRequest.packages.length})
               </Typography>
               
-              <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
-                <Table stickyHeader>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Package</TableCell>
-                      <TableCell>Version</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell>License</TableCell>
-                      <TableCell>Security Score</TableCell>
-                      <TableCell>Vulnerabilities</TableCell>
-                      <TableCell>Type</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {selectedRequest.packages.map((pkg) => (
-                      <TableRow key={pkg.id}>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-                            {pkg.name}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
-                            {pkg.version}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={pkg.status}
-                            color={getPackageStatusColor(pkg.status)}
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {pkg.license_identifier ? (
-                            <Tooltip title={`${pkg.license_identifier} - ${getLicenseCategory(pkg.license_identifier)}`}>
-                              <Chip
-                                label={pkg.license_identifier}
-                                color={getLicenseStatusColor(pkg.license_identifier)}
-                                size="small"
-                              />
-                            </Tooltip>
-                          ) : (
-                            <Tooltip title="Unknown License - No license information available">
-                              <Chip
-                                label="Unknown"
-                                color="default"
-                                size="small"
-                              />
-                            </Tooltip>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {pkg.security_score !== null ? (
-                            <Chip
-                              label={`${pkg.security_score}/100`}
-                              color={getScoreColor(pkg.security_score)}
-                              size="small"
-                            />
-                          ) : (
-                            "N/A"
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {pkg.vulnerability_count > 0 ? (
-                            <Box>
-                              <Typography variant="body2" color="error">
-                                {pkg.vulnerability_count} total
-                              </Typography>
-                              {pkg.critical_vulnerabilities > 0 && (
-                                <Typography variant="caption" color="error">
-                                  {pkg.critical_vulnerabilities} critical
-                                </Typography>
-                              )}
-                            </Box>
-                          ) : (
-                            <Typography variant="body2" color="success">
-                              None
-                            </Typography>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {pkg.type === "existing" ? (
-                            <Chip
-                              label="Already Validated"
-                              color="success"
-                              size="small"
-                              variant="outlined"
-                            />
-                          ) : (
-                            <Chip
-                              label="New"
-                              color="primary"
-                              size="small"
-                              variant="outlined"
-                            />
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+              <MaterialReactTable
+                columns={packageColumns}
+                data={selectedRequest.packages}
+                enableColumnFilters
+                enableGlobalFilter
+                enableSorting
+                enableColumnResizing
+                enablePagination={false}
+                enableTopToolbar={false}
+                enableBottomToolbar={false}
+                enableColumnFilterModes={false}
+                muiTableProps={{
+                  sx: {
+                    tableLayout: "fixed",
+                  },
+                }}
+                muiTableContainerProps={{
+                  sx: {
+                    maxHeight: "400px",
+                  },
+                }}
+                muiTableHeadProps={{
+                  sx: {
+                    position: "sticky",
+                    top: 0,
+                    zIndex: 1,
+                    backgroundColor: "background.paper",
+                  },
+                }}
+                initialState={{
+                  density: "compact",
+                  showColumnFilters: true,
+                  sorting: [
+                    { id: "name", desc: false },
+                    { id: "version", desc: false }
+                  ],
+                }}
+              />
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
+              <CircularProgress />
+              <Typography variant="body2" sx={{ ml: 2 }}>
+                Loading package details...
+              </Typography>
             </Box>
           )}
         </DialogContent>
@@ -515,17 +603,46 @@ function getRequestStatusColor(
   | "warning" {
   switch (status) {
     case "requested":
-      return "primary";
-    case "processing":
-      return "warning";
-    case "completed":
-      return "success";
-    case "failed":
-      return "error";
-    case "cancelled":
       return "default";
+    case "performing_licence_check":
+      return "warning";
+    case "licence_check_complete":
+      return "info";
+    case "performing_security_scan":
+      return "warning";
+    case "security_scan_complete":
+      return "info";
+    case "pending_approval":
+      return "warning";
+    case "approved":
+      return "success";
+    case "rejected":
+      return "error";
     default:
       return "default";
+  }
+}
+
+function getRequestStatusLabel(status: string): string {
+  switch (status) {
+    case "requested":
+      return "Requested";
+    case "performing_licence_check":
+      return "Checking Licenses";
+    case "licence_check_complete":
+      return "License Check Complete";
+    case "performing_security_scan":
+      return "Scanning Security";
+    case "security_scan_complete":
+      return "Security Scan Complete";
+    case "pending_approval":
+      return "Pending Approval";
+    case "approved":
+      return "Approved";
+    case "rejected":
+      return "Rejected";
+    default:
+      return status;
   }
 }
 
@@ -541,27 +658,46 @@ function getPackageStatusColor(
   | "warning" {
   switch (status) {
     case "requested":
-      return "primary";
-    case "downloading":
-      return "info";
-    case "downloaded":
-      return "info";
-    case "validating":
+      return "default";
+    case "performing_licence_check":
       return "warning";
-    case "validated":
-      return "success";
-    case "already_validated":
-      return "success";
-    case "failed":
-      return "error";
-    case "approved":
+    case "licence_check_complete":
       return "info";
-    case "published":
+    case "performing_security_scan":
+      return "warning";
+    case "security_scan_complete":
+      return "info";
+    case "pending_approval":
+      return "warning";
+    case "approved":
       return "success";
     case "rejected":
       return "error";
     default:
       return "default";
+  }
+}
+
+function getPackageStatusLabel(status: string): string {
+  switch (status) {
+    case "requested":
+      return "Requested";
+    case "performing_licence_check":
+      return "Checking License";
+    case "licence_check_complete":
+      return "License OK";
+    case "performing_security_scan":
+      return "Scanning";
+    case "security_scan_complete":
+      return "Scan Complete";
+    case "pending_approval":
+      return "Pending Approval";
+    case "approved":
+      return "Approved";
+    case "rejected":
+      return "Rejected";
+    default:
+      return status;
   }
 }
 

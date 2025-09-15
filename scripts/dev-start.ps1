@@ -14,12 +14,27 @@ docker volume rm secure_package_manager_npm_storage 2>$null
 
 # Start services with dev configuration
 Write-Host "🔄 Starting services..." -ForegroundColor Yellow
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
 
-Write-Host "✅ Development environment started!" -ForegroundColor Green
-Write-Host "🌐 Frontend: http://localhost:3000" -ForegroundColor Cyan
-Write-Host "🔧 API: http://localhost:5000" -ForegroundColor Cyan
-Write-Host "🗄️  Database: localhost:5432" -ForegroundColor Cyan
-Write-Host "🔍 Trivy: http://localhost:4954" -ForegroundColor Cyan
-Write-Host "🔐 Mock IDP: http://localhost:8081" -ForegroundColor Cyan
-Write-Host "📦 Mock NPM Registry: http://localhost:8080" -ForegroundColor Cyan
+# Wait for services to be healthy
+Write-Host "⏳ Waiting for services to be ready..." -ForegroundColor Yellow
+Start-Sleep -Seconds 10
+
+# Check if services are running
+Write-Host "🔍 Checking service status..." -ForegroundColor Yellow
+$services = docker-compose -f docker-compose.yml -f docker-compose.dev.yml ps --services
+$running = docker-compose -f docker-compose.yml -f docker-compose.dev.yml ps --services --filter "status=running"
+
+if ($services.Count -eq $running.Count) {
+    Write-Host "✅ Development environment started successfully!" -ForegroundColor Green
+    Write-Host "🌐 Frontend: http://localhost:3000" -ForegroundColor Cyan
+    Write-Host "🔧 API: http://localhost:5000" -ForegroundColor Cyan
+    Write-Host "🗄️  Database: localhost:5432" -ForegroundColor Cyan
+    Write-Host "🔍 Trivy: http://localhost:4954" -ForegroundColor Cyan
+    Write-Host "🔐 Mock IDP: http://localhost:8081" -ForegroundColor Cyan
+    Write-Host "📦 Mock NPM Registry: http://localhost:8080" -ForegroundColor Cyan
+} else {
+    Write-Host "❌ Some services failed to start. Check logs with:" -ForegroundColor Red
+    Write-Host "   docker-compose -f docker-compose.yml -f docker-compose.dev.yml logs" -ForegroundColor Yellow
+    exit 1
+}

@@ -9,4 +9,5 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml down
 
 echo "✅ Production environment stopped!"
 echo "💡 To start again, run: ./scripts/prod-start.sh"
+echo "💡 To completely reset (including database), run: ./scripts/prod-reset.sh"
 echo "⚠️  Note: Database data is preserved. Use 'docker-compose down -v' to remove volumes."

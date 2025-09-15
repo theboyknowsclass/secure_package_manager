@@ -8,8 +8,8 @@ import Login from "./pages/Login";
 import OAuthCallback from "./pages/OAuthCallback";
 import Dashboard from "./pages/Dashboard";
 import PackageUpload from "./pages/PackageUpload";
-import PackageRequests from "./pages/PackageRequests";
-import AdminDashboard from "./pages/AdminDashboard";
+import RequestStatus from "./pages/RequestStatus";
+import ApprovalDashboard from "./pages/ApprovalDashboard";
 import Settings from "./pages/Settings";
 import ConfigurationRequired from "./pages/ConfigurationRequired";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -72,15 +72,15 @@ function App() {
             path="/status"
             element={
               <ProtectedRoute>
-                <PackageRequests />
+                <RequestStatus />
               </ProtectedRoute>
             }
           />
           <Route
             path="/approve"
             element={
-              <ProtectedRoute requireApprover>
-                <AdminDashboard />
+              <ProtectedRoute>
+                <ApprovalDashboard />
               </ProtectedRoute>
             }
           />

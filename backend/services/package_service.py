@@ -170,7 +170,10 @@ class PackageService:
         """Filter packages to find new ones that need processing"""
         packages_to_process = []
         existing_packages = []
-
+        
+        # First, deduplicate packages by name+version within the same lock file
+        unique_packages = {}
+        
         for package_path, package_info in packages.items():
             if package_path == "":  # Skip root package
                 continue
@@ -184,7 +187,26 @@ class PackageService:
                 )
                 continue
 
-            # Check if package already exists
+            # Use name+version as the key to deduplicate
+            package_key = f"{package_name}@{package_version}"
+            
+            # Keep the first occurrence of each unique package
+            if package_key not in unique_packages:
+                unique_packages[package_key] = {
+                    'name': package_name,
+                    'version': package_version,
+                    'info': package_info
+                }
+
+        logger.info(f"Deduplicated {len(packages)} package entries to {len(unique_packages)} unique packages")
+
+        # Now process the deduplicated packages
+        for package_key, package_data in unique_packages.items():
+            package_name = package_data['name']
+            package_version = package_data['version']
+            package_info = package_data['info']
+
+            # Check if package already exists in database
             existing_package = Package.query.filter_by(
                 name=package_name,
                 version=package_version,
@@ -276,9 +298,34 @@ class PackageService:
                     ).count()
 
                     if failed_packages > 0:
-                        package_request.status = "validation_failed"
+                        package_request.status = "rejected"
                     else:
-                        package_request.status = "validated"
+                        # Check if all packages are pending approval
+                        pending_approval_packages = Package.query.filter_by(
+                            package_request_id=request_id, status="pending_approval"
+                        ).count()
+                        
+                        if pending_approval_packages == package_request.total_packages:
+                            package_request.status = "pending_approval"
+                        else:
+                            # Check if all packages have completed security scan
+                            completed_packages = Package.query.filter_by(
+                                package_request_id=request_id, status="security_scan_complete"
+                            ).count()
+                            
+                            if completed_packages == package_request.total_packages:
+                                package_request.status = "security_scan_complete"
+                            else:
+                                # Some packages are still processing
+                                processing_packages = Package.query.filter(
+                                    Package.package_request_id == request_id,
+                                    Package.status.in_(["performing_licence_check", "licence_check_complete", "performing_security_scan"])
+                                ).count()
+                                
+                                if processing_packages > 0:
+                                    package_request.status = "performing_security_scan"
+                                else:
+                                    package_request.status = "performing_licence_check"
 
                     db.session.commit()
 
@@ -294,18 +341,11 @@ class PackageService:
     def _download_and_validate_package(self, package):
         """Validate package information from package-lock.json"""
         try:
-            # Update status to validating
-            package.status = "validating"
+            # Step 1: Perform license check
+            package.status = "performing_licence_check"
             db.session.commit()
 
-            # For now, we'll validate based on the information in package-lock.json
-            # In production, you might want to:
-            # 1. Verify integrity hashes
-            # 2. Check against security databases
-            # 3. Validate license information
-            # 4. Check for known vulnerabilities
-
-            # Simulate validation process
+            # Validate package information (license check)
             if not self._validate_package_info(package):
                 package.status = "rejected"
                 package.validation_errors = ["Package validation failed"]
@@ -319,7 +359,14 @@ class PackageService:
                 db.session.commit()
                 return False
 
-            # Perform security scan with Trivy
+            # Step 2: License check complete
+            package.status = "licence_check_complete"
+            db.session.commit()
+
+            # Step 3: Perform security scan
+            package.status = "performing_security_scan"
+            db.session.commit()
+
             logger.info(
                 f"Starting security scan for package {package.name}@{package.version}"
             )
@@ -339,24 +386,24 @@ class PackageService:
                     f"Security scan completed for {package.name}@{package.version}: {scan_result.get('vulnerability_count', 0)} vulnerabilities found"
                 )
 
-            # Update status to validated
-            package.status = "validated"
+            # Step 4: Security scan complete - ready for manual approval
+            package.status = "pending_approval"
             package.security_score = self._calculate_security_score(package)
 
             # Update PackageRequest validated_packages count
             package_request = PackageRequest.query.get(package.package_request_id)
             if package_request:
-                # Count packages with status 'validated' for this request
-                validated_count = Package.query.filter_by(
-                    package_request_id=package.package_request_id, status="validated"
+                # Count packages with status 'pending_approval' for this request
+                completed_count = Package.query.filter_by(
+                    package_request_id=package.package_request_id, status="pending_approval"
                 ).count()
-                package_request.validated_packages = validated_count
+                package_request.validated_packages = completed_count
 
-                # Update request status based on validation progress
-                if validated_count == package_request.total_packages:
-                    package_request.status = "validated"
-                elif validated_count > 0:
-                    package_request.status = "validating"
+                # Update request status based on processing progress
+                if completed_count == package_request.total_packages:
+                    package_request.status = "pending_approval"
+                elif completed_count > 0:
+                    package_request.status = "performing_security_scan"
 
             db.session.commit()
 

@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS package_requests (
     application_id INTEGER REFERENCES applications(id),
     requestor_id INTEGER REFERENCES users(id),
     package_lock_file TEXT NOT NULL,
-    status VARCHAR(50) DEFAULT 'requested' CHECK (status IN ('requested', 'validating', 'validated', 'approved', 'published', 'rejected', 'validation_failed', 'partially_validated')),
+    status VARCHAR(50) DEFAULT 'requested',
     total_packages INTEGER DEFAULT 0,
     validated_packages INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -60,11 +60,11 @@ CREATE TABLE IF NOT EXISTS packages (
     checksum VARCHAR(255),
     license_identifier VARCHAR(100), -- SPDX license identifier from package.json
     license_text TEXT, -- Full license text if available
-    status VARCHAR(50) DEFAULT 'requested' CHECK (status IN ('requested', 'downloading', 'downloaded', 'validating', 'validated', 'approved', 'published', 'rejected', 'validation_failed', 'already_validated')),
+    status VARCHAR(50) DEFAULT 'requested',
     validation_errors TEXT[],
     security_score INTEGER CHECK (security_score >= 0 AND security_score <= 100),
     license_score INTEGER CHECK (license_score >= 0 AND license_score <= 100), -- License compliance score
-    security_scan_status VARCHAR(50) DEFAULT 'pending' CHECK (security_scan_status IN ('pending', 'scanning', 'completed', 'failed', 'skipped')),
+    security_scan_status VARCHAR(50) DEFAULT 'pending',
     vulnerability_count INTEGER DEFAULT 0,
     critical_vulnerabilities INTEGER DEFAULT 0,
     high_vulnerabilities INTEGER DEFAULT 0,
@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS package_references (
     version VARCHAR(100) NOT NULL,
     npm_url VARCHAR(500),
     integrity VARCHAR(255),
-    status VARCHAR(50) DEFAULT 'referenced' CHECK (status IN ('referenced', 'already_validated', 'needs_validation')),
+    status VARCHAR(50) DEFAULT 'referenced',
     existing_package_id INTEGER REFERENCES packages(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS package_validations (
     id SERIAL PRIMARY KEY,
     package_id INTEGER REFERENCES packages(id),
     validation_type VARCHAR(100) NOT NULL,
-    status VARCHAR(50) NOT NULL CHECK (status IN ('pending', 'passed', 'failed')),
+    status VARCHAR(50) NOT NULL,
     details TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -102,8 +102,8 @@ CREATE TABLE IF NOT EXISTS package_validations (
 CREATE TABLE IF NOT EXISTS security_scans (
     id SERIAL PRIMARY KEY,
     package_id INTEGER REFERENCES packages(id) ON DELETE CASCADE,
-    scan_type VARCHAR(50) NOT NULL DEFAULT 'trivy' CHECK (scan_type IN ('trivy', 'snyk', 'npm_audit')),
-    status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'completed', 'failed', 'skipped')),
+    scan_type VARCHAR(50) NOT NULL DEFAULT 'trivy',
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
     scan_result JSONB, -- Store the full Trivy scan result
     vulnerability_count INTEGER DEFAULT 0,
     critical_count INTEGER DEFAULT 0,

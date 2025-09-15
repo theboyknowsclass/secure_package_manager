@@ -21,6 +21,21 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml down
 Write-Host "🔄 Starting production services..." -ForegroundColor Yellow
 docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
-Write-Host "✅ Production environment started!" -ForegroundColor Green
-Write-Host "🔧 Services are running in detached mode" -ForegroundColor Cyan
-Write-Host "📊 Use 'docker-compose -f docker-compose.yml -f docker-compose.prod.yml logs -f' to view logs" -ForegroundColor Cyan
+# Wait for services to be healthy
+Write-Host "⏳ Waiting for services to be ready..." -ForegroundColor Yellow
+Start-Sleep -Seconds 15
+
+# Check if services are running
+Write-Host "🔍 Checking service status..." -ForegroundColor Yellow
+$services = docker-compose -f docker-compose.yml -f docker-compose.prod.yml ps --services
+$running = docker-compose -f docker-compose.yml -f docker-compose.prod.yml ps --services --filter "status=running"
+
+if ($services.Count -eq $running.Count) {
+    Write-Host "✅ Production environment started successfully!" -ForegroundColor Green
+    Write-Host "🔧 Services are running in detached mode" -ForegroundColor Cyan
+    Write-Host "📊 Use 'docker-compose -f docker-compose.yml -f docker-compose.prod.yml logs -f' to view logs" -ForegroundColor Cyan
+} else {
+    Write-Host "❌ Some services failed to start. Check logs with:" -ForegroundColor Red
+    Write-Host "   docker-compose -f docker-compose.yml -f docker-compose.prod.yml logs" -ForegroundColor Yellow
+    exit 1
+}

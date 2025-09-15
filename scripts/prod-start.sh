@@ -22,6 +22,21 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml down
 echo "🔄 Starting production services..."
 docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
-echo "✅ Production environment started!"
-echo "🔧 Services are running in detached mode"
-echo "📊 Use 'docker-compose -f docker-compose.yml -f docker-compose.prod.yml logs -f' to view logs"
+# Wait for services to be healthy
+echo "⏳ Waiting for services to be ready..."
+sleep 15
+
+# Check if services are running
+echo "🔍 Checking service status..."
+services=$(docker-compose -f docker-compose.yml -f docker-compose.prod.yml ps --services | wc -l)
+running=$(docker-compose -f docker-compose.yml -f docker-compose.prod.yml ps --services --filter "status=running" | wc -l)
+
+if [ "$services" -eq "$running" ]; then
+    echo "✅ Production environment started successfully!"
+    echo "🔧 Services are running in detached mode"
+    echo "📊 Use 'docker-compose -f docker-compose.yml -f docker-compose.prod.yml logs -f' to view logs"
+else
+    echo "❌ Some services failed to start. Check logs with:"
+    echo "   docker-compose -f docker-compose.yml -f docker-compose.prod.yml logs"
+    exit 1
+fi

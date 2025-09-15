@@ -23,8 +23,8 @@ def approve_package(package_id):
     try:
         package = Package.query.get_or_404(package_id)
 
-        if package.status != "validated":
-            return jsonify({"error": "Package must be validated before approval"}), 400
+        if package.status != "pending_approval":
+            return jsonify({"error": "Package must be pending approval before it can be approved"}), 400
 
         # Approve the package
         package.status = "approved"
@@ -58,6 +58,44 @@ def approve_package(package_id):
 
     except Exception as e:
         logger.error(f"Approve package error: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@admin_bp.route("/packages/reject/<int:package_id>", methods=["POST"])
+@auth_service.require_admin
+def reject_package(package_id):
+    """Reject a package"""
+    try:
+        package = Package.query.get_or_404(package_id)
+
+        if package.status in ["approved", "published"]:
+            return jsonify({"error": "Cannot reject an already approved or published package"}), 400
+
+        # Get rejection reason from request body
+        data = request.get_json() or {}
+        rejection_reason = data.get("reason", "Package rejected by administrator")
+
+        # Reject the package
+        package.status = "rejected"
+        package.validation_errors = package.validation_errors or []
+        package.validation_errors.append(f"Rejected: {rejection_reason}")
+        db.session.commit()
+
+        # Log the rejection
+        audit_log = AuditLog(
+            user_id=request.user.id,
+            action="reject_package",
+            resource_type="package",
+            resource_id=package.id,
+            details=f"Package {package.name}@{package.version} rejected: {rejection_reason}",
+        )
+        db.session.add(audit_log)
+        db.session.commit()
+
+        return jsonify({"message": "Package rejected successfully"})
+
+    except Exception as e:
+        logger.error(f"Reject package error: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -101,9 +139,9 @@ def publish_package(package_id):
 @admin_bp.route("/packages/validated", methods=["GET"])
 @auth_service.require_admin
 def get_validated_packages():
-    """Get all validated packages for admin review"""
+    """Get all packages ready for admin review (pending approval)"""
     try:
-        packages = Package.query.filter_by(status="validated").all()
+        packages = Package.query.filter_by(status="pending_approval").all()
 
         # Handle case when no packages exist
         if not packages:

@@ -10,13 +10,16 @@ import {
   CircularProgress,
   Card,
   CardContent,
+  LinearProgress,
+  Link,
 } from "@mui/material";
-import { CloudUpload } from "@mui/icons-material";
+import { CloudUpload, CheckCircle, Visibility } from "@mui/icons-material";
 import { api, endpoints } from "../services/api";
 
 export default function PackageUpload() {
   const navigate = useNavigate();
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadResult, setUploadResult] = useState<any>(null);
   const [error, setError] = useState("");
   const [errorDetails, setErrorDetails] = useState("");
@@ -31,6 +34,7 @@ export default function PackageUpload() {
     }
 
     setUploading(true);
+    setUploadProgress(0);
     setError("");
     setUploadResult(null);
 
@@ -42,14 +46,22 @@ export default function PackageUpload() {
         headers: {
           "Content-Type": "multipart/form-data",
         },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadProgress(progress);
+          }
+        },
       });
 
+      // Set progress to 100% when upload completes
+      setUploadProgress(100);
       setUploadResult(response.data);
 
       // Auto-redirect to status page after successful upload
       setTimeout(() => {
         navigate("/status");
-      }, 1500); // 1.5 second delay to show success message
+      }, 2000); // 2 second delay to show success message
     } catch (err: any) {
       const errorData = err.response?.data;
       setError(errorData?.error || "Upload failed. Please try again.");
@@ -126,22 +138,57 @@ export default function PackageUpload() {
         </Alert>
       )}
 
-      {uploading && (
-        <Box display="flex" alignItems="center" justifyContent="center" mt={2}>
-          <CircularProgress size={20} sx={{ mr: 1 }} />
-          <Typography>Uploading and processing package...</Typography>
+      {uploading && uploadProgress < 100 && (
+        <Box mt={2}>
+          <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+            <Typography variant="body2" color="textSecondary">
+              Uploading package-lock.json...
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              {uploadProgress}%
+            </Typography>
+          </Box>
+          <LinearProgress 
+            variant="determinate" 
+            value={uploadProgress}
+            sx={{ height: 8, borderRadius: 4 }}
+          />
         </Box>
+      )}
+
+      {uploading && uploadProgress === 100 && (
+        <Alert 
+          severity="success" 
+          sx={{ mt: 2 }}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              startIcon={<Visibility />}
+              onClick={() => navigate("/status")}
+            >
+              View Status
+            </Button>
+          }
+        >
+          <Typography variant="body2">
+            Package uploaded successfully!
+          </Typography>
+        </Alert>
       )}
 
       {uploadResult && (
         <Card sx={{ mt: 2 }}>
           <CardContent>
-            <Typography variant="h6" color="success.main" gutterBottom>
-              Upload Successful!
-            </Typography>
+            <Box display="flex" alignItems="center" mb={2}>
+              <CheckCircle sx={{ color: "success.main", mr: 1 }} />
+              <Typography variant="h6" color="success.main">
+                Package uploaded successfully!
+              </Typography>
+            </Box>
 
             <Typography variant="body2" paragraph>
-              <strong>Request ID:</strong> {uploadResult.request_id}
+              <strong>ID:</strong> {uploadResult.request_id}
             </Typography>
 
             <Typography variant="body2" paragraph>

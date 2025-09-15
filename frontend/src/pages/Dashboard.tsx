@@ -159,7 +159,7 @@ export default function Dashboard() {
                 </Box>
 
                 <Typography variant="body2" color="textSecondary" gutterBottom>
-                  Request ID: {request.id}
+                  ID: {request.id}
                 </Typography>
 
                 <Typography variant="body2" color="textSecondary">
