@@ -6,10 +6,8 @@ version: '3.8'
 services:
   # Override database for development
   db:
-    environment:
-      - POSTGRES_DB=secure_package_manager_dev
     volumes:
-      # Use dev-specific init script
+      # Use dev-specific init script (in addition to base init.sql)
       - ./database/init-dev.sql:/docker-entrypoint-initdb.d/01-init-dev.sql:ro
     ports:
       # Expose database port for direct access
@@ -20,11 +18,19 @@ services:
     environment:
       - FLASK_ENV=development
       - FLASK_DEBUG=1
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/secure_package_manager_dev
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/secure_package_manager
       - LOG_LEVEL=DEBUG
+      # Required environment variables
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-dev-secret-key-change-in-production}
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
+      - MOCK_IDP_SECRET_KEY=${MOCK_IDP_SECRET_KEY:-mock-idp-secret-key}
+      - OAUTH_AUDIENCE=${OAUTH_AUDIENCE:-secure-package-manager}
+      - OAUTH_ISSUER=${OAUTH_ISSUER:-http://localhost:8081}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - SECURE_REPO_URL=http://mock-npm-registry:8080
       # Use mock services for development
-      - ADFS_ENTITY_ID=http://localhost:3000
-      - ADFS_SSO_URL=http://localhost:8081/sso
+      - ADFS_ENTITY_ID=${ADFS_ENTITY_ID:-http://localhost:3000}
+      - ADFS_SSO_URL=${ADFS_SSO_URL:-http://localhost:8081/sso}
     volumes:
       # Mount source code for hot reloading
       - ./backend:/app
@@ -36,9 +42,9 @@ services:
   frontend:
     environment:
       - NODE_ENV=development
-      - VITE_API_URL=http://localhost:5000
-      - VITE_ADFS_ENTITY_ID=http://localhost:3000
-      - VITE_ADFS_SSO_URL=http://localhost:8081/sso
+      - VITE_API_URL=${FRONTEND_API_URL:-http://localhost:5000}
+      - VITE_ADFS_ENTITY_ID=${ADFS_ENTITY_ID:-http://localhost:3000}
+      - VITE_ADFS_SSO_URL=${ADFS_SSO_URL:-http://localhost:8081/sso}
     volumes:
       # Mount source code for hot reloading
       - ./frontend:/app
@@ -53,8 +59,13 @@ services:
       context: ./mock-idp
       dockerfile: Dockerfile
     environment:
-      - IDP_ENTITY_ID=http://localhost:3000
-      - IDP_SSO_URL=http://localhost:8081/sso
+      - IDP_ENTITY_ID=${ADFS_ENTITY_ID:-http://localhost:3000}
+      - IDP_SSO_URL=${ADFS_SSO_URL:-http://localhost:8081/sso}
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
+      - MOCK_IDP_SECRET_KEY=${MOCK_IDP_SECRET_KEY:-mock-idp-secret-key}
+      - OAUTH_AUDIENCE=${OAUTH_AUDIENCE:-secure-package-manager}
+      - OAUTH_ISSUER=${OAUTH_ISSUER:-http://localhost:8081}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
     ports:
       - "8081:8081"
     networks:

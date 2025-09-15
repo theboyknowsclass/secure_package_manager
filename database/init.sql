@@ -154,36 +154,6 @@ CREATE INDEX IF NOT EXISTS idx_security_scans_scan_type ON security_scans(scan_t
 CREATE INDEX IF NOT EXISTS idx_security_scans_created_at ON security_scans(created_at);
 CREATE INDEX IF NOT EXISTS idx_packages_security_scan_status ON packages(security_scan_status);
 
--- Insert default admin user
-INSERT INTO users (username, email, full_name, role) 
-VALUES ('admin', 'admin@example.com', 'System Administrator', 'admin')
-ON CONFLICT (username) DO NOTHING;
-
--- Insert default supported licenses with 4-tier status system
-INSERT INTO supported_licenses (name, identifier, status, created_by) VALUES
--- Always Acceptable (highest priority, no restrictions)
-('MIT License', 'MIT', 'always_allowed', 1),
-('BSD License', 'BSD', 'always_allowed', 1),
-('Apache License 2.0', 'Apache-2.0', 'always_allowed', 1),
-
--- Acceptable (standard approval, may have minor restrictions)
-('GNU Lesser General Public License', 'LGPL', 'allowed', 1),
-('Mozilla Public License', 'MPL', 'allowed', 1),
-
--- Avoid (discouraged but not blocked, may have significant restrictions)
-('Do What The F*ck You Want To Public License', 'WTFPL', 'avoid', 1),
-
--- Blocked (explicitly prohibited)
-('GNU General Public License', 'GPL', 'blocked', 1),
-('GNU General Public License v2.0', 'GPL-2.0', 'blocked', 1),
-('GNU Affero General Public License', 'AGPL', 'blocked', 1)
-ON CONFLICT (identifier) DO NOTHING;
-
--- Insert default repository configuration
-INSERT INTO repository_config (config_key, config_value, description) VALUES
-('source_repository_url', 'https://registry.npmjs.org/', 'Source repository URL for package downloads'),
-('target_repository_url', 'http://localhost:8080/', 'Target repository URL for package publishing')
-ON CONFLICT (config_key) DO NOTHING;
 
 -- Create function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -194,11 +164,34 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Create triggers for updated_at
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_applications_updated_at BEFORE UPDATE ON applications FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_supported_licenses_updated_at BEFORE UPDATE ON supported_licenses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_package_requests_updated_at BEFORE UPDATE ON package_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_packages_updated_at BEFORE UPDATE ON packages FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_repository_config_updated_at BEFORE UPDATE ON repository_config FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_security_scans_updated_at BEFORE UPDATE ON security_scans FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Create triggers for updated_at (only if they don't exist)
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_users_updated_at') THEN
+        CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_applications_updated_at') THEN
+        CREATE TRIGGER update_applications_updated_at BEFORE UPDATE ON applications FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_supported_licenses_updated_at') THEN
+        CREATE TRIGGER update_supported_licenses_updated_at BEFORE UPDATE ON supported_licenses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_package_requests_updated_at') THEN
+        CREATE TRIGGER update_package_requests_updated_at BEFORE UPDATE ON package_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_packages_updated_at') THEN
+        CREATE TRIGGER update_packages_updated_at BEFORE UPDATE ON packages FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_repository_config_updated_at') THEN
+        CREATE TRIGGER update_repository_config_updated_at BEFORE UPDATE ON repository_config FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_security_scans_updated_at') THEN
+        CREATE TRIGGER update_security_scans_updated_at BEFORE UPDATE ON security_scans FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+END $$;

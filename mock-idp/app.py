@@ -9,7 +9,10 @@ import time
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
-app.secret_key = 'mock-idp-secret-key'
+app.secret_key = os.getenv('MOCK_IDP_SECRET_KEY', 'mock-idp-secret-key')
+
+# Get JWT secret from environment variable
+JWT_SECRET = os.getenv('JWT_SECRET', 'dev-secret-key-change-in-production')
 
 # Mock AD group to role mapping
 AD_GROUP_ROLE_MAPPING = {
@@ -154,7 +157,7 @@ def authorize():
             
             # Redirect back to client with authorization code
             oauth_params = session.get('oauth_params', {})
-            redirect_uri = oauth_params.get('redirect_uri', 'http://localhost:3000')
+            redirect_uri = oauth_params.get('redirect_uri', os.getenv('FRONTEND_URL', 'http://localhost:3000'))
             state = oauth_params.get('state', '')
             
             params = {
@@ -223,7 +226,7 @@ def token():
         'ad_groups': user['ad_groups']
     }
     
-    secret_key = 'mock-jwt-secret'
+    secret_key = JWT_SECRET
     access_token = jwt.encode(access_token_payload, secret_key, algorithm='HS256')
     id_token = jwt.encode(id_token_payload, secret_key, algorithm='HS256')
     
@@ -263,10 +266,10 @@ def userinfo():
         # Decode token with audience validation
         payload = jwt.decode(
             token, 
-            'mock-jwt-secret', 
+            JWT_SECRET, 
             algorithms=['HS256'],
-            audience='secure-package-manager',  # Validate audience
-            issuer='http://localhost:8081'      # Validate issuer
+            audience=os.getenv('OAUTH_AUDIENCE', 'secure-package-manager'),  # Validate audience
+            issuer=os.getenv('OAUTH_ISSUER', 'http://localhost:8081')      # Validate issuer
         )
         print(f"Token decoded successfully: {payload}", flush=True)
         return jsonify({
@@ -292,7 +295,7 @@ def jwks():
             {
                 'kty': 'oct',
                 'kid': 'mock-key-1',
-                'k': base64.urlsafe_b64encode('mock-jwt-secret'.encode()).decode().rstrip('=')
+                'k': base64.urlsafe_b64encode(JWT_SECRET.encode()).decode().rstrip('=')
             }
         ]
     })
