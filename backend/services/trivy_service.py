@@ -1,11 +1,11 @@
 import json
 import logging
-import os
 import subprocess
 import tempfile
 from typing import Dict, Optional
 
 import requests
+from config.constants import NPM_PROXY_URL, TRIVY_MAX_RETRIES, TRIVY_TIMEOUT, TRIVY_URL
 from models import Package, SecurityScan, db
 
 logger = logging.getLogger(__name__)
@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 
 class TrivyService:
     def __init__(self):
-        self.trivy_url = os.getenv("TRIVY_URL", "http://trivy:4954")
-        self.timeout = int(os.getenv("TRIVY_TIMEOUT", "300"))  # 5 minutes default
-        self.max_retries = int(os.getenv("TRIVY_MAX_RETRIES", "3"))
+        self.trivy_url = TRIVY_URL
+        self.timeout = TRIVY_TIMEOUT
+        self.max_retries = TRIVY_MAX_RETRIES
 
     def scan_package(self, package: Package) -> Dict:
         """
@@ -85,7 +85,7 @@ class TrivyService:
             )
 
             # Try to download the actual package from NPM registry
-            npm_proxy_url = os.getenv("NPM_PROXY_URL", "https://registry.npmjs.org")
+            npm_proxy_url = NPM_PROXY_URL
 
             try:
                 # Get package metadata from NPM

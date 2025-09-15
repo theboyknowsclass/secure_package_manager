@@ -1,18 +1,16 @@
 from flask import Flask, request, jsonify, redirect, session, url_for
 from flask_cors import CORS
-import os
 import jwt
 import secrets
 import base64
 from urllib.parse import urlencode, parse_qs
 import time
 
+from constants import JWT_SECRET, IDP_SECRET_KEY, OAUTH_AUDIENCE, OAUTH_ISSUER, FRONTEND_URL
+
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
-app.secret_key = os.getenv('MOCK_IDP_SECRET_KEY', 'mock-idp-secret-key')
-
-# Get JWT secret from environment variable
-JWT_SECRET = os.getenv('JWT_SECRET', 'dev-secret-key-change-in-production')
+app.secret_key = IDP_SECRET_KEY
 
 # Mock AD group to role mapping
 AD_GROUP_ROLE_MAPPING = {
@@ -157,7 +155,7 @@ def authorize():
             
             # Redirect back to client with authorization code
             oauth_params = session.get('oauth_params', {})
-            redirect_uri = oauth_params.get('redirect_uri', os.getenv('FRONTEND_URL', 'http://localhost:3000'))
+            redirect_uri = oauth_params.get('redirect_uri', FRONTEND_URL)
             state = oauth_params.get('state', '')
             
             params = {
@@ -268,8 +266,8 @@ def userinfo():
             token, 
             JWT_SECRET, 
             algorithms=['HS256'],
-            audience=os.getenv('OAUTH_AUDIENCE', 'secure-package-manager'),  # Validate audience
-            issuer=os.getenv('OAUTH_ISSUER', 'http://localhost:8081')      # Validate issuer
+            audience=OAUTH_AUDIENCE,  # Validate audience
+            issuer=OAUTH_ISSUER      # Validate issuer
         )
         print(f"Token decoded successfully: {payload}", flush=True)
         return jsonify({

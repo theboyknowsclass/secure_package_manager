@@ -1,7 +1,14 @@
 import logging
-import os
 from datetime import datetime
 
+# Import centralized configuration
+from config.constants import (
+    DATABASE_URL,
+    FLASK_SECRET_KEY,
+    MAX_CONTENT_LENGTH,
+    SQLALCHEMY_TRACK_MODIFICATIONS,
+    validate_all_required_env,
+)
 from dotenv import load_dotenv
 from flask import Flask, jsonify
 from flask_cors import CORS
@@ -9,11 +16,14 @@ from flask_cors import CORS
 # Load environment variables
 load_dotenv()
 
+# Validate all required environment variables
+validate_all_required_env()
+
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max file size
+app.config["SECRET_KEY"] = FLASK_SECRET_KEY
+app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = SQLALCHEMY_TRACK_MODIFICATIONS
+app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 
 # Initialize extensions
 CORS(app)

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { handleUnauthorized } from '../utils/auth'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
@@ -29,12 +30,8 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid, redirect to login
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('id_token')
-      localStorage.removeItem('user')
-      localStorage.removeItem('token')
-      window.location.href = '/login'
+      // Token expired or invalid - clear all auth storage and redirect
+      handleUnauthorized()
     }
     return Promise.reject(error)
   }

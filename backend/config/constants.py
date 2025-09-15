@@ -77,14 +77,12 @@ FRONTEND_APP_NAME = get_required_env("FRONTEND_APP_NAME", "Frontend application 
 # =============================================================================
 
 # Ports
-FRONTEND_PORT = int(get_required_env("FRONTEND_PORT", "Frontend port") or "3000")
-API_PORT = int(get_required_env("API_PORT", "API port") or "5000")
-DATABASE_PORT = int(get_required_env("DATABASE_PORT", "Database port") or "5432")
-MOCK_IDP_PORT = int(get_required_env("MOCK_IDP_PORT", "Mock IDP port") or "8081")
-MOCK_NPM_REGISTRY_PORT = int(
-    get_required_env("MOCK_NPM_REGISTRY_PORT", "Mock NPM registry port") or "8080"
-)
-TRIVY_PORT = int(get_required_env("TRIVY_PORT", "Trivy port") or "4954")
+FRONTEND_PORT = int(get_required_env("FRONTEND_PORT", "Frontend port"))
+API_PORT = int(get_required_env("API_PORT", "API port"))
+DATABASE_PORT = int(get_required_env("DATABASE_PORT", "Database port"))
+IDP_PORT = int(get_required_env("IDP_PORT", "Identity Provider port"))
+NPM_REGISTRY_PORT = int(get_required_env("NPM_REGISTRY_PORT", "NPM registry port"))
+TRIVY_PORT = int(get_required_env("TRIVY_PORT", "Trivy port"))
 
 # Hosts
 LOCALHOST = get_required_env("LOCALHOST", "Localhost address") or "localhost"
@@ -94,9 +92,11 @@ DOCKER_HOST = get_required_env("DOCKER_HOST", "Docker host address") or "localho
 FRONTEND_URL = f"http://{LOCALHOST}:{FRONTEND_PORT}"
 API_URL = f"http://{LOCALHOST}:{API_PORT}"
 DATABASE_URL = get_required_env("DATABASE_URL", "Database connection URL")
-MOCK_IDP_URL = f"http://{LOCALHOST}:{MOCK_IDP_PORT}"
-MOCK_NPM_REGISTRY_URL = f"http://{LOCALHOST}:{MOCK_NPM_REGISTRY_PORT}"
+IDP_URL = f"http://{LOCALHOST}:{IDP_PORT}"
+NPM_REGISTRY_URL = f"http://{LOCALHOST}:{NPM_REGISTRY_PORT}"
 TRIVY_URL = get_required_env("TRIVY_URL", "Trivy service URL")
+SECURE_REPO_URL = get_required_env("SECURE_REPO_URL", "Secure repository URL")
+NPM_PROXY_URL = get_optional_env("NPM_PROXY_URL", "https://registry.npmjs.org")
 
 # =============================================================================
 # SECURITY CONFIGURATION
@@ -105,11 +105,33 @@ TRIVY_URL = get_required_env("TRIVY_URL", "Trivy service URL")
 # JWT Configuration
 JWT_SECRET = get_required_env("JWT_SECRET", "JWT signing secret")
 FLASK_SECRET_KEY = get_required_env("FLASK_SECRET_KEY", "Flask secret key")
-MOCK_IDP_SECRET_KEY = get_required_env("MOCK_IDP_SECRET_KEY", "Mock IDP secret key")
+IDP_SECRET_KEY = get_required_env("IDP_SECRET_KEY", "Identity Provider secret key")
 
 # OAuth Configuration
 OAUTH_AUDIENCE = get_required_env("OAUTH_AUDIENCE", "OAuth audience")
 OAUTH_ISSUER = get_required_env("OAUTH_ISSUER", "OAuth issuer URL")
+
+# =============================================================================
+# FLASK CONFIGURATION
+# =============================================================================
+
+# Flask App Configuration
+FLASK_ENV = get_optional_env("FLASK_ENV", "development")
+FLASK_DEBUG = get_optional_env(
+    "FLASK_DEBUG", "1" if FLASK_ENV == "development" else "0"
+)
+MAX_CONTENT_LENGTH = int(
+    get_optional_env("MAX_CONTENT_LENGTH", "16777216")
+)  # 16MB default
+SQLALCHEMY_TRACK_MODIFICATIONS = False  # Disable for performance
+
+# =============================================================================
+# TRIVY CONFIGURATION
+# =============================================================================
+
+# Trivy Service Configuration
+TRIVY_TIMEOUT = int(get_optional_env("TRIVY_TIMEOUT", "300"))  # 5 minutes default
+TRIVY_MAX_RETRIES = int(get_optional_env("TRIVY_MAX_RETRIES", "3"))
 
 # =============================================================================
 # DATABASE CONFIGURATION
@@ -125,8 +147,8 @@ INTERNAL_API_URL = f"http://api:{API_PORT}"
 INTERNAL_DATABASE_URL = (
     f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@db:{DATABASE_PORT}/{POSTGRES_DB}"
 )
-INTERNAL_MOCK_IDP_URL = f"http://mock-idp:{MOCK_IDP_PORT}"
-INTERNAL_MOCK_NPM_REGISTRY_URL = f"http://mock-npm-registry:{MOCK_NPM_REGISTRY_PORT}"
+INTERNAL_IDP_URL = f"http://idp:{IDP_PORT}"
+INTERNAL_NPM_REGISTRY_URL = f"http://npm-registry:{NPM_REGISTRY_PORT}"
 INTERNAL_TRIVY_URL = f"http://trivy:{TRIVY_PORT}"
 
 # =============================================================================

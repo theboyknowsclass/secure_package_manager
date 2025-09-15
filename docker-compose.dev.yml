@@ -20,14 +20,38 @@ services:
       - FLASK_DEBUG=1
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/secure_package_manager
       - LOG_LEVEL=DEBUG
+      # Application configuration
+      - APP_NAME=secure-package-manager
+      - FRONTEND_APP_NAME=secure-package-manager-frontend
+      # Network configuration
+      - FRONTEND_PORT=3000
+      - API_PORT=5000
+      - DATABASE_PORT=5432
+      - IDP_PORT=8081
+      - NPM_REGISTRY_PORT=8080
+      - TRIVY_PORT=4954
+      - LOCALHOST=localhost
+      - DOCKER_HOST=localhost
       # Required environment variables
       - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-dev-secret-key-change-in-production}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
-      - MOCK_IDP_SECRET_KEY=${MOCK_IDP_SECRET_KEY:-mock-idp-secret-key}
+      - IDP_SECRET_KEY=${IDP_SECRET_KEY:-idp-secret-key}
       - OAUTH_AUDIENCE=${OAUTH_AUDIENCE:-secure-package-manager}
       - OAUTH_ISSUER=${OAUTH_ISSUER:-http://localhost:8081}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       - SECURE_REPO_URL=http://mock-npm-registry:8080
+      - TRIVY_URL=${TRIVY_URL:-http://trivy:4954}
+      - NPM_PROXY_URL=${NPM_PROXY_URL:-https://registry.npmjs.org}
+      - TRIVY_TIMEOUT=${TRIVY_TIMEOUT:-300}
+      - TRIVY_MAX_RETRIES=${TRIVY_MAX_RETRIES:-3}
+      # Database configuration
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=secure_package_manager
+      # Default admin users (development only)
+      - DEFAULT_ADMIN_USERNAME=admin
+      - DEFAULT_ADMIN_PASSWORD=admin
+      - DEFAULT_ADMIN_EMAIL=admin@company.com
       # Use mock services for development
       - ADFS_ENTITY_ID=${ADFS_ENTITY_ID:-http://localhost:3000}
       - ADFS_SSO_URL=${ADFS_SSO_URL:-http://localhost:8081/sso}
@@ -62,7 +86,7 @@ services:
       - IDP_ENTITY_ID=${ADFS_ENTITY_ID:-http://localhost:3000}
       - IDP_SSO_URL=${ADFS_SSO_URL:-http://localhost:8081/sso}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
-      - MOCK_IDP_SECRET_KEY=${MOCK_IDP_SECRET_KEY:-mock-idp-secret-key}
+      - IDP_SECRET_KEY=${IDP_SECRET_KEY:-idp-secret-key}
       - OAUTH_AUDIENCE=${OAUTH_AUDIENCE:-secure-package-manager}
       - OAUTH_ISSUER=${OAUTH_ISSUER:-http://localhost:8081}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}

@@ -4,6 +4,7 @@ import os
 import subprocess
 import tempfile
 
+from config.constants import SECURE_REPO_URL
 from models import (
     Package,
     PackageRequest,
@@ -44,11 +45,9 @@ class PackageService:
 
             # Set secure_repo_url based on target_repo_url or environment
             if self._config_cache["target_repo_url"]:
-                self._config_cache["secure_repo_url"] = os.getenv(
-                    "SECURE_REPO_URL", self._config_cache["target_repo_url"]
-                )
+                self._config_cache["secure_repo_url"] = SECURE_REPO_URL
             else:
-                self._config_cache["secure_repo_url"] = os.getenv("SECURE_REPO_URL")
+                self._config_cache["secure_repo_url"] = SECURE_REPO_URL
 
             self._config_loaded = True
 
@@ -73,7 +72,7 @@ class PackageService:
             self._config_cache = {
                 "source_repo_url": None,
                 "target_repo_url": None,
-                "secure_repo_url": os.getenv("SECURE_REPO_URL"),
+                "secure_repo_url": SECURE_REPO_URL,
             }
             self._config_loaded = True
 
@@ -528,7 +527,7 @@ class PackageService:
 
             # Get the target repository URL
             self._load_config()
-            target_url = self.target_repo_url or os.getenv("SECURE_REPO_URL")
+            target_url = self.target_repo_url or SECURE_REPO_URL
             if not target_url:
                 raise ValueError("SECURE_REPO_URL environment variable is required")
 

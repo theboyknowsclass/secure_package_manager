@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { api } from '../services/api';
+import { clearAuthStorage } from '../utils/auth';
 
 export interface User {
   sub: string;
@@ -77,6 +78,9 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: false, 
           loading: false 
         });
+        
+        // Clear all authentication storage
+        clearAuthStorage();
         
         // Clear API headers
         delete api.defaults.headers.common["Authorization"];

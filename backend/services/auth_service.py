@@ -1,16 +1,14 @@
-import os
 from functools import wraps
 
 import jwt
+from config.constants import JWT_SECRET, OAUTH_AUDIENCE, OAUTH_ISSUER
 from flask import jsonify, request
 from models import User, db
 
 
 class AuthService:
     def __init__(self):
-        self.secret_key = os.getenv("FLASK_SECRET_KEY")
-        if not self.secret_key:
-            raise ValueError("FLASK_SECRET_KEY environment variable is required")
+        self.secret_key = JWT_SECRET
 
     def generate_token(self, user):
         """Generate JWT token for user"""
@@ -19,10 +17,8 @@ class AuthService:
             "username": user.username,
             "role": user.role,
             "sub": user.username,  # OAuth2 subject
-            "aud": os.getenv(
-                "OAUTH_AUDIENCE", "secure-package-manager"
-            ),  # OAuth2 audience
-            "iss": os.getenv("OAUTH_ISSUER", "http://localhost:8081"),  # OAuth2 issuer
+            "aud": OAUTH_AUDIENCE,  # OAuth2 audience
+            "iss": OAUTH_ISSUER,  # OAuth2 issuer
         }
         return jwt.encode(payload, self.secret_key, algorithm="HS256")
 
@@ -71,8 +67,8 @@ class AuthService:
             token,
             self.secret_key,
             algorithms=["HS256"],
-            audience=os.getenv("OAUTH_AUDIENCE", "secure-package-manager"),
-            issuer=os.getenv("OAUTH_ISSUER", "http://localhost:8081"),
+            audience=OAUTH_AUDIENCE,
+            issuer=OAUTH_ISSUER,
         )
         logger.info(f"Token decoded successfully. Payload: {payload}")
         return payload
