@@ -10,7 +10,6 @@ import {
 } from "@mui/material";
 import { useAuth } from "../hooks/useAuth";
 import { oauthService } from "../services/oauth";
-import { clearAuthStorage } from "../utils/auth";
 
 export default function Login() {
   const [error, setError] = useState("");
@@ -91,37 +90,10 @@ export default function Login() {
             >
               Sign In with Enterprise ID
             </Button>
-            
-            {/* Development utility button */}
-            {import.meta.env.DEV && (
-              <Button
-                fullWidth
-                variant="outlined"
-                size="small"
-                onClick={() => {
-                  clearAuthStorage();
-                  setError("");
-                  alert("Authentication storage cleared! You can now log in fresh.");
-                }}
-                sx={{ mt: 1, mb: 2, py: 1 }}
-                color="warning"
-              >
-                🧹 Clear Auth Storage (Dev)
-              </Button>
-            )}
           </Box>
 
           <Typography variant="body2" color="textSecondary" sx={{ mt: 2, textAlign: 'center' }}>
             This will redirect you to your organization's identity provider for secure authentication.
-            <br />
-            <br />
-            <strong>Demo users available:</strong>
-            <br />
-            • Admin (admin/admin)
-            <br />
-            • Approver (approver/approver)  
-            <br />
-            • User (user/user)
           </Typography>
         </Paper>
       </Box>
