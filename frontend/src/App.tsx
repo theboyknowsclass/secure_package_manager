@@ -8,7 +8,7 @@ import Login from "./pages/Login";
 import OAuthCallback from "./pages/OAuthCallback";
 import Dashboard from "./pages/Dashboard";
 import PackageUpload from "./pages/PackageUpload";
-import RequestStatus from "./pages/RequestStatus";
+import { RequestStatusDashboard } from "./components/pages";
 import ApprovalDashboard from "./pages/ApprovalDashboard";
 import Settings from "./pages/Settings";
 import ConfigurationRequired from "./pages/ConfigurationRequired";
@@ -69,7 +69,7 @@ function App() {
             path="/status"
             element={
               <ProtectedRoute>
-                <RequestStatus />
+                <RequestStatusDashboard />
               </ProtectedRoute>
             }
           />

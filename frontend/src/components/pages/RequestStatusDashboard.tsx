@@ -2,14 +2,12 @@ import React, { useMemo, useState } from "react";
 import { Box, Typography, Alert, IconButton } from "@mui/material";
 import { MaterialReactTable, type MRT_ColumnDef } from "material-react-table";
 import { Visibility, Download } from "@mui/icons-material";
-import { usePackageRequests } from "../services/api/packageService";
-import { type PackageRequest, type DetailedRequestResponse } from "../types";
-import { LoadingSpinner, PackageStatusChip } from "../components/atoms";
-import RequestDetailDialog from "../components/RequestDetailDialog";
+import { usePackageRequests } from "../../services/api/packageService";
+import { type PackageRequest } from "../../types";
+import { LoadingSpinner, PackageStatusChip } from "../atoms";
+import { RequestDetailDialog } from "../organisms";
 
-export default function RequestStatus() {
-  const [selectedRequest, setSelectedRequest] =
-    useState<DetailedRequestResponse | null>(null);
+export default function RequestStatusDashboard() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(
     null
@@ -34,11 +32,6 @@ export default function RequestStatus() {
   const handleCloseDetails = () => {
     setDetailsOpen(false);
     setSelectedRequestId(null);
-    setSelectedRequest(null);
-  };
-
-  const handleRequestLoaded = (request: DetailedRequestResponse) => {
-    setSelectedRequest(request);
   };
 
   // Transform data for the table - now showing requests instead of individual packages
@@ -266,8 +259,7 @@ export default function RequestStatus() {
         open={detailsOpen}
         onClose={handleCloseDetails}
         requestId={selectedRequestId}
-        selectedRequest={selectedRequest}
-        onRequestLoaded={handleRequestLoaded}
+        refetchInterval={5000}
       />
     </Box>
   );

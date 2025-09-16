@@ -174,6 +174,7 @@ class TrivyService:
             try:
                 import subprocess
                 import json
+                import time
                 
                 # Run Trivy filesystem scan
                 cmd = [
@@ -190,14 +191,20 @@ class TrivyService:
 
                 logger.info(f"Running Trivy command: {' '.join(cmd)}")
 
+                # Record start time for duration calculation
+                start_time = time.time()
+                
                 result = subprocess.run(
                     cmd, capture_output=True, text=True, timeout=self.timeout
                 )
+                
+                # Calculate scan duration
+                scan_duration_ms = int((time.time() - start_time) * 1000)
 
                 if result.returncode == 0:
                     scan_result = json.loads(result.stdout)
                     logger.info(f"Trivy scan completed successfully for {package.name}")
-                    return self._format_trivy_result(scan_result, package)
+                    return self._format_trivy_result(scan_result, package, scan_duration_ms)
                 else:
                     logger.error(
                         f"Trivy scan failed with return code {result.returncode}: {result.stderr}"
@@ -219,18 +226,22 @@ class TrivyService:
             return None
 
 
-    def _format_trivy_result(self, trivy_response: Dict, package: Package) -> Dict:
+    def _format_trivy_result(self, trivy_response: Dict, package: Package, scan_duration_ms: int) -> Dict:
         """
         Format Trivy scan response to our expected format
 
         Args:
             trivy_response: Raw response from Trivy server
             package: Package object
+            scan_duration_ms: Scan duration in milliseconds
 
         Returns:
             Formatted scan result dictionary
         """
         try:
+            # Get Trivy version from the binary
+            trivy_version = self._get_trivy_version()
+            
             # Extract vulnerabilities from Trivy response
             vulnerabilities = []
             summary = {
@@ -242,11 +253,16 @@ class TrivyService:
                 "info": 0,
             }
 
-            # Trivy response structure may vary, handle different formats
+            # Parse the real Trivy response structure
+            # Trivy response has a "Results" array, each with "Vulnerabilities" array
             if "Results" in trivy_response:
-                # Standard Trivy format
+                logger.info(f"Processing {len(trivy_response.get('Results', []))} results from Trivy scan")
+                
                 for result in trivy_response.get("Results", []):
-                    for vuln in result.get("Vulnerabilities", []):
+                    result_vulnerabilities = result.get("Vulnerabilities", [])
+                    logger.info(f"Found {len(result_vulnerabilities)} vulnerabilities in result: {result.get('Target', 'Unknown target')}")
+                    
+                    for vuln in result_vulnerabilities:
                         severity = vuln.get("Severity", "UNKNOWN").upper()
                         vulnerability = {
                             "vulnerability_id": vuln.get("VulnerabilityID", "UNKNOWN"),
@@ -261,6 +277,9 @@ class TrivyService:
                             ),
                             "fixed_version": vuln.get("FixedVersion"),
                             "references": vuln.get("References", []),
+                            "cvss_score": vuln.get("CVSS", {}).get("nvd", {}).get("V3Score") if vuln.get("CVSS") else None,
+                            "published_date": vuln.get("PublishedDate"),
+                            "last_modified_date": vuln.get("LastModifiedDate"),
                         }
                         vulnerabilities.append(vulnerability)
 
@@ -270,37 +289,39 @@ class TrivyService:
                             summary[severity.lower()] += 1
                         else:
                             summary["info"] += 1
+                            
+                        logger.debug(f"Added vulnerability: {vulnerability['vulnerability_id']} ({severity})")
 
-            elif "vulnerabilities" in trivy_response:
-                # Alternative format
-                for vuln in trivy_response.get("vulnerabilities", []):
-                    severity = vuln.get("severity", "UNKNOWN").upper()
-                    vulnerability = {
-                        "vulnerability_id": vuln.get("id", "UNKNOWN"),
-                        "severity": severity,
-                        "title": vuln.get("title", "Unknown vulnerability"),
-                        "description": vuln.get(
-                            "description", "No description available"
-                        ),
-                        "package_name": vuln.get("package", package.name),
-                        "installed_version": vuln.get("version", package.version),
-                        "fixed_version": vuln.get("fix_version"),
-                        "references": vuln.get("references", []),
-                    }
-                    vulnerabilities.append(vulnerability)
+            else:
+                logger.info("No 'Results' found in Trivy response - this is normal for packages with no vulnerabilities")
 
-                    # Update summary counts
-                    summary["total"] += 1
-                    if severity in summary:
-                        summary[severity.lower()] += 1
-                    else:
-                        summary["info"] += 1
+            # Extract additional metadata from Trivy response
+            metadata = trivy_response.get("Metadata", {})
+            artifact_info = {
+                "artifact_name": trivy_response.get("ArtifactName", package.name),
+                "artifact_type": trivy_response.get("ArtifactType", "filesystem"),
+                "schema_version": trivy_response.get("SchemaVersion", 2),
+                "created_at": trivy_response.get("CreatedAt"),
+            }
+            
+            # Add OS information if available
+            if "OS" in metadata:
+                artifact_info["os"] = {
+                    "family": metadata["OS"].get("Family"),
+                    "name": metadata["OS"].get("Name"),
+                    "eosl": metadata["OS"].get("EOSL", False)
+                }
 
             return {
-                "trivy_version": trivy_response.get("trivy_version", "unknown"),
-                "scan_duration_ms": trivy_response.get("scan_duration_ms", 0),
+                "trivy_version": trivy_version,
+                "scan_duration_ms": scan_duration_ms,
                 "vulnerabilities": vulnerabilities,
                 "summary": summary,
+                "artifact_info": artifact_info,
+                "scan_metadata": {
+                    "total_results": len(trivy_response.get("Results", [])),
+                    "scan_completed_at": trivy_response.get("CreatedAt"),
+                }
             }
 
         except Exception as e:
@@ -308,7 +329,7 @@ class TrivyService:
             # Return empty result on formatting error
             return {
                 "trivy_version": "unknown",
-                "scan_duration_ms": 0,
+                "scan_duration_ms": scan_duration_ms,
                 "vulnerabilities": [],
                 "summary": {
                     "total": 0,
@@ -318,7 +339,40 @@ class TrivyService:
                     "low": 0,
                     "info": 0,
                 },
+                "artifact_info": {
+                    "artifact_name": package.name,
+                    "artifact_type": "filesystem",
+                    "schema_version": 2,
+                },
+                "scan_metadata": {
+                    "total_results": 0,
+                    "error": str(e),
+                }
             }
+
+    def _get_trivy_version(self) -> str:
+        """
+        Get Trivy version from the binary
+
+        Returns:
+            Trivy version string or "unknown" if not available
+        """
+        try:
+            import subprocess
+
+            result = subprocess.run(
+                ["trivy", "--version"], capture_output=True, text=True, timeout=10
+            )
+            if result.returncode == 0:
+                # Extract version from output like "Version: 0.66.0"
+                version_line = result.stdout.strip()
+                if "Version:" in version_line:
+                    return version_line.split("Version:")[1].strip()
+                return version_line
+            return "unknown"
+        except Exception as e:
+            logger.warning(f"Could not get Trivy version: {str(e)}")
+            return "unknown"
 
     def _is_trivy_server_available(self) -> bool:
         """

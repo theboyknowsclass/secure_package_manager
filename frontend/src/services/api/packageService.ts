@@ -17,7 +17,7 @@ export const usePackageRequests = (options?: { refetchInterval?: number }) => {
   );
 };
 
-export const usePackageRequest = (requestId: number) => {
+export const usePackageRequest = (requestId: number, options?: { refetchInterval?: number }) => {
   return useQuery<DetailedRequestResponse>(
     ["packageRequest", requestId],
     async () => {
@@ -26,6 +26,8 @@ export const usePackageRequest = (requestId: number) => {
     },
     {
       enabled: !!requestId,
+      refetchInterval: options?.refetchInterval || 5000,
+      refetchIntervalInBackground: true,
     }
   );
 };

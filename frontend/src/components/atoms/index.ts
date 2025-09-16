@@ -5,6 +5,7 @@ export { default as SecurityScoreChip } from "./SecurityScoreChip";
 export { default as LicenseScoreChip } from "./LicenseScoreChip";
 export { default as VulnerabilityChip } from "./VulnerabilityChip";
 export { default as PackageTypeChip } from "./PackageTypeChip";
+export { default as RequestStatusChip } from "./RequestStatusChip";
 export { default as LoadingSpinner } from "./LoadingSpinner";
 
 // Export types
@@ -14,4 +15,5 @@ export type { SecurityScoreChipProps } from "./SecurityScoreChip";
 export type { LicenseScoreChipProps } from "./LicenseScoreChip";
 export type { VulnerabilityChipProps } from "./VulnerabilityChip";
 export type { PackageTypeChipProps } from "./PackageTypeChip";
+export type { RequestStatusChipProps } from "./RequestStatusChip";
 export type { LoadingSpinnerProps } from "./LoadingSpinner";
