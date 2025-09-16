@@ -87,7 +87,7 @@ export const isActiveProcessingStatus = (status: PackageStatus): boolean => {
     PACKAGE_STATUS.CHECKING_LICENCE,
     PACKAGE_STATUS.DOWNLOADING,
     PACKAGE_STATUS.SECURITY_SCANNING
-  ].includes(status);
+  ].includes(status as any);
 };
 
 export const isCompletedProcessingStatus = (status: PackageStatus): boolean => {
@@ -95,7 +95,7 @@ export const isCompletedProcessingStatus = (status: PackageStatus): boolean => {
     PACKAGE_STATUS.LICENCE_CHECKED,
     PACKAGE_STATUS.DOWNLOADED,
     PACKAGE_STATUS.SECURITY_SCANNED
-  ].includes(status);
+  ].includes(status as any);
 };
 
 export const getStatusDisplayName = (status: PackageStatus): string => {
@@ -113,3 +113,53 @@ export const getStatusDisplayName = (status: PackageStatus): string => {
   };
   return displayNames[status] || status;
 };
+
+// Shared API Types
+export interface Package {
+  id: number;
+  name: string;
+  version: string;
+  status: string;
+  security_score: number | null;
+  license_score: number | null;
+  security_scan_status: string;
+  license_identifier: string | null;
+  type?: "new" | "existing";
+  vulnerability_count?: number;
+  critical_vulnerabilities?: number;
+}
+
+export interface PackageRequest {
+  id: number;
+  application_name: string;
+  version: string;
+  status: string;
+  requestor: {
+    id: number;
+    username: string;
+    full_name: string;
+  };
+  created_at: string;
+  updated_at: string;
+  total_packages: number;
+  completion_percentage: number;
+  packages: Package[];
+  package_counts: {
+    total: number;
+    Requested: number;
+    "Checking Licence": number;
+    "Licence Checked": number;
+    Downloading: number;
+    Downloaded: number;
+    "Security Scanning": number;
+    "Security Scanned": number;
+    "Pending Approval": number;
+    Approved: number;
+    Rejected: number;
+  };
+}
+
+export interface DetailedRequestResponse {
+  request: PackageRequest;
+  packages: Package[];
+}

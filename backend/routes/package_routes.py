@@ -5,7 +5,7 @@ from typing import Any, Dict, Union
 
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
-from models import Package, Request, RequestPackage, db
+from models import Package, PackageStatus, Request, RequestPackage, db
 from services.auth_service import AuthService
 from services.package_service import PackageService
 
@@ -431,4 +431,159 @@ def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
 
     except Exception as e:
         logger.error(f"Trigger security scan error: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@package_bp.route("/processing/status", methods=["GET"])  # type: ignore[misc]
+@auth_service.require_auth
+def get_processing_status() -> ResponseReturnValue:
+    """Get overall processing status and statistics"""
+    try:
+        # Count packages by status
+        status_counts = {}
+        for status in ["Requested", "Checking Licence", "Downloading", "Security Scanning", "Pending Approval", "Rejected"]:
+            count = db.session.query(Package).join(PackageStatus).filter(PackageStatus.status == status).count()
+            status_counts[status] = count
+        
+        # Count total requests
+        total_requests = db.session.query(Request).count()
+        
+        # Get recent activity (last 10 packages processed)
+        recent_packages = (
+            db.session.query(Package, PackageStatus)
+            .join(PackageStatus)
+            .filter(PackageStatus.updated_at.isnot(None))
+            .order_by(PackageStatus.updated_at.desc())
+            .limit(10)
+            .all()
+        )
+        
+        recent_activity = []
+        for package, status in recent_packages:
+            recent_activity.append({
+                "package_name": package.name,
+                "package_version": package.version,
+                "status": status.status,
+                "updated_at": status.updated_at.isoformat() if status.updated_at else None,
+            })
+        
+        return jsonify({
+            "status_counts": status_counts,
+            "total_requests": total_requests,
+            "recent_activity": recent_activity,
+            "timestamp": datetime.utcnow().isoformat(),
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Get processing status error: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@package_bp.route("/processing/retry", methods=["POST"])  # type: ignore[misc]
+@auth_service.require_auth
+def retry_failed_packages() -> ResponseReturnValue:
+    """Retry failed packages, optionally for a specific request"""
+    try:
+        data = request.get_json() or {}
+        request_id = data.get("request_id")
+        
+        # Only admins can retry packages
+        if not request.user.is_admin():
+            return jsonify({"error": "Admin access required"}), 403
+        
+        # Build query for failed packages
+        query = db.session.query(Package).join(PackageStatus).filter(PackageStatus.status == "Rejected")
+        
+        if request_id:
+            query = query.join(RequestPackage).filter(RequestPackage.request_id == request_id)
+        
+        failed_packages = query.all()
+        
+        if not failed_packages:
+            return jsonify({"message": "No failed packages found", "retried": 0}), 200
+        
+        retried_count = 0
+        for package in failed_packages:
+            if package.package_status:
+                package.package_status.status = "Requested"
+                package.package_status.updated_at = datetime.utcnow()
+                retried_count += 1
+        
+        db.session.commit()
+        
+        logger.info(f"Retried {retried_count} failed packages")
+        return jsonify({
+            "message": f"Retried {retried_count} packages",
+            "retried": retried_count,
+            "request_id": request_id,
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Retry failed packages error: {str(e)}")
+        db.session.rollback()
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@package_bp.route("/requests/<int:request_id>/processing-status", methods=["GET"])  # type: ignore[misc]
+@auth_service.require_auth
+def get_request_processing_status(request_id: int) -> ResponseReturnValue:
+    """Get detailed processing status for a specific request"""
+    try:
+        # Get the request
+        request_obj = Request.query.get(request_id)
+        if not request_obj:
+            return jsonify({"error": "Request not found"}), 404
+        
+        # Check if user has access to this request
+        if not request.user.is_admin() and request_obj.requestor_id != request.user.id:
+            return jsonify({"error": "Access denied"}), 403
+        
+        # Get packages for this request
+        packages = (
+            db.session.query(Package, PackageStatus)
+            .join(PackageStatus)
+            .join(RequestPackage)
+            .filter(RequestPackage.request_id == request_id)
+            .all()
+        )
+        
+        # Count packages by status
+        status_counts = {}
+        for status in ["Requested", "Checking Licence", "Downloading", "Security Scanning", "Pending Approval", "Rejected"]:
+            count = sum(1 for _, pkg_status in packages if pkg_status.status == status)
+            status_counts[status] = count
+        
+        # Calculate progress
+        total_packages = len(packages)
+        completed_packages = sum(1 for _, pkg_status in packages if pkg_status.status in ["Pending Approval", "Rejected"])
+        progress_percentage = (completed_packages / total_packages * 100) if total_packages > 0 else 0
+        
+        # Get package details
+        package_details = []
+        for package, pkg_status in packages:
+            package_details.append({
+                "package_id": package.id,
+                "package_name": package.name,
+                "package_version": package.version,
+                "status": pkg_status.status,
+                "license_score": pkg_status.license_score,
+                "security_score": pkg_status.security_score,
+                "security_scan_status": pkg_status.security_scan_status,
+                "updated_at": pkg_status.updated_at.isoformat() if pkg_status.updated_at else None,
+            })
+        
+        return jsonify({
+            "request_id": request_id,
+            "application_name": request_obj.application_name,
+            "application_version": request_obj.version,
+            "total_packages": total_packages,
+            "completed_packages": completed_packages,
+            "progress_percentage": round(progress_percentage, 2),
+            "status_counts": status_counts,
+            "packages": package_details,
+            "timestamp": datetime.utcnow().isoformat(),
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Get request processing status error: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500

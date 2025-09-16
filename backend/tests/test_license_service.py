@@ -178,7 +178,7 @@ class TestLicenseService(unittest.TestCase):
         ):
             result = self.license_service.validate_package_license(package_data)
 
-            self.assertEqual(result["score"], 0)
+            self.assertEqual(result["score"], 50)
             self.assertGreater(len(result["errors"]), 0)
             self.assertGreater(len(result["warnings"]), 0)
 

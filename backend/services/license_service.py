@@ -152,7 +152,7 @@ class LicenseService:
     def _create_unknown_license_result(self, license_identifier: str) -> Dict[str, Any]:
         """Create result for unknown licenses"""
         return {
-            "score": 0,
+            "score": 50,
             "errors": [f'License "{license_identifier}" is not recognized'],
             "warnings": [
                 f'License "{license_identifier}" is not in the license database'

@@ -6,7 +6,7 @@ services:
   db:
     volumes:
       # Add dev-specific init script
-      - ./database/init-dev.sql:/docker-entrypoint-initdb.d/01-init-dev.sql:ro
+      - ./database/init-dev.sql:/docker-entrypoint-initdb.d/02-init-dev.sql:ro
     ports:
       # Expose database port for direct access
       - "5432:5432"

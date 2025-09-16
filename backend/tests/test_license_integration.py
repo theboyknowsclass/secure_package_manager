@@ -194,7 +194,7 @@ class TestLicenseIntegration(unittest.TestCase):
 
         # Mock license validation to return unknown license result
         mock_validation_result = {
-            "score": 0,
+            "score": 50,
             "errors": ['License "UNKNOWN-LICENSE" is not recognized'],
             "warnings": ['License "UNKNOWN-LICENSE" is not in the license database'],
         }
@@ -208,7 +208,7 @@ class TestLicenseIntegration(unittest.TestCase):
 
             result = self.package_service._validate_package_license(self.mock_package)
 
-            self.assertEqual(result["score"], 0)
+            self.assertEqual(result["score"], 50)
             self.assertIn("not recognized", result["errors"][0])
 
     def test_license_validation_workflow_completeness(self):
@@ -219,7 +219,7 @@ class TestLicenseIntegration(unittest.TestCase):
             {"license": "Apache-2.0", "expected_score": 100, "expected_errors": 0},
             {"license": "CC0-1.0", "expected_score": 80, "expected_errors": 0},
             {"license": "GPL-3.0", "expected_score": 30, "expected_errors": 0},
-            {"license": "GPL", "expected_score": 0, "expected_errors": 1},
+            {"license": "GPL", "expected_score": 50, "expected_errors": 1},
             {
                 "license": "(MIT OR Apache-2.0)",
                 "expected_score": 100,

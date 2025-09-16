@@ -77,6 +77,8 @@ services:
   # Trivy Security Scanner
   trivy:
     image: aquasec/trivy:latest
+    environment:
+      - TRIVY_PORT=${TRIVY_PORT}
     command: ["server", "--listen", "0.0.0.0:${TRIVY_PORT}", "--cache-dir", "/tmp/trivy-cache"]
     volumes:
       - trivy_cache:/tmp/trivy-cache
@@ -90,10 +92,68 @@ services:
       start_period: 60s
     restart: unless-stopped
 
+  # Background Worker Service
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    depends_on:
+      - db
+      - trivy
+    environment:
+      - FLASK_APP=app.py
+      - APP_NAME=${APP_NAME}
+      - FLASK_ENV=${FLASK_ENV}
+      - FLASK_DEBUG=${FLASK_DEBUG}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${DATABASE_PORT}/${POSTGRES_DB}
+      - DATABASE_PORT=${DATABASE_PORT}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - JWT_SECRET=${JWT_SECRET}
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
+      - IDP_SECRET_KEY=${IDP_SECRET_KEY}
+      - SOURCE_REPOSITORY_URL=${SOURCE_REPOSITORY_URL}
+      - TARGET_REPOSITORY_URL=${TARGET_REPOSITORY_URL}
+      - TRIVY_URL=http://trivy:${TRIVY_PORT}
+      - TRIVY_PORT=${TRIVY_PORT}
+      - TRIVY_TIMEOUT=${TRIVY_TIMEOUT}
+      - TRIVY_MAX_RETRIES=${TRIVY_MAX_RETRIES}
+      - OAUTH_AUDIENCE=${OAUTH_AUDIENCE}
+      - OAUTH_ISSUER=${OAUTH_ISSUER}
+      - ADFS_ENTITY_ID=${ADFS_ENTITY_ID}
+      - ADFS_SSO_URL=${ADFS_SSO_URL}
+      - ADFS_CERT_PATH=${ADFS_CERT_PATH}
+      - MAX_CONTENT_LENGTH=${MAX_CONTENT_LENGTH}
+      - API_PORT=${API_PORT}
+      - IDP_PORT=${IDP_PORT}
+      - FRONTEND_PORT=${FRONTEND_PORT}
+      - LOCALHOST=${LOCALHOST}
+      - DOCKER_HOST=${DOCKER_HOST}
+      - DEFAULT_ADMIN_USERNAME=${DEFAULT_ADMIN_USERNAME}
+      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD}
+      - DEFAULT_ADMIN_EMAIL=${DEFAULT_ADMIN_EMAIL}
+      - WORKER_TYPE=package_processor
+      - WORKER_SLEEP_INTERVAL=10
+      - WORKER_MAX_PACKAGES_PER_CYCLE=5
+    volumes:
+      - package_cache:/app/package_cache
+      - worker_logs:/app/logs
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
 volumes:
   postgres_data:
   package_cache:
   trivy_cache:
+  worker_logs:
 
 networks:
   app-network:

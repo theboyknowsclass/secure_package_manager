@@ -348,9 +348,11 @@ class PackageProcessor:
             # Validate license information
             license_validation = self._validate_package_license(package)
 
-            # Store the license score
+            # Store the license score and commit to database
             if package.package_status:
                 package.package_status.license_score = license_validation["score"]
+                package.package_status.updated_at = datetime.utcnow()
+                self.db.session.commit()
 
             if license_validation["score"] == 0:
                 # For testing, allow packages with missing licenses to proceed

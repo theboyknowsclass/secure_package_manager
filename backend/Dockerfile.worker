@@ -1,0 +1,44 @@
+# Worker-specific Dockerfile for background processing
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    wget \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Trivy for security scanning
+RUN wget -qO- https://github.com/aquasecurity/trivy/releases/download/v0.50.2/trivy_0.50.2_Linux-64bit.tar.gz | tar -xz -C /usr/local/bin trivy
+
+# Install Node.js for npm package handling
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Create logs directory
+RUN mkdir -p /app/logs
+
+# Create package cache directory
+RUN mkdir -p /app/package_cache
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV WORKER_TYPE=package_processor
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)"
+
+# Run the worker
+CMD ["python", "worker.py"]

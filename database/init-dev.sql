@@ -2,7 +2,7 @@
 -- Includes schema + development users + license data
 
 -- Include the base schema
-\i /docker-entrypoint-initdb.d/init.sql
+\i /docker-entrypoint-initdb.d/01-init.sql
 
 -- Insert default admin user and development users
 INSERT INTO users (username, email, full_name, role) VALUES

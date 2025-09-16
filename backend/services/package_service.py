@@ -72,8 +72,9 @@ class PackageService:
             # Create database records for new packages
             self._create_package_records(packages_to_process, request_id)
 
-            # Start async processing
-            self._process_packages_async(request_id)
+            # Packages are now processed by the background worker
+            # No need to process synchronously - worker will pick them up
+            logger.info(f"Created {len(packages_to_process)} packages for request {request_id}, worker will process them")
 
             return {
                 "packages_to_process": len(packages_to_process),

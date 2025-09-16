@@ -91,7 +91,11 @@ class TrivyService:
 
             try:
                 # Get package metadata from source repository
-                package_url = f"{source_repo_url}/{package.name}"
+                # URL encode the package name to handle scoped packages (e.g., @types/node -> %40types%2Fnode)
+                import urllib.parse
+                encoded_package_name = urllib.parse.quote(package.name, safe='')
+                package_url = f"{source_repo_url}/{encoded_package_name}"
+                logger.info(f"Fetching package metadata from {package_url}")
                 response = requests.get(package_url, timeout=30)
 
                 if response.status_code == 200:
@@ -123,23 +127,23 @@ class TrivyService:
                                 )
                                 return temp_dir
                             else:
-                                logger.warning(
-                                    f"Failed to download tarball: {tarball_response.status_code}"
+                                logger.error(
+                                    f"Failed to download tarball: HTTP {tarball_response.status_code}"
                                 )
                                 return None
                         else:
-                            logger.warning(
+                            logger.error(
                                 f"No tarball URL found for {package.name}@{package.version}"
                             )
                             return None
                     else:
-                        logger.warning(
-                            f"Version {package.version} not found for {package.name}"
+                        logger.error(
+                            f"Version {package.version} not found for {package.name}. Available versions: {list(package_metadata.get('versions', {}).keys())[:10]}"
                         )
                         return None
                 else:
-                    logger.warning(
-                        f"Failed to get package metadata: {response.status_code}"
+                    logger.error(
+                        f"Failed to get package metadata: HTTP {response.status_code}"
                     )
                     return None
 
@@ -150,6 +154,7 @@ class TrivyService:
         except Exception as e:
             logger.error(f"Error creating package structure for scanning: {str(e)}")
             return None
+
 
     def _perform_trivy_scan(
         self, package_path: str, package: Package
@@ -175,9 +180,11 @@ class TrivyService:
             logger.info(f"Performing Trivy scan on {package_path}")
 
             # Use Trivy filesystem scanning via subprocess
-            # This is more reliable than trying to use the server API for file uploads
-
+            # This is the most reliable way to scan local files
             try:
+                import subprocess
+                import json
+                
                 # Run Trivy filesystem scan
                 cmd = [
                     "trivy",
@@ -206,7 +213,7 @@ class TrivyService:
                         f"Trivy scan failed with return code {result.returncode}: {result.stderr}"
                     )
                     return None
-
+                    
             except subprocess.TimeoutExpired:
                 logger.error(f"Trivy scan timed out after {self.timeout} seconds")
                 return None
@@ -220,6 +227,7 @@ class TrivyService:
         except Exception as e:
             logger.error(f"Error performing Trivy scan: {str(e)}")
             return None
+
 
     def _format_trivy_result(self, trivy_response: Dict, package: Package) -> Dict:
         """
@@ -327,7 +335,7 @@ class TrivyService:
         Check if Trivy binary is available
 
         Returns:
-            True if Trivy is available, False otherwise
+            True if Trivy binary is available, False otherwise
         """
         try:
             import subprocess
