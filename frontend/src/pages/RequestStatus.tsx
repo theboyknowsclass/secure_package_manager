@@ -200,6 +200,9 @@ export default function RequestStatus() {
   } = useQuery<PackageRequest[]>("packageRequests", async () => {
     const response = await api.get(endpoints.packages.requests);
     return response.data.requests;
+  }, {
+    refetchInterval: 5000, // Poll every 5 seconds
+    refetchIntervalInBackground: true, // Continue polling when tab is not active
   });
 
   const handleViewDetails = (requestId: number) => {
