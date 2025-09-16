@@ -5,7 +5,7 @@ from typing import Any, Dict, Union
 
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
-from models import Package, PackageStatus, Request, RequestPackage, db
+from models import Package, PackageStatus, Request, RequestPackage, SecurityScan, db
 from services.auth_service import AuthService
 from services.package_service import PackageService
 
@@ -182,10 +182,11 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
         ):
             return jsonify({"error": "Access denied"}), 403
 
-        # Get packages for this request with their creation context
+        # Get packages for this request with their creation context and scan results
         packages_with_context = (
-            db.session.query(Package, RequestPackage)
+            db.session.query(Package, RequestPackage, SecurityScan)
             .join(RequestPackage)
+            .outerjoin(SecurityScan)  # LEFT JOIN - allows null scan results
             .filter(RequestPackage.request_id == request_id)
             .all()
         )
@@ -248,8 +249,24 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                                 else None
                             ),
                             "type": rp.package_type,
+                            "scan_result": (
+                                {
+                                    "scan_duration_ms": scan.scan_duration_ms,
+                                    "critical_count": scan.critical_count,
+                                    "high_count": scan.high_count,
+                                    "medium_count": scan.medium_count,
+                                    "low_count": scan.low_count,
+                                    "info_count": scan.info_count,
+                                    "scan_type": scan.scan_type,
+                                    "trivy_version": scan.trivy_version,
+                                    "created_at": scan.created_at.isoformat() if scan.created_at else None,
+                                    "completed_at": scan.completed_at.isoformat() if scan.completed_at else None,
+                                }
+                                if scan
+                                else None
+                            ),
                         }
-                        for pkg, rp in packages_with_context
+                        for pkg, rp, scan in packages_with_context
                     ],
                 }
             ),
@@ -532,68 +549,3 @@ def retry_failed_packages() -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
-@package_bp.route("/requests/<int:request_id>/processing-status", methods=["GET"])  # type: ignore[misc]
-@auth_service.require_auth
-def get_request_processing_status(request_id: int) -> ResponseReturnValue:
-    """Get detailed processing status for a specific request"""
-    try:
-        # Get the request
-        request_obj = Request.query.get(request_id)
-        if not request_obj:
-            return jsonify({"error": "Request not found"}), 404
-        
-        # Check if user has access to this request
-        if not request.user.is_admin() and request_obj.requestor_id != request.user.id:
-            return jsonify({"error": "Access denied"}), 403
-        
-        # Get packages for this request with package_type
-        packages = (
-            db.session.query(Package, PackageStatus, RequestPackage)
-            .join(PackageStatus)
-            .join(RequestPackage, Package.id == RequestPackage.package_id)
-            .filter(RequestPackage.request_id == request_id)
-            .all()
-        )
-        
-        # Count packages by status
-        status_counts = {}
-        for status in ["Requested", "Checking Licence", "Downloading", "Security Scanning", "Pending Approval", "Rejected"]:
-            count = sum(1 for _, pkg_status, _ in packages if pkg_status.status == status)
-            status_counts[status] = count
-        
-        # Calculate progress
-        total_packages = len(packages)
-        completed_packages = sum(1 for _, pkg_status, _ in packages if pkg_status.status in ["Pending Approval", "Rejected"])
-        progress_percentage = (completed_packages / total_packages * 100) if total_packages > 0 else 0
-        
-        # Get package details
-        package_details = []
-        for package, pkg_status, rp in packages:
-            package_details.append({
-                "package_id": package.id,
-                "package_name": package.name,
-                "package_version": package.version,
-                "status": pkg_status.status,
-                "license_score": pkg_status.license_score,
-                "license_status": pkg_status.license_status,
-                "security_score": pkg_status.security_score,
-                "security_scan_status": pkg_status.security_scan_status,
-                "updated_at": pkg_status.updated_at.isoformat() if pkg_status.updated_at else None,
-                "type": rp.package_type,
-            })
-        
-        return jsonify({
-            "request_id": request_id,
-            "application_name": request_obj.application_name,
-            "application_version": request_obj.version,
-            "total_packages": total_packages,
-            "completed_packages": completed_packages,
-            "progress_percentage": round(progress_percentage, 2),
-            "status_counts": status_counts,
-            "packages": package_details,
-            "timestamp": datetime.utcnow().isoformat(),
-        }), 200
-        
-    except Exception as e:
-        logger.error(f"Get request processing status error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500

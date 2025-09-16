@@ -91,11 +91,6 @@ Content-Type: application/json
 }
 ```
 
-### Request-Specific Status
-```http
-GET /api/packages/requests/{request_id}/processing-status
-```
-Returns detailed processing status for a specific request.
 
 ## Configuration
 

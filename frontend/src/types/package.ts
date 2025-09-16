@@ -1,6 +1,19 @@
 // Package and Package Request Types
 import { PackageStatus } from "./packageStatus";
 
+export interface ScanResult {
+  scan_duration_ms: number | null;
+  critical_count: number;
+  high_count: number;
+  medium_count: number;
+  low_count: number;
+  info_count: number;
+  scan_type: string;
+  trivy_version: string | null;
+  created_at: string | null;
+  completed_at: string | null;
+}
+
 export interface Package {
   id: number;
   name: string;
@@ -15,8 +28,7 @@ export interface Package {
   rejector_id: number | null;
   published_at: string | null;
   type?: "new" | "existing";
-  vulnerability_count?: number;
-  critical_vulnerabilities?: number;
+  scan_result: ScanResult | null;
 }
 
 export interface PackageRequest {

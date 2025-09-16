@@ -412,7 +412,6 @@ class TrivyService:
 
             # Update security scan record
             security_scan.scan_result = scan_result
-            security_scan.vulnerability_count = summary.get("total", 0)
             security_scan.critical_count = summary.get("critical", 0)
             security_scan.high_count = summary.get("high", 0)
             security_scan.medium_count = summary.get("medium", 0)
@@ -433,13 +432,14 @@ class TrivyService:
 
             db.session.commit()
 
+            total_vulnerabilities = security_scan.get_total_vulnerabilities()
             logger.info(
-                f"Completed Trivy scan for {package.name}@{package.version}: {security_scan.vulnerability_count} vulnerabilities found"
+                f"Completed Trivy scan for {package.name}@{package.version}: {total_vulnerabilities} vulnerabilities found"
             )
 
             return {
                 "status": "completed",
-                "vulnerability_count": security_scan.vulnerability_count,
+                "vulnerability_count": total_vulnerabilities,
                 "critical_count": security_scan.critical_count,
                 "high_count": security_scan.high_count,
                 "medium_count": security_scan.medium_count,
@@ -463,6 +463,10 @@ class TrivyService:
     ) -> int:
         """
         Calculate security score based on vulnerability counts
+        
+        Business Rules:
+        - Any critical vulnerability = 0 (blocks approval)
+        - High/medium/low vulnerabilities reduce score proportionally
 
         Args:
             security_scan: SecurityScan object
@@ -471,14 +475,18 @@ class TrivyService:
             Security score (0-100)
         """
         try:
-            # Base score starts at 100
+            # Any critical vulnerability blocks approval (score = 0)
+            if security_scan.critical_count > 0:
+                return 0
+
+            # Base score starts at 100 for non-critical vulnerabilities
             score = 100
 
-            # Deduct points for vulnerabilities
-            score -= security_scan.critical_count * 25  # -25 per critical
+            # Deduct points for non-critical vulnerabilities
             score -= security_scan.high_count * 15  # -15 per high
             score -= security_scan.medium_count * 8  # -8 per medium
             score -= security_scan.low_count * 3  # -3 per low
+            # info_count is ignored (informational only)
 
             # Ensure score is between 0 and 100
             return int(max(0, min(100, score)))

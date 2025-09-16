@@ -4,10 +4,13 @@ import {
   SECURITY_SCAN_STATUS,
   type SecurityScanStatus,
 } from "../../types/securityStatus";
+import { ScanResult } from "../../types/package";
+import { getVulnerabilityBreakdown, formatScanDuration } from "../../utils/scanUtils";
 
 export interface SecurityScoreChipProps {
   score: number | null;
   scanStatus?: SecurityScanStatus;
+  scanResult?: ScanResult | null;
   showTooltip?: boolean;
   size?: "small" | "medium";
   variant?: "filled" | "outlined";
@@ -22,6 +25,7 @@ const getScoreColor = (score: number) => {
 export const SecurityScoreChip: React.FC<SecurityScoreChipProps> = ({
   score,
   scanStatus,
+  scanResult,
   showTooltip = true,
   size = "small",
   variant = "filled",
@@ -39,7 +43,23 @@ export const SecurityScoreChip: React.FC<SecurityScoreChipProps> = ({
     );
 
     if (showTooltip) {
-      return <Tooltip title={`Security Score: ${score}/100`}>{chip}</Tooltip>;
+      const tooltipContent = (
+        <div>
+          <div><strong>Security Score:</strong> {score}/100</div>
+          {scanResult && (
+            <>
+              <div><strong>Vulnerabilities:</strong> {getVulnerabilityBreakdown(scanResult)}</div>
+              <div><strong>Scan Duration:</strong> {formatScanDuration(scanResult.scan_duration_ms)}</div>
+              {score === 0 && scanResult.critical_count > 0 && (
+                <div style={{ color: '#f44336', fontWeight: 'bold' }}>
+                  ⚠️ Critical vulnerabilities block approval
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      );
+      return <Tooltip title={tooltipContent} arrow>{chip}</Tooltip>;
     }
     return chip;
   }

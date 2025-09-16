@@ -229,7 +229,6 @@ class SecurityScan(db.Model):  # type: ignore[misc]
         db.String(50), default="trivy", nullable=False
     )  # trivy, snyk, npm_audit
     scan_result = db.Column(db.JSON)  # Store the full Trivy scan result
-    vulnerability_count = db.Column(db.Integer, default=0)
     critical_count = db.Column(db.Integer, default=0)
     high_count = db.Column(db.Integer, default=0)
     medium_count = db.Column(db.Integer, default=0)
@@ -240,13 +239,23 @@ class SecurityScan(db.Model):  # type: ignore[misc]
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     completed_at = db.Column(db.DateTime)
 
+    def get_total_vulnerabilities(self) -> int:
+        """Calculate total vulnerability count from granular counts"""
+        return (
+            self.critical_count + 
+            self.high_count + 
+            self.medium_count + 
+            self.low_count + 
+            self.info_count
+        )
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "package_id": self.package_id,
             "scan_type": self.scan_type,
             "scan_result": self.scan_result,
-            "vulnerability_count": self.vulnerability_count,
+            "vulnerability_count": self.get_total_vulnerabilities(),  # Calculate from granular counts
             "critical_count": self.critical_count,
             "high_count": self.high_count,
             "medium_count": self.medium_count,

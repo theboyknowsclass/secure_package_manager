@@ -83,26 +83,33 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     accessorKey: "security_score",
     header: "Security Score",
     size: 120,
+    muiTableHeadCellProps: {
+      sx: {
+        "&:hover": {
+          cursor: "default !important",
+        },
+      },
+    },
     Cell: ({ row }) => {
       const pkg = row.original;
       return (
         <SecurityScoreChip
           score={pkg.security_score}
           scanStatus={pkg.security_scan_status as SecurityScanStatus}
+          scanResult={pkg.scan_result}
         />
       );
     },
   },
   {
-    accessorKey: "vulnerability_count",
+    accessorKey: "scan_result",
     header: "Vulnerabilities",
     size: 120,
     Cell: ({ row }) => {
       const pkg = row.original;
       return (
         <VulnerabilityChip
-          vulnerabilityCount={pkg.vulnerability_count}
-          criticalCount={pkg.critical_vulnerabilities}
+          scanResult={pkg.scan_result}
         />
       );
     },
@@ -178,9 +185,21 @@ export default function RequestDetailDialog({
               enableTopToolbar={false}
               enableBottomToolbar={false}
               enableColumnFilterModes={false}
+              enableRowActions={false}
+              enableRowSelection={false}
               muiTableProps={{
                 sx: {
                   tableLayout: "fixed",
+                  // Override cursor for tooltip columns to prevent interference
+                  "& .MuiTableHead-root th[data-columnid='security_score']:hover": {
+                    cursor: "default !important",
+                  },
+                  "& .MuiTableHead-root th[data-columnid='license_score']:hover": {
+                    cursor: "default !important",
+                  },
+                  "& .MuiTableHead-root th[data-columnid='scan_result']:hover": {
+                    cursor: "default !important",
+                  },
                 },
               }}
               muiTableContainerProps={{
