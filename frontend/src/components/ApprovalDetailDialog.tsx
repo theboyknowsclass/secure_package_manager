@@ -14,22 +14,16 @@ import {
   Grid,
   Card,
   CardContent,
-  Tooltip,
 } from "@mui/material";
 import { MaterialReactTable, type MRT_ColumnDef } from "material-react-table";
-import { 
-  Close, 
-  CheckCircle, 
-  Cancel 
-} from "@mui/icons-material";
+import { Close, CheckCircle, Cancel } from "@mui/icons-material";
 import { api, endpoints } from "../services/api";
-import { 
-  PACKAGE_STATUS, 
+import {
+  PACKAGE_STATUS,
   LICENSE_STATUS,
-  type PackageStatus,
   type LicenseStatus,
   type Package,
-  type DetailedRequestResponse
+  type DetailedRequestResponse,
 } from "../types/status";
 
 interface ApprovalDetailDialogProps {
@@ -40,26 +34,29 @@ interface ApprovalDetailDialogProps {
 }
 
 // Define columns for package details table with selection
-const packageColumns: MRT_ColumnDef<Package & { selected?: boolean; onSelectChange?: (selected: boolean) => void }>[] = [
+const packageColumns: MRT_ColumnDef<
+  Package & { selected?: boolean; onSelectChange?: (selected: boolean) => void }
+>[] = [
   {
     accessorKey: "select",
     header: "Select",
     size: 60,
     Cell: ({ row }) => {
-      const isPendingApproval = row.original.status === PACKAGE_STATUS.PENDING_APPROVAL;
+      const isPendingApproval =
+        row.original.status === PACKAGE_STATUS.PENDING_APPROVAL;
       return (
         <input
           type="checkbox"
           checked={row.original.selected || false}
           disabled={!isPendingApproval}
-          onChange={(e) => {
+          onChange={e => {
             if (row.original.onSelectChange && isPendingApproval) {
               row.original.onSelectChange(e.target.checked);
             }
           }}
           style={{
             opacity: isPendingApproval ? 1 : 0.5,
-            cursor: isPendingApproval ? 'pointer' : 'not-allowed'
+            cursor: isPendingApproval ? "pointer" : "not-allowed",
           }}
         />
       );
@@ -80,9 +77,7 @@ const packageColumns: MRT_ColumnDef<Package & { selected?: boolean; onSelectChan
     header: "Version",
     size: 120,
     Cell: ({ row }) => (
-      <Typography variant="body2">
-        {row.original.version}
-      </Typography>
+      <Typography variant="body2">{row.original.version}</Typography>
     ),
   },
   {
@@ -104,20 +99,24 @@ const packageColumns: MRT_ColumnDef<Package & { selected?: boolean; onSelectChan
     Cell: ({ row }) => {
       const pkg = row.original;
       if (!pkg.license_identifier) {
-        return <Typography variant="body2" color="textSecondary">Unknown</Typography>;
+        return (
+          <Typography variant="body2" color="textSecondary">
+            Unknown
+          </Typography>
+        );
       }
-      
+
       // Parse license expression to separate individual licenses
       const parseLicenseExpression = (expression: string): string[] => {
         return expression
-          .replace(/[()]/g, '')
+          .replace(/[()]/g, "")
           .split(/\s+(?:OR|AND)\s+/i)
           .map(license => license.trim())
           .filter(license => license.length > 0);
       };
-      
+
       const licenses = parseLicenseExpression(pkg.license_identifier);
-      
+
       if (licenses.length === 1) {
         return (
           <Chip
@@ -127,7 +126,7 @@ const packageColumns: MRT_ColumnDef<Package & { selected?: boolean; onSelectChan
           />
         );
       }
-      
+
       return (
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
           {licenses.map((license, index) => (
@@ -149,7 +148,11 @@ const packageColumns: MRT_ColumnDef<Package & { selected?: boolean; onSelectChan
     Cell: ({ row }) => {
       const score = row.original.security_score;
       if (score === null) {
-        return <Typography variant="body2" color="textSecondary">-</Typography>;
+        return (
+          <Typography variant="body2" color="textSecondary">
+            -
+          </Typography>
+        );
       }
       return (
         <Chip
@@ -168,14 +171,21 @@ const packageColumns: MRT_ColumnDef<Package & { selected?: boolean; onSelectChan
       const pkg = row.original;
       const total = pkg.vulnerability_count || 0;
       const critical = pkg.critical_vulnerabilities || 0;
-      
+
       if (total === 0) {
-        return <Typography variant="body2" color="success.main">None</Typography>;
+        return (
+          <Typography variant="body2" color="success.main">
+            None
+          </Typography>
+        );
       }
-      
+
       return (
         <Box>
-          <Typography variant="body2" color={critical > 0 ? "error.main" : "warning.main"}>
+          <Typography
+            variant="body2"
+            color={critical > 0 ? "error.main" : "warning.main"}
+          >
             {total} total
           </Typography>
           {critical > 0 && (
@@ -210,7 +220,9 @@ export default function ApprovalDetailDialog({
   const [approvalReason, setApprovalReason] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedPackages, setSelectedPackages] = useState<Set<number>>(new Set());
+  const [selectedPackages, setSelectedPackages] = useState<Set<number>>(
+    new Set()
+  );
 
   const handlePackageSelect = (packageId: number, selected: boolean) => {
     setSelectedPackages(prev => {
@@ -229,7 +241,7 @@ export default function ApprovalDetailDialog({
     const pendingPackageIds = selectedRequest.packages
       .filter(pkg => pkg.status === PACKAGE_STATUS.PENDING_APPROVAL)
       .map(pkg => pkg.id);
-    
+
     if (selected) {
       setSelectedPackages(new Set(pendingPackageIds));
     } else {
@@ -239,29 +251,30 @@ export default function ApprovalDetailDialog({
 
   const handleApproveRequest = async () => {
     if (!selectedRequest || selectedPackages.size === 0) return;
-    
+
     // Double-check that all selected packages are actually pending approval
-    const selectedPendingPackages = Array.from(selectedPackages).filter(packageId => {
-      const pkg = selectedRequest.packages.find(p => p.id === packageId);
-      return pkg && pkg.status === PACKAGE_STATUS.PENDING_APPROVAL;
-    });
-    
+    const selectedPendingPackages = Array.from(selectedPackages).filter(
+      packageId => {
+        const pkg = selectedRequest.packages.find(p => p.id === packageId);
+        return pkg && pkg.status === PACKAGE_STATUS.PENDING_APPROVAL;
+      }
+    );
+
     if (selectedPendingPackages.length === 0) {
       console.warn("No pending approval packages selected for approval");
       return;
     }
-    
+
     setIsProcessing(true);
     try {
       const response = await api.post(endpoints.approver.batchApprove, {
         package_ids: selectedPendingPackages,
-        reason: approvalReason || "Approved by administrator"
+        reason: approvalReason || "Approved by administrator",
       });
-      
+
       console.log("Batch approval response:", response.data);
       onApprovalComplete();
       handleClose();
-      
     } catch (error) {
       console.error("Error approving packages:", error);
     } finally {
@@ -271,29 +284,30 @@ export default function ApprovalDetailDialog({
 
   const handleRejectRequest = async () => {
     if (!selectedRequest || selectedPackages.size === 0) return;
-    
+
     // Double-check that all selected packages are actually pending approval
-    const selectedPendingPackages = Array.from(selectedPackages).filter(packageId => {
-      const pkg = selectedRequest.packages.find(p => p.id === packageId);
-      return pkg && pkg.status === PACKAGE_STATUS.PENDING_APPROVAL;
-    });
-    
+    const selectedPendingPackages = Array.from(selectedPackages).filter(
+      packageId => {
+        const pkg = selectedRequest.packages.find(p => p.id === packageId);
+        return pkg && pkg.status === PACKAGE_STATUS.PENDING_APPROVAL;
+      }
+    );
+
     if (selectedPendingPackages.length === 0) {
       console.warn("No pending approval packages selected for rejection");
       return;
     }
-    
+
     setIsProcessing(true);
     try {
       const response = await api.post(endpoints.approver.batchReject, {
         package_ids: selectedPendingPackages,
-        reason: rejectionReason || "Rejected by administrator"
+        reason: rejectionReason || "Rejected by administrator",
       });
-      
+
       console.log("Batch rejection response:", response.data);
       onApprovalComplete();
       handleClose();
-      
     } catch (error) {
       console.error("Error rejecting packages:", error);
     } finally {
@@ -324,57 +338,18 @@ export default function ApprovalDetailDialog({
 
   const getLicenseSummary = (packages: Package[]) => {
     const licenseCounts: { [key: string]: number } = {};
-    const licenseCategories: { [key: string]: string } = {};
-    
-    const categorizeLicense = (licenseExpression: string): string => {
-      const hasAllowed = licenseExpression.includes("MIT") || 
-                        licenseExpression.includes("Apache-2.0") || 
-                        licenseExpression.includes("BSD") ||
-                        licenseExpression.includes("CC0-1.0") ||
-                        licenseExpression.includes("Unlicense") ||
-                        licenseExpression.includes("ISC") ||
-                        licenseExpression.includes("0BSD");
-      
-      const hasBlocked = licenseExpression.includes("GPL-3.0") || 
-                        licenseExpression.includes("LGPL-3.0") ||
-                        licenseExpression.includes("AGPL");
-      
-      const hasAvoid = licenseExpression.includes("GPL-2.0") || 
-                      licenseExpression.includes("LGPL-2.0");
-      
-      if (licenseExpression.includes(" OR ") && hasAllowed && !hasBlocked) {
-        return "Allowed";
-      }
-      
-      if (licenseExpression.includes(" AND ")) {
-        if (hasBlocked) return "Blocked";
-        if (hasAvoid) return "Avoid";
-        return "Review";
-      }
-      
-      if (["MIT", "Apache-2.0", "BSD", "CC0-1.0", "Unlicense", "ISC", "0BSD"].some(l => licenseExpression.includes(l))) {
-        return "Allowed";
-      } else if (["GPL-3.0", "LGPL-3.0", "AGPL"].some(l => licenseExpression.includes(l))) {
-        return "Blocked";
-      } else if (["GPL-2.0", "LGPL-2.0"].some(l => licenseExpression.includes(l))) {
-        return "Avoid";
-      } else {
-        return "Review";
-      }
-    };
-    
+
     packages.forEach(pkg => {
       const license = pkg.license_identifier || "Unknown";
       licenseCounts[license] = (licenseCounts[license] || 0) + 1;
-      licenseCategories[license] = categorizeLicense(license);
     });
-    
-    return { licenseCounts, licenseCategories };
+
+    return { licenseCounts };
   };
 
   return (
-    <Dialog 
-      open={open} 
+    <Dialog
+      open={open}
       onClose={handleClose}
       maxWidth="lg"
       fullWidth
@@ -383,14 +358,17 @@ export default function ApprovalDetailDialog({
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Typography variant="h6">
-            Package Approval {selectedRequest ? `- ID #${selectedRequest.request.id}` : '- Loading...'}
+            Package Approval{" "}
+            {selectedRequest
+              ? `- ID #${selectedRequest.request.id}`
+              : "- Loading..."}
           </Typography>
           <IconButton onClick={handleClose} size="small">
             <Close />
           </IconButton>
         </Box>
       </DialogTitle>
-      
+
       <DialogContent>
         {selectedRequest ? (
           <Box>
@@ -405,7 +383,8 @@ export default function ApprovalDetailDialog({
                     Application
                   </Typography>
                   <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-                    {selectedRequest.request.application_name} v{selectedRequest.request.version}
+                    {selectedRequest.request.application_name} v
+                    {selectedRequest.request.version}
                   </Typography>
                 </Grid>
                 <Grid item xs={4}>
@@ -413,7 +392,8 @@ export default function ApprovalDetailDialog({
                     Requestor
                   </Typography>
                   <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-                    {selectedRequest.request.requestor.full_name} (@{selectedRequest.request.requestor.username})
+                    {selectedRequest.request.requestor.full_name} (@
+                    {selectedRequest.request.requestor.username})
                   </Typography>
                 </Grid>
                 <Grid item xs={4}>
@@ -421,7 +401,9 @@ export default function ApprovalDetailDialog({
                     Created
                   </Typography>
                   <Typography variant="body2">
-                    {new Date(selectedRequest.request.created_at).toLocaleString()}
+                    {new Date(
+                      selectedRequest.request.created_at
+                    ).toLocaleString()}
                   </Typography>
                 </Grid>
               </Grid>
@@ -433,38 +415,49 @@ export default function ApprovalDetailDialog({
                 License Summary
               </Typography>
               {(() => {
-                const { licenseCounts, licenseCategories } = getLicenseSummary(selectedRequest.packages);
-                
+                const { licenseCounts } = getLicenseSummary(
+                  selectedRequest.packages
+                );
+
                 const individualLicenseCounts: { [key: string]: number } = {};
-                
-                Object.entries(licenseCounts).forEach(([licenseExpression, count]) => {
-                  const individualLicenses = licenseExpression
-                    .replace(/[()]/g, '')
-                    .split(/\s+(?:OR|AND)\s+/i)
-                    .map(license => license.trim())
-                    .filter(license => license.length > 0);
-                  
-                  individualLicenses.forEach(license => {
-                    individualLicenseCounts[license] = (individualLicenseCounts[license] || 0) + count;
-                  });
-                });
-                
+
+                Object.entries(licenseCounts).forEach(
+                  ([licenseExpression, count]) => {
+                    const individualLicenses = licenseExpression
+                      .replace(/[()]/g, "")
+                      .split(/\s+(?:OR|AND)\s+/i)
+                      .map(license => license.trim())
+                      .filter(license => license.length > 0);
+
+                    individualLicenses.forEach(license => {
+                      individualLicenseCounts[license] =
+                        (individualLicenseCounts[license] || 0) + count;
+                    });
+                  }
+                );
+
                 return (
                   <Grid container spacing={2}>
-                    {Object.entries(individualLicenseCounts).map(([license, count]) => (
-                      <Grid item xs={3} key={license}>
-                        <Box sx={{ textAlign: "center" }}>
-                          <Chip
-                            label={`${count} ${license}`}
-                            color={getLicenseStatusColor(license)}
-                            size="small"
-                          />
-                          <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 0.5 }}>
-                            {getLicenseCategory(license)}
-                          </Typography>
-                        </Box>
-                      </Grid>
-                    ))}
+                    {Object.entries(individualLicenseCounts).map(
+                      ([license, count]) => (
+                        <Grid item xs={3} key={license}>
+                          <Box sx={{ textAlign: "center" }}>
+                            <Chip
+                              label={`${count} ${license}`}
+                              color={getLicenseStatusColor(license)}
+                              size="small"
+                            />
+                            <Typography
+                              variant="caption"
+                              color="textSecondary"
+                              sx={{ display: "block", mt: 0.5 }}
+                            >
+                              {getLicenseCategory(license)}
+                            </Typography>
+                          </Box>
+                        </Grid>
+                      )
+                    )}
                   </Grid>
                 );
               })()}
@@ -472,18 +465,34 @@ export default function ApprovalDetailDialog({
 
             {/* Approval Actions */}
             <Box sx={{ mb: 3 }}>
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-                <Typography variant="h6">
-                  Approval Actions
-                </Typography>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mb: 2,
+                }}
+              >
+                <Typography variant="h6">Approval Actions</Typography>
                 <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
                   <Typography variant="body2" color="textSecondary">
-                    {getSelectedPendingPackages().length} of {selectedRequest.packages.filter(p => p.status === PACKAGE_STATUS.PENDING_APPROVAL).length} pending packages selected
+                    {getSelectedPendingPackages().length} of{" "}
+                    {
+                      selectedRequest.packages.filter(
+                        p => p.status === PACKAGE_STATUS.PENDING_APPROVAL
+                      ).length
+                    }{" "}
+                    pending packages selected
                   </Typography>
                   <Button
                     size="small"
                     onClick={() => handleSelectAll(true)}
-                    disabled={selectedPackages.size === selectedRequest.packages.filter(p => p.status === PACKAGE_STATUS.PENDING_APPROVAL).length}
+                    disabled={
+                      selectedPackages.size ===
+                      selectedRequest.packages.filter(
+                        p => p.status === PACKAGE_STATUS.PENDING_APPROVAL
+                      ).length
+                    }
                   >
                     Select All Pending
                   </Button>
@@ -498,7 +507,9 @@ export default function ApprovalDetailDialog({
               </Box>
               <Grid container spacing={2}>
                 <Grid item xs={6}>
-                  <Card sx={{ border: "1px solid", borderColor: "success.main" }}>
+                  <Card
+                    sx={{ border: "1px solid", borderColor: "success.main" }}
+                  >
                     <CardContent>
                       <Box display="flex" alignItems="center" mb={2}>
                         <CheckCircle color="success" sx={{ mr: 1 }} />
@@ -512,7 +523,7 @@ export default function ApprovalDetailDialog({
                         rows={3}
                         placeholder="Optional approval reason..."
                         value={approvalReason}
-                        onChange={(e) => setApprovalReason(e.target.value)}
+                        onChange={e => setApprovalReason(e.target.value)}
                         size="small"
                       />
                       <Button
@@ -544,7 +555,7 @@ export default function ApprovalDetailDialog({
                         rows={3}
                         placeholder="Rejection reason (required)..."
                         value={rejectionReason}
-                        onChange={(e) => setRejectionReason(e.target.value)}
+                        onChange={e => setRejectionReason(e.target.value)}
                         size="small"
                         required
                       />
@@ -554,7 +565,11 @@ export default function ApprovalDetailDialog({
                         color="error"
                         startIcon={<Cancel />}
                         onClick={handleRejectRequest}
-                        disabled={isProcessing || !rejectionReason.trim() || !hasSelectedPendingPackages()}
+                        disabled={
+                          isProcessing ||
+                          !rejectionReason.trim() ||
+                          !hasSelectedPendingPackages()
+                        }
                         sx={{ mt: 2 }}
                       >
                         Reject Selected ({getSelectedPendingPackages().length})
@@ -566,21 +581,30 @@ export default function ApprovalDetailDialog({
             </Box>
 
             {/* Packages Table */}
-            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 1,
+              }}
+            >
               <Typography variant="h6">
                 Packages ({selectedRequest.packages.length})
               </Typography>
               <Typography variant="caption" color="textSecondary">
-                Only packages with "Pending Approval" status can be selected for approval/rejection
+                Only packages with "Pending Approval" status can be selected for
+                approval/rejection
               </Typography>
             </Box>
-            
+
             <MaterialReactTable
               columns={packageColumns}
               data={selectedRequest.packages.map(pkg => ({
                 ...pkg,
                 selected: selectedPackages.has(pkg.id),
-                onSelectChange: (selected: boolean) => handlePackageSelect(pkg.id, selected)
+                onSelectChange: (selected: boolean) =>
+                  handlePackageSelect(pkg.id, selected),
               }))}
               enableColumnFilters
               enableGlobalFilter
@@ -610,10 +634,14 @@ export default function ApprovalDetailDialog({
               }}
               muiTableBodyRowProps={({ row }) => ({
                 sx: {
-                  opacity: row.original.status === PACKAGE_STATUS.PENDING_APPROVAL ? 1 : 0.6,
-                  backgroundColor: row.original.status === PACKAGE_STATUS.PENDING_APPROVAL 
-                    ? "transparent" 
-                    : "rgba(0, 0, 0, 0.02)",
+                  opacity:
+                    row.original.status === PACKAGE_STATUS.PENDING_APPROVAL
+                      ? 1
+                      : 0.6,
+                  backgroundColor:
+                    row.original.status === PACKAGE_STATUS.PENDING_APPROVAL
+                      ? "transparent"
+                      : "rgba(0, 0, 0, 0.02)",
                 },
               })}
               initialState={{
@@ -627,7 +655,14 @@ export default function ApprovalDetailDialog({
             />
           </Box>
         ) : (
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              minHeight: 200,
+            }}
+          >
             <CircularProgress />
             <Typography variant="body2" sx={{ ml: 2 }}>
               Loading package details...
@@ -635,7 +670,7 @@ export default function ApprovalDetailDialog({
           </Box>
         )}
       </DialogContent>
-      
+
       <DialogActions>
         <Button onClick={handleClose}>Close</Button>
       </DialogActions>
@@ -676,7 +711,10 @@ function getPackageStatusLabel(status: string): string {
   }
 }
 
-function getLicenseStatusColor(licenseIdentifier: string, licenseStatus?: LicenseStatus) {
+function getLicenseStatusColor(
+  licenseIdentifier: string,
+  licenseStatus?: LicenseStatus
+) {
   if (licenseStatus) {
     switch (licenseStatus) {
       case LICENSE_STATUS.ALWAYS_ALLOWED:
@@ -691,7 +729,15 @@ function getLicenseStatusColor(licenseIdentifier: string, licenseStatus?: Licens
     }
   }
 
-  const allowedLicenses = ["MIT", "Apache-2.0", "BSD", "CC0-1.0", "Unlicense", "ISC", "0BSD"];
+  const allowedLicenses = [
+    "MIT",
+    "Apache-2.0",
+    "BSD",
+    "CC0-1.0",
+    "Unlicense",
+    "ISC",
+    "0BSD",
+  ];
   const avoidLicenses = ["GPL-3.0", "LGPL-3.0"];
   const blockedLicenses = ["GPL", "GPL-2.0", "AGPL"];
 
@@ -702,13 +748,26 @@ function getLicenseStatusColor(licenseIdentifier: string, licenseStatus?: Licens
   } else if (blockedLicenses.includes(licenseIdentifier)) {
     return "error";
   } else {
-    if (licenseIdentifier.includes("GPL-2.0") || licenseIdentifier.includes("LGPL-2.0")) {
+    if (
+      licenseIdentifier.includes("GPL-2.0") ||
+      licenseIdentifier.includes("LGPL-2.0")
+    ) {
       return "warning";
-    } else if (licenseIdentifier.includes("GPL-3.0") || licenseIdentifier.includes("LGPL-3.0") || licenseIdentifier.includes("AGPL")) {
+    } else if (
+      licenseIdentifier.includes("GPL-3.0") ||
+      licenseIdentifier.includes("LGPL-3.0") ||
+      licenseIdentifier.includes("AGPL")
+    ) {
       return "error";
-    } else if (licenseIdentifier.includes("MIT") || licenseIdentifier.includes("Apache-2.0") || licenseIdentifier.includes("BSD") || 
-               licenseIdentifier.includes("CC0-1.0") || licenseIdentifier.includes("Unlicense") || licenseIdentifier.includes("ISC") || 
-               licenseIdentifier.includes("0BSD")) {
+    } else if (
+      licenseIdentifier.includes("MIT") ||
+      licenseIdentifier.includes("Apache-2.0") ||
+      licenseIdentifier.includes("BSD") ||
+      licenseIdentifier.includes("CC0-1.0") ||
+      licenseIdentifier.includes("Unlicense") ||
+      licenseIdentifier.includes("ISC") ||
+      licenseIdentifier.includes("0BSD")
+    ) {
       return "success";
     } else {
       return "default";
@@ -716,7 +775,10 @@ function getLicenseStatusColor(licenseIdentifier: string, licenseStatus?: Licens
   }
 }
 
-function getLicenseCategory(licenseIdentifier: string, licenseStatus?: LicenseStatus): string {
+function getLicenseCategory(
+  licenseIdentifier: string,
+  licenseStatus?: LicenseStatus
+): string {
   if (licenseStatus) {
     switch (licenseStatus) {
       case LICENSE_STATUS.ALWAYS_ALLOWED:
@@ -731,7 +793,15 @@ function getLicenseCategory(licenseIdentifier: string, licenseStatus?: LicenseSt
     }
   }
 
-  const allowedLicenses = ["MIT", "Apache-2.0", "BSD", "CC0-1.0", "Unlicense", "ISC", "0BSD"];
+  const allowedLicenses = [
+    "MIT",
+    "Apache-2.0",
+    "BSD",
+    "CC0-1.0",
+    "Unlicense",
+    "ISC",
+    "0BSD",
+  ];
   const avoidLicenses = ["GPL-3.0", "LGPL-3.0"];
   const blockedLicenses = ["GPL", "GPL-2.0", "AGPL"];
 
@@ -742,13 +812,26 @@ function getLicenseCategory(licenseIdentifier: string, licenseStatus?: LicenseSt
   } else if (blockedLicenses.includes(licenseIdentifier)) {
     return "Blocked";
   } else {
-    if (licenseIdentifier.includes("GPL-2.0") || licenseIdentifier.includes("LGPL-2.0")) {
+    if (
+      licenseIdentifier.includes("GPL-2.0") ||
+      licenseIdentifier.includes("LGPL-2.0")
+    ) {
       return "Avoid";
-    } else if (licenseIdentifier.includes("GPL-3.0") || licenseIdentifier.includes("LGPL-3.0") || licenseIdentifier.includes("AGPL")) {
+    } else if (
+      licenseIdentifier.includes("GPL-3.0") ||
+      licenseIdentifier.includes("LGPL-3.0") ||
+      licenseIdentifier.includes("AGPL")
+    ) {
       return "Blocked";
-    } else if (licenseIdentifier.includes("MIT") || licenseIdentifier.includes("Apache-2.0") || licenseIdentifier.includes("BSD") || 
-               licenseIdentifier.includes("CC0-1.0") || licenseIdentifier.includes("Unlicense") || licenseIdentifier.includes("ISC") || 
-               licenseIdentifier.includes("0BSD")) {
+    } else if (
+      licenseIdentifier.includes("MIT") ||
+      licenseIdentifier.includes("Apache-2.0") ||
+      licenseIdentifier.includes("BSD") ||
+      licenseIdentifier.includes("CC0-1.0") ||
+      licenseIdentifier.includes("Unlicense") ||
+      licenseIdentifier.includes("ISC") ||
+      licenseIdentifier.includes("0BSD")
+    ) {
       return "Allowed";
     } else {
       return "Review";

@@ -40,10 +40,7 @@ function App() {
             path="/login"
             element={user ? <Navigate to="/" /> : <Login />}
           />
-          <Route
-            path="/oauth/callback"
-            element={<OAuthCallback />}
-          />
+          <Route path="/oauth/callback" element={<OAuthCallback />} />
           <Route
             path="/configuration-required"
             element={

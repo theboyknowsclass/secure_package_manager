@@ -80,7 +80,7 @@ export default function Navbar() {
           </Button>
 
           {/* Approve section - for approvers and admins */}
-          {(user?.role === 'approver' || user?.role === 'admin') && (
+          {(user?.role === "approver" || user?.role === "admin") && (
             <Button
               color="inherit"
               onClick={() => navigate("/approve")}
@@ -95,7 +95,7 @@ export default function Navbar() {
           )}
 
           {/* Settings section - for admins only */}
-          {user?.role === 'admin' && (
+          {user?.role === "admin" && (
             <Button
               color="inherit"
               onClick={() => navigate("/settings")}

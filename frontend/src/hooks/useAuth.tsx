@@ -21,7 +21,7 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { user, loading, logout: storeLogout, checkAuth } = useAuthStore();
+  const { user, loading, checkAuth } = useAuthStore();
 
   // Initialize authentication check on mount
   React.useEffect(() => {

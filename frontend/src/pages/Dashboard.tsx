@@ -1,5 +1,4 @@
 import React from "react";
-import { useQuery } from "react-query";
 import {
   Box,
   Typography,
@@ -7,69 +6,20 @@ import {
   Card,
   CardContent,
   Paper,
-  CircularProgress,
   Alert,
 } from "@mui/material";
 import { useAuth } from "../hooks/useAuth";
-import { api, endpoints } from "../services/api";
-import { 
-  PACKAGE_STATUS, 
-  type PackageStatus,
-  isPendingStatus,
-  isCompletedStatus 
-} from "../types/status";
-
-interface PackageRequest {
-  id: number;
-  status: PackageStatus;
-  total_packages: number;
-  completion_percentage: number;
-  created_at: string;
-  application_name: string;
-  version: string;
-  requestor: {
-    id: number;
-    username: string;
-    full_name: string;
-  };
-  package_counts: {
-    total: number;
-    Requested: number;
-    "Checking Licence": number;
-    "Licence Checked": number;
-    Downloading: number;
-    Downloaded: number;
-    "Security Scanning": number;
-    "Security Scanned": number;
-    "Pending Approval": number;
-    Approved: number;
-    Rejected: number;
-  };
-}
+import { usePackageRequests } from "../services/api/packageService";
+import { type PackageRequest, isCompletedStatus } from "../types";
+import { LoadingSpinner, PackageStatusChip } from "../components/atoms";
 
 export default function Dashboard() {
   const { user } = useAuth();
 
-  const {
-    data: requests,
-    isLoading,
-    error,
-  } = useQuery<PackageRequest[]>("packageRequests", async () => {
-    const response = await api.get(endpoints.packages.requests);
-    return response.data.requests;
-  });
+  const { data: requests, isLoading, error } = usePackageRequests();
 
   if (isLoading) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="50vh"
-      >
-        <CircularProgress />
-      </Box>
-    );
+    return <LoadingSpinner message="Loading package requests..." />;
   }
 
   if (error) {
@@ -82,13 +32,11 @@ export default function Dashboard() {
 
   const totalRequests = requests?.length || 0;
   const pendingRequests =
-    requests?.filter(
-      (r) => !isCompletedStatus(r.status)
-    ).length || 0;
+    requests?.filter((r: PackageRequest) => !isCompletedStatus(r.status))
+      .length || 0;
   const completedRequests =
-    requests?.filter(
-      (r) => isCompletedStatus(r.status)
-    ).length || 0;
+    requests?.filter((r: PackageRequest) => isCompletedStatus(r.status))
+      .length || 0;
 
   return (
     <Box>
@@ -150,7 +98,7 @@ export default function Dashboard() {
 
       {requests && requests.length > 0 ? (
         <Grid container spacing={2}>
-          {requests.slice(0, 6).map((request) => (
+          {requests.slice(0, 6).map((request: PackageRequest) => (
             <Grid item xs={12} md={6} key={request.id}>
               <Paper sx={{ p: 2 }}>
                 <Box
@@ -162,19 +110,11 @@ export default function Dashboard() {
                   <Typography variant="h6">
                     {request.application_name} v{request.version}
                   </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      px: 1,
-                      py: 0.5,
-                      borderRadius: 1,
-                      backgroundColor: getStatusColor(request.status),
-                      color: "white",
-                      textTransform: "capitalize",
-                    }}
-                  >
-                    {request.status}
-                  </Typography>
+                  <PackageStatusChip
+                    status={request.status}
+                    size="small"
+                    showTooltip={true}
+                  />
                 </Box>
 
                 <Typography variant="body2" color="textSecondary" gutterBottom>
@@ -182,8 +122,8 @@ export default function Dashboard() {
                 </Typography>
 
                 <Typography variant="body2" color="textSecondary">
-                  Packages: {request.validated_packages}/
-                  {request.total_packages} validated
+                  Packages: {request.completion_percentage}% complete (
+                  {request.total_packages} total)
                 </Typography>
 
                 <Typography variant="body2" color="textSecondary">
@@ -206,24 +146,4 @@ export default function Dashboard() {
       )}
     </Box>
   );
-}
-
-function getStatusColor(status: PackageStatus): string {
-  switch (status) {
-    case PACKAGE_STATUS.REQUESTED:
-      return "#757575"; // Grey
-    case PACKAGE_STATUS.PERFORMING_LICENCE_CHECK:
-    case PACKAGE_STATUS.PERFORMING_SECURITY_SCAN:
-    case PACKAGE_STATUS.PENDING_APPROVAL:
-      return "#ed6c02"; // Orange/Warning
-    case PACKAGE_STATUS.LICENCE_CHECK_COMPLETE:
-    case PACKAGE_STATUS.SECURITY_SCAN_COMPLETE:
-      return "#1976d2"; // Blue/Info
-    case PACKAGE_STATUS.APPROVED:
-      return "#2e7d32"; // Green/Success
-    case PACKAGE_STATUS.REJECTED:
-      return "#d32f2f"; // Red/Error
-    default:
-      return "#757575"; // Grey
-  }
 }

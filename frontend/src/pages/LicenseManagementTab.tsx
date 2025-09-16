@@ -23,14 +23,22 @@ import {
   Tooltip,
 } from "@mui/material";
 import { MaterialReactTable, type MRT_ColumnDef } from "material-react-table";
-import { Add, Edit, Delete, CheckCircle, Warning, Info, Error } from "@mui/icons-material";
+import {
+  Add,
+  Edit,
+  Delete,
+  CheckCircle,
+  Warning,
+  Info,
+  Error,
+} from "@mui/icons-material";
 import { api, endpoints } from "../services/api";
 
 interface SupportedLicense {
   id: number;
   name: string;
   identifier: string;
-  status: 'always_allowed' | 'allowed' | 'avoid' | 'blocked';
+  status: "always_allowed" | "allowed" | "avoid" | "blocked";
   created_by: number;
   created_at: string;
   updated_at: string;
@@ -39,27 +47,39 @@ interface SupportedLicense {
 // Helper function to get status icon and color
 const getStatusDisplay = (status: string) => {
   switch (status) {
-    case 'always_allowed':
-      return { icon: <CheckCircle />, color: 'success', label: 'Always Allowed' };
-    case 'allowed':
-      return { icon: <Info />, color: 'info', label: 'Allowed' };
-    case 'avoid':
-      return { icon: <Warning />, color: 'warning', label: 'Avoid' };
-    case 'blocked':
-      return { icon: <Error />, color: 'error', label: 'Blocked' };
+    case "always_allowed":
+      return {
+        icon: <CheckCircle />,
+        color: "success",
+        label: "Always Allowed",
+      };
+    case "allowed":
+      return { icon: <Info />, color: "info", label: "Allowed" };
+    case "avoid":
+      return { icon: <Warning />, color: "warning", label: "Avoid" };
+    case "blocked":
+      return { icon: <Error />, color: "error", label: "Blocked" };
     default:
-      return { icon: <Info />, color: 'default', label: status };
+      return { icon: <Info />, color: "default", label: status };
   }
 };
 
 export default function LicenseManagementTab() {
-  const [selectedLicenses, setSelectedLicenses] = useState<SupportedLicense[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [selectedLicenses, setSelectedLicenses] = useState<SupportedLicense[]>(
+    []
+  );
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [rowSelection, setRowSelection] = useState({});
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [editingLicense, setEditingLicense] = useState<SupportedLicense | null>(null);
-  const [currentView, setCurrentView] = useState<'all' | 'always_allowed' | 'allowed' | 'avoid' | 'blocked'>('all');
+  const [editingLicense, setEditingLicense] = useState<SupportedLicense | null>(
+    null
+  );
+  const [currentView, setCurrentView] = useState<
+    "all" | "always_allowed" | "allowed" | "avoid" | "blocked"
+  >("all");
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
@@ -70,7 +90,7 @@ export default function LicenseManagementTab() {
   const [formData, setFormData] = useState({
     name: "",
     identifier: "",
-    status: 'allowed' as 'always_allowed' | 'allowed' | 'avoid' | 'blocked',
+    status: "allowed" as "always_allowed" | "allowed" | "avoid" | "blocked",
   });
 
   const queryClient = useQueryClient();
@@ -79,10 +99,17 @@ export default function LicenseManagementTab() {
     data: licenses,
     isLoading,
     error,
-  } = useQuery<SupportedLicense[]>(["supportedLicenses", currentView], async () => {
-    const response = await api.get(endpoints.admin.licenses(currentView === 'all' ? undefined : currentView));
-    return response.data.licenses;
-  });
+  } = useQuery<SupportedLicense[]>(
+    ["supportedLicenses", currentView],
+    async () => {
+      const response = await api.get(
+        endpoints.admin.licenses(
+          currentView === "all" ? undefined : currentView
+        )
+      );
+      return response.data.licenses;
+    }
+  );
 
   const createMutation = useMutation(
     async (licenseData: any) => {
@@ -176,12 +203,15 @@ export default function LicenseManagementTab() {
         header: "License Name",
         size: 300,
         Cell: ({ row }) => (
-          <Typography variant="body2" sx={{ 
-            overflow: "hidden", 
-            textOverflow: "ellipsis", 
-            whiteSpace: "nowrap",
-            maxWidth: "100%"
-          }}>
+          <Typography
+            variant="body2"
+            sx={{
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              maxWidth: "100%",
+            }}
+          >
             {row.original.name}
           </Typography>
         ),
@@ -236,7 +266,7 @@ export default function LicenseManagementTab() {
     setFormData({
       name: "",
       identifier: "",
-      status: 'allowed',
+      status: "allowed",
     });
   };
 
@@ -303,7 +333,14 @@ export default function LicenseManagementTab() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
         <Button
           variant="contained"
           startIcon={<Add />}
@@ -385,21 +422,26 @@ export default function LicenseManagementTab() {
       )}
 
       {/* Create License Dialog */}
-      <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="md" fullWidth>
+      <Dialog
+        open={createDialogOpen}
+        onClose={() => setCreateDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogTitle>Add New License</DialogTitle>
         <DialogContent>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
             <TextField
               label="License Name"
               value={formData.name}
-              onChange={(e) => handleFormChange("name", e.target.value)}
+              onChange={e => handleFormChange("name", e.target.value)}
               fullWidth
               required
             />
             <TextField
               label="SPDX Identifier"
               value={formData.identifier}
-              onChange={(e) => handleFormChange("identifier", e.target.value)}
+              onChange={e => handleFormChange("identifier", e.target.value)}
               fullWidth
               required
               helperText="e.g., MIT, Apache-2.0, GPL-3.0"
@@ -409,7 +451,7 @@ export default function LicenseManagementTab() {
               <Select
                 value={formData.status}
                 label="Status"
-                onChange={(e) => handleFormChange("status", e.target.value)}
+                onChange={e => handleFormChange("status", e.target.value)}
               >
                 <MenuItem value="always_allowed">
                   <CheckCircle sx={{ mr: 1 }} />
@@ -436,7 +478,9 @@ export default function LicenseManagementTab() {
           <Button
             onClick={handleSubmitCreate}
             variant="contained"
-            disabled={createMutation.isLoading || !formData.name || !formData.identifier}
+            disabled={
+              createMutation.isLoading || !formData.name || !formData.identifier
+            }
           >
             {createMutation.isLoading ? "Creating..." : "Create License"}
           </Button>
@@ -444,21 +488,26 @@ export default function LicenseManagementTab() {
       </Dialog>
 
       {/* Edit License Dialog */}
-      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="md" fullWidth>
+      <Dialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogTitle>Edit License</DialogTitle>
         <DialogContent>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
             <TextField
               label="License Name"
               value={formData.name}
-              onChange={(e) => handleFormChange("name", e.target.value)}
+              onChange={e => handleFormChange("name", e.target.value)}
               fullWidth
               required
             />
             <TextField
               label="SPDX Identifier"
               value={formData.identifier}
-              onChange={(e) => handleFormChange("identifier", e.target.value)}
+              onChange={e => handleFormChange("identifier", e.target.value)}
               fullWidth
               required
               disabled
@@ -469,7 +518,7 @@ export default function LicenseManagementTab() {
               <Select
                 value={formData.status}
                 label="Status"
-                onChange={(e) => handleFormChange("status", e.target.value)}
+                onChange={e => handleFormChange("status", e.target.value)}
               >
                 <MenuItem value="always_allowed">
                   <CheckCircle sx={{ mr: 1 }} />
@@ -504,7 +553,10 @@ export default function LicenseManagementTab() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+      >
         <DialogTitle>Delete License</DialogTitle>
         <DialogContent>
           <Typography>
@@ -512,7 +564,8 @@ export default function LicenseManagementTab() {
             <strong>{editingLicense?.name}</strong>?
           </Typography>
           <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-            This action cannot be undone. Make sure no packages are using this license.
+            This action cannot be undone. Make sure no packages are using this
+            license.
           </Typography>
         </DialogContent>
         <DialogActions>

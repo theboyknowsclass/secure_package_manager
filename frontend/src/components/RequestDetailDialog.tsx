@@ -1,22 +1,25 @@
 import React from "react";
-import { 
-  Box, 
-  Typography, 
-  CircularProgress, 
-  Chip, 
+import {
+  Box,
+  Typography,
+  CircularProgress,
+  Chip,
   Button,
   IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Tooltip
+  Tooltip,
 } from "@mui/material";
 import { MaterialReactTable, type MRT_ColumnDef } from "material-react-table";
 import { Close } from "@mui/icons-material";
 import { api, endpoints } from "../services/api";
-import { PACKAGE_STATUS, type PackageStatus, type Package, type PackageRequest, type DetailedRequestResponse } from "../types/status";
-
+import {
+  PACKAGE_STATUS,
+  type Package,
+  type DetailedRequestResponse,
+} from "../types/status";
 
 interface RequestDetailDialogProps {
   open: boolean;
@@ -43,9 +46,7 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     header: "Version",
     size: 120,
     Cell: ({ row }) => (
-      <Typography variant="body2">
-        {row.original.version}
-      </Typography>
+      <Typography variant="body2">{row.original.version}</Typography>
     ),
   },
   {
@@ -67,7 +68,9 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     Cell: ({ row }) => {
       const pkg = row.original;
       return pkg.license_identifier ? (
-        <Tooltip title={`${pkg.license_identifier} - ${getLicenseCategoryFromScore(pkg.license_score)}`}>
+        <Tooltip
+          title={`${pkg.license_identifier} - ${getLicenseCategoryFromScore(pkg.license_score)}`}
+        >
           <Chip
             label={pkg.license_identifier}
             color={getLicenseColorFromScore(pkg.license_score)}
@@ -76,11 +79,7 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
         </Tooltip>
       ) : (
         <Tooltip title="Unknown License - No license information available">
-          <Chip
-            label="Unknown"
-            color="default"
-            size="small"
-          />
+          <Chip label="Unknown" color="default" size="small" />
         </Tooltip>
       );
     },
@@ -92,7 +91,7 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     Cell: ({ row }) => {
       const score = row.original.security_score;
       const scanStatus = row.original.security_scan_status;
-      
+
       if (score !== null) {
         return (
           <Chip
@@ -104,26 +103,20 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
       } else if (scanStatus === "failed") {
         return (
           <Tooltip title="Security scan failed">
-            <Chip
-              label="Scan Failed"
-              color="error"
-              size="small"
-            />
+            <Chip label="Scan Failed" color="error" size="small" />
           </Tooltip>
         );
       } else if (scanStatus === "running") {
         return (
           <Tooltip title="Security scan in progress">
-            <Chip
-              label="Scanning..."
-              color="info"
-              size="small"
-            />
+            <Chip label="Scanning..." color="info" size="small" />
           </Tooltip>
         );
       } else {
         return (
-          <Typography variant="body2" color="textSecondary">-</Typography>
+          <Typography variant="body2" color="textSecondary">
+            -
+          </Typography>
         );
       }
     },
@@ -141,7 +134,9 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
           size="small"
         />
       ) : (
-        <Typography variant="body2" color="textSecondary">-</Typography>
+        <Typography variant="body2" color="textSecondary">
+          -
+        </Typography>
       );
     },
   },
@@ -152,15 +147,23 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     Cell: ({ row }) => {
       const count = row.original.vulnerability_count;
       const critical = row.original.critical_vulnerabilities;
-      
+
       if (count === null || count === undefined) {
-        return <Typography variant="body2" color="textSecondary">-</Typography>;
+        return (
+          <Typography variant="body2" color="textSecondary">
+            -
+          </Typography>
+        );
       }
-      
+
       if (count === 0) {
-        return <Typography variant="body2" color="success.main">None</Typography>;
+        return (
+          <Typography variant="body2" color="success.main">
+            None
+          </Typography>
+        );
       }
-      
+
       return (
         <Box>
           <Typography variant="body2" color="error.main">
@@ -181,14 +184,15 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     size: 80,
     Cell: ({ row }) => {
       const type = row.original.type;
-      return type ? (
+      return type === "existing" ? (
         <Chip
-          label={type === "new" ? "New" : "Existing"}
-          color={type === "new" ? "primary" : "default"}
+          label="Already Processed"
+          color="success"
           size="small"
+          variant="outlined"
         />
       ) : (
-        <Typography variant="body2" color="textSecondary">-</Typography>
+        <Chip label="New" color="primary" size="small" />
       );
     },
   },
@@ -207,12 +211,13 @@ export default function RequestDetailDialog({
     if (open && requestId && !selectedRequest) {
       setLoading(true);
       // Fetch detailed request information with packages
-      api.get(endpoints.packages.request(requestId))
+      api
+        .get(endpoints.packages.request(requestId))
         .then(response => {
           onRequestLoaded(response.data);
         })
         .catch(error => {
-          console.error('Failed to fetch request details:', error);
+          console.error("Failed to fetch request details:", error);
         })
         .finally(() => {
           setLoading(false);
@@ -225,8 +230,8 @@ export default function RequestDetailDialog({
   };
 
   return (
-    <Dialog 
-      open={open} 
+    <Dialog
+      open={open}
       onClose={handleClose}
       maxWidth="lg"
       fullWidth
@@ -239,7 +244,7 @@ export default function RequestDetailDialog({
           </IconButton>
         </Box>
       </DialogTitle>
-      
+
       <DialogContent>
         {selectedRequest ? (
           <Box>
@@ -254,7 +259,8 @@ export default function RequestDetailDialog({
                     Application
                   </Typography>
                   <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-                    {selectedRequest.request.application_name} v{selectedRequest.request.version}
+                    {selectedRequest.request.application_name} v
+                    {selectedRequest.request.version}
                   </Typography>
                 </Box>
                 <Box>
@@ -262,7 +268,8 @@ export default function RequestDetailDialog({
                     Requestor
                   </Typography>
                   <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-                    {selectedRequest.request.requestor.full_name} (@{selectedRequest.request.requestor.username})
+                    {selectedRequest.request.requestor.full_name} (@
+                    {selectedRequest.request.requestor.username})
                   </Typography>
                 </Box>
                 <Box>
@@ -271,8 +278,12 @@ export default function RequestDetailDialog({
                   </Typography>
                   <Box sx={{ mt: 0.5 }}>
                     <Chip
-                      label={getRequestStatusLabel(selectedRequest.request.status)}
-                      color={getRequestStatusColor(selectedRequest.request.status)}
+                      label={getRequestStatusLabel(
+                        selectedRequest.request.status
+                      )}
+                      color={getRequestStatusColor(
+                        selectedRequest.request.status
+                      )}
                       size="small"
                     />
                   </Box>
@@ -282,7 +293,9 @@ export default function RequestDetailDialog({
                     Created
                   </Typography>
                   <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-                    {new Date(selectedRequest.request.created_at).toLocaleString()}
+                    {new Date(
+                      selectedRequest.request.created_at
+                    ).toLocaleString()}
                   </Typography>
                 </Box>
                 <Box>
@@ -300,7 +313,7 @@ export default function RequestDetailDialog({
             <Typography variant="h6" gutterBottom>
               Packages ({selectedRequest.packages.length})
             </Typography>
-            
+
             <MaterialReactTable
               columns={packageColumns}
               data={selectedRequest.packages}
@@ -335,27 +348,41 @@ export default function RequestDetailDialog({
                 showColumnFilters: true,
                 sorting: [
                   { id: "name", desc: false },
-                  { id: "version", desc: false }
+                  { id: "version", desc: false },
                 ],
               }}
             />
           </Box>
         ) : loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              minHeight: 200,
+            }}
+          >
             <CircularProgress />
             <Typography variant="body2" sx={{ ml: 2 }}>
               Loading package details...
             </Typography>
           </Box>
         ) : (
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              minHeight: 200,
+            }}
+          >
             <Typography variant="body2" color="textSecondary">
               Failed to load request details
             </Typography>
           </Box>
         )}
       </DialogContent>
-      
+
       <DialogActions>
         <Button onClick={handleClose}>Close</Button>
       </DialogActions>
@@ -457,7 +484,7 @@ function getLicenseColorFromScore(
   if (licenseScore === null) {
     return "info"; // Pending - blue
   }
-  
+
   if (licenseScore === 0) {
     return "error"; // Blocked - red
   } else if (licenseScore >= 80) {
@@ -475,7 +502,7 @@ function getLicenseCategoryFromScore(licenseScore: number | null): string {
   if (licenseScore === null) {
     return "Pending";
   }
-  
+
   if (licenseScore === 0) {
     return "Blocked";
   } else if (licenseScore >= 80) {

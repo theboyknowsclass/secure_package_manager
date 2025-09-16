@@ -51,8 +51,8 @@ export default function ConfigurationRequired() {
                 The secure package manager service is not yet configured.
               </Typography>
               <Typography variant="body1">
-                Please contact your system administrator to complete the initial setup
-                before you can use this service.
+                Please contact your system administrator to complete the initial
+                setup before you can use this service.
               </Typography>
             </Alert>
 
@@ -61,9 +61,15 @@ export default function ConfigurationRequired() {
                 <Typography variant="h6" gutterBottom>
                   What needs to be configured?
                 </Typography>
-                <Typography variant="body2" color="text.secondary" component="div">
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  component="div"
+                >
                   <ul>
-                    <li>Repository configuration (source and target repositories)</li>
+                    <li>
+                      Repository configuration (source and target repositories)
+                    </li>
                     <li>License management settings</li>
                     <li>Security policies and validation rules</li>
                     <li>User permissions and access controls</li>
@@ -72,8 +78,14 @@ export default function ConfigurationRequired() {
               </CardContent>
             </Card>
 
-            <Typography variant="body1" color="text.secondary" align="center" sx={{ mb: 3 }}>
-              Once the administrator completes the configuration, you will be able to:
+            <Typography
+              variant="body1"
+              color="text.secondary"
+              align="center"
+              sx={{ mb: 3 }}
+            >
+              Once the administrator completes the configuration, you will be
+              able to:
             </Typography>
 
             <Box
@@ -131,8 +143,14 @@ export default function ConfigurationRequired() {
               </Button>
             </Box>
 
-            <Typography variant="caption" color="text.secondary" align="center" sx={{ mt: 2 }}>
-              If you believe this is an error, please contact your system administrator.
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              align="center"
+              sx={{ mt: 2 }}
+            >
+              If you believe this is an error, please contact your system
+              administrator.
             </Typography>
           </Box>
         </Paper>

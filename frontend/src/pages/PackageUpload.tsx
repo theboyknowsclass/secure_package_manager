@@ -7,11 +7,9 @@ import {
   Paper,
   Button,
   Alert,
-  CircularProgress,
   Card,
   CardContent,
   LinearProgress,
-  Link,
 } from "@mui/material";
 import { CloudUpload, CheckCircle, Visibility } from "@mui/icons-material";
 import { api, endpoints } from "../services/api";
@@ -46,9 +44,11 @@ export default function PackageUpload() {
         headers: {
           "Content-Type": "multipart/form-data",
         },
-        onUploadProgress: (progressEvent) => {
+        onUploadProgress: progressEvent => {
           if (progressEvent.total) {
-            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            const progress = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
             setUploadProgress(progress);
           }
         },
@@ -89,7 +89,6 @@ export default function PackageUpload() {
         Upload your package-lock.json file to start the package validation
         process.
       </Typography>
-
 
       <Paper
         {...getRootProps()}
@@ -140,7 +139,12 @@ export default function PackageUpload() {
 
       {uploading && uploadProgress < 100 && (
         <Box mt={2}>
-          <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+          <Box
+            display="flex"
+            alignItems="center"
+            justifyContent="space-between"
+            mb={1}
+          >
             <Typography variant="body2" color="textSecondary">
               Uploading package-lock.json...
             </Typography>
@@ -148,8 +152,8 @@ export default function PackageUpload() {
               {uploadProgress}%
             </Typography>
           </Box>
-          <LinearProgress 
-            variant="determinate" 
+          <LinearProgress
+            variant="determinate"
             value={uploadProgress}
             sx={{ height: 8, borderRadius: 4 }}
           />
@@ -157,8 +161,8 @@ export default function PackageUpload() {
       )}
 
       {uploading && uploadProgress === 100 && (
-        <Alert 
-          severity="success" 
+        <Alert
+          severity="success"
           sx={{ mt: 2 }}
           action={
             <Button

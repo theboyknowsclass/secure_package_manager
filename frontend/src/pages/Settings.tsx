@@ -1,12 +1,5 @@
 import React, { useState } from "react";
-import {
-  Box,
-  Typography,
-  Tabs,
-  Tab,
-  Paper,
-  Container,
-} from "@mui/material";
+import { Box, Typography, Tabs, Tab, Paper, Container } from "@mui/material";
 import { Settings as SettingsIcon, Storage, Gavel } from "@mui/icons-material";
 import RepositoryConfig from "../components/RepositoryConfig";
 import LicenseManagementTab from "./LicenseManagementTab";
@@ -36,7 +29,7 @@ function TabPanel(props: TabPanelProps) {
 function a11yProps(index: number) {
   return {
     id: `settings-tab-${index}`,
-    'aria-controls': `settings-tabpanel-${index}`,
+    "aria-controls": `settings-tabpanel-${index}`,
   };
 }
 
@@ -50,19 +43,20 @@ export default function Settings() {
   return (
     <Container maxWidth="lg">
       <Box sx={{ mt: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
           <SettingsIcon sx={{ mr: 2, fontSize: 32 }} color="primary" />
           <Typography variant="h4" component="h1">
             System Settings
           </Typography>
         </Box>
-        
+
         <Typography variant="body1" color="textSecondary" paragraph>
-          Configure system settings and manage licenses for the secure package manager.
+          Configure system settings and manage licenses for the secure package
+          manager.
         </Typography>
 
-        <Paper sx={{ width: '100%' }}>
-          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Paper sx={{ width: "100%" }}>
+          <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
             <Tabs
               value={tabValue}
               onChange={handleTabChange}
@@ -83,11 +77,11 @@ export default function Settings() {
               />
             </Tabs>
           </Box>
-          
+
           <TabPanel value={tabValue} index={0}>
             <RepositoryConfig />
           </TabPanel>
-          
+
           <TabPanel value={tabValue} index={1}>
             <LicenseManagementTab />
           </TabPanel>

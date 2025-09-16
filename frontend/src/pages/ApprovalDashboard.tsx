@@ -10,23 +10,21 @@ import {
   Alert,
 } from "@mui/material";
 import { MaterialReactTable, type MRT_ColumnDef } from "material-react-table";
-import { 
-  Visibility, 
-  CheckCircle, 
-  Warning
-} from "@mui/icons-material";
+import { Visibility, CheckCircle, Warning } from "@mui/icons-material";
 import { api, endpoints } from "../services/api";
-import { 
-  PACKAGE_STATUS, 
-  type PackageStatus,
+import {
+  PACKAGE_STATUS,
   type DetailedRequestResponse,
   type PackageRequest,
-  type Package
+  type Package,
 } from "../types/status";
 import ApprovalDetailDialog from "../components/ApprovalDetailDialog";
 
 // Define columns for package details table
-const packageColumns: MRT_ColumnDef<Package & { selected?: boolean; onSelectChange?: (selected: boolean) => void }>[] = [
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const packageColumns: MRT_ColumnDef<
+  Package & { selected?: boolean; onSelectChange?: (selected: boolean) => void }
+>[] = [
   {
     accessorKey: "select",
     header: "Select",
@@ -35,7 +33,7 @@ const packageColumns: MRT_ColumnDef<Package & { selected?: boolean; onSelectChan
       <input
         type="checkbox"
         checked={row.original.selected || false}
-        onChange={(e) => {
+        onChange={e => {
           // This will be handled by the parent component
           if (row.original.onSelectChange) {
             row.original.onSelectChange(e.target.checked);
@@ -59,9 +57,7 @@ const packageColumns: MRT_ColumnDef<Package & { selected?: boolean; onSelectChan
     header: "Version",
     size: 120,
     Cell: ({ row }) => (
-      <Typography variant="body2">
-        {row.original.version}
-      </Typography>
+      <Typography variant="body2">{row.original.version}</Typography>
     ),
   },
   {
@@ -83,21 +79,25 @@ const packageColumns: MRT_ColumnDef<Package & { selected?: boolean; onSelectChan
     Cell: ({ row }) => {
       const pkg = row.original;
       if (!pkg.license_identifier) {
-        return <Typography variant="body2" color="textSecondary">Unknown</Typography>;
+        return (
+          <Typography variant="body2" color="textSecondary">
+            Unknown
+          </Typography>
+        );
       }
-      
+
       // Parse license expression to separate individual licenses
       const parseLicenseExpression = (expression: string): string[] => {
         // Remove parentheses and split by OR and AND, then clean up
         return expression
-          .replace(/[()]/g, '') // Remove parentheses
+          .replace(/[()]/g, "") // Remove parentheses
           .split(/\s+(?:OR|AND)\s+/i)
           .map(license => license.trim())
           .filter(license => license.length > 0);
       };
-      
+
       const licenses = parseLicenseExpression(pkg.license_identifier);
-      
+
       if (licenses.length === 1) {
         return (
           <Chip
@@ -107,7 +107,7 @@ const packageColumns: MRT_ColumnDef<Package & { selected?: boolean; onSelectChan
           />
         );
       }
-      
+
       return (
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
           {licenses.map((license, index) => (
@@ -129,7 +129,11 @@ const packageColumns: MRT_ColumnDef<Package & { selected?: boolean; onSelectChan
     Cell: ({ row }) => {
       const score = row.original.security_score;
       if (score === null) {
-        return <Typography variant="body2" color="textSecondary">-</Typography>;
+        return (
+          <Typography variant="body2" color="textSecondary">
+            -
+          </Typography>
+        );
       }
       return (
         <Chip
@@ -148,14 +152,21 @@ const packageColumns: MRT_ColumnDef<Package & { selected?: boolean; onSelectChan
       const pkg = row.original;
       const total = pkg.vulnerability_count || 0;
       const critical = pkg.critical_vulnerabilities || 0;
-      
+
       if (total === 0) {
-        return <Typography variant="body2" color="success.main">None</Typography>;
+        return (
+          <Typography variant="body2" color="success.main">
+            None
+          </Typography>
+        );
       }
-      
+
       return (
         <Box>
-          <Typography variant="body2" color={critical > 0 ? "error.main" : "warning.main"}>
+          <Typography
+            variant="body2"
+            color={critical > 0 ? "error.main" : "warning.main"}
+          >
             {total} total
           </Typography>
           {critical > 0 && (
@@ -182,7 +193,8 @@ const packageColumns: MRT_ColumnDef<Package & { selected?: boolean; onSelectChan
 ];
 
 export default function ApprovalDashboard() {
-  const [selectedRequest, setSelectedRequest] = useState<DetailedRequestResponse | null>(null);
+  const [selectedRequest, setSelectedRequest] =
+    useState<DetailedRequestResponse | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   const {
@@ -198,12 +210,12 @@ export default function ApprovalDashboard() {
   const handleViewDetails = async (requestId: number) => {
     setDetailsOpen(true);
     setSelectedRequest(null); // Show loading state
-    
+
     try {
       const response = await api.get(endpoints.packages.request(requestId));
       setSelectedRequest(response.data);
     } catch (error) {
-      console.error('Failed to fetch request details:', error);
+      console.error("Failed to fetch request details:", error);
       setSelectedRequest(null);
     }
   };
@@ -220,27 +232,33 @@ export default function ApprovalDashboard() {
   // Filter requests that have packages pending approval
   const approvalRequests = useMemo(() => {
     if (!requests) return [];
-    
-    return requests.filter(request => 
-      request.package_counts && request.package_counts["Pending Approval"] > 0
+
+    return requests.filter(
+      request =>
+        request.package_counts && request.package_counts["Pending Approval"] > 0
     );
   }, [requests]);
 
   // Transform data for the table
   const tableData = useMemo(() => {
-    return approvalRequests.map((request) => {
+    return approvalRequests.map(request => {
       const packageCounts = request.package_counts || {};
       const pendingPackages = packageCounts["Pending Approval"] || 0;
       const approvedPackages = packageCounts["Approved"] || 0;
       const rejectedPackages = packageCounts["Rejected"] || 0;
-      const processingPackages = request.total_packages - pendingPackages - approvedPackages - rejectedPackages;
-      
+      const processingPackages =
+        request.total_packages -
+        pendingPackages -
+        approvedPackages -
+        rejectedPackages;
+
       return {
         id: request.id,
         requestId: request.id,
         applicationName: request.application_name,
         applicationVersion: request.version,
-        requestorName: request.requestor.full_name || request.requestor.username,
+        requestorName:
+          request.requestor.full_name || request.requestor.username,
         requestorUsername: request.requestor.username,
         status: request.status,
         processingCount: processingPackages,
@@ -305,7 +323,7 @@ export default function ApprovalDashboard() {
         Cell: ({ row }) => {
           const { processingCount, totalPackages } = row.original;
           const isAllProcessed = processingCount === 0;
-          
+
           if (isAllProcessed) {
             return (
               <Box>
@@ -317,7 +335,11 @@ export default function ApprovalDashboard() {
                     icon={<CheckCircle />}
                   />
                 </Tooltip>
-                <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 0.5 }}>
+                <Typography
+                  variant="caption"
+                  color="textSecondary"
+                  sx={{ display: "block", mt: 0.5 }}
+                >
                   processed
                 </Typography>
               </Box>
@@ -325,7 +347,9 @@ export default function ApprovalDashboard() {
           } else {
             return (
               <Box>
-                <Tooltip title={`${processingCount} of ${totalPackages} processing`}>
+                <Tooltip
+                  title={`${processingCount} of ${totalPackages} processing`}
+                >
                   <Chip
                     label={`${processingCount}/${totalPackages}`}
                     color="warning"
@@ -333,7 +357,11 @@ export default function ApprovalDashboard() {
                     icon={<CircularProgress size={16} />}
                   />
                 </Tooltip>
-                <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 0.5 }}>
+                <Typography
+                  variant="caption"
+                  color="textSecondary"
+                  sx={{ display: "block", mt: 0.5 }}
+                >
                   processing
                 </Typography>
               </Box>
@@ -355,7 +383,11 @@ export default function ApprovalDashboard() {
                 icon={<Warning />}
               />
             </Tooltip>
-            <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 0.5 }}>
+            <Typography
+              variant="caption"
+              color="textSecondary"
+              sx={{ display: "block", mt: 0.5 }}
+            >
               pending
             </Typography>
           </Box>
@@ -399,7 +431,14 @@ export default function ApprovalDashboard() {
 
   if (isLoading) {
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: 400,
+        }}
+      >
         <CircularProgress />
       </Box>
     );
@@ -408,7 +447,8 @@ export default function ApprovalDashboard() {
   if (error) {
     return (
       <Alert severity="error" sx={{ mt: 2 }}>
-        Error loading approval requests: {error instanceof Error ? error.message : 'Unknown error'}
+        Error loading approval requests:{" "}
+        {error instanceof Error ? error.message : "Unknown error"}
       </Alert>
     );
   }
@@ -419,7 +459,8 @@ export default function ApprovalDashboard() {
         Approval Dashboard
       </Typography>
       <Typography variant="body1" color="textSecondary" paragraph>
-        Review and approve package requests that have completed security scanning.
+        Review and approve package requests that have completed security
+        scanning.
       </Typography>
 
       {tableData.length > 0 ? (
@@ -503,7 +544,15 @@ function getPackageStatusLabel(status: string): string {
 }
 
 function getLicenseStatusColor(licenseIdentifier: string) {
-  const allowedLicenses = ["MIT", "Apache-2.0", "BSD", "CC0-1.0", "Unlicense", "ISC", "0BSD"];
+  const allowedLicenses = [
+    "MIT",
+    "Apache-2.0",
+    "BSD",
+    "CC0-1.0",
+    "Unlicense",
+    "ISC",
+    "0BSD",
+  ];
   const avoidLicenses = ["GPL-3.0", "LGPL-3.0"];
   const blockedLicenses = ["GPL", "GPL-2.0", "AGPL"];
 
@@ -514,17 +563,29 @@ function getLicenseStatusColor(licenseIdentifier: string) {
   } else if (blockedLicenses.includes(licenseIdentifier)) {
     return "error";
   } else {
-    if (licenseIdentifier.includes("GPL-2.0") || licenseIdentifier.includes("LGPL-2.0")) {
+    if (
+      licenseIdentifier.includes("GPL-2.0") ||
+      licenseIdentifier.includes("LGPL-2.0")
+    ) {
       return "warning";
-    } else if (licenseIdentifier.includes("GPL-3.0") || licenseIdentifier.includes("LGPL-3.0") || licenseIdentifier.includes("AGPL")) {
+    } else if (
+      licenseIdentifier.includes("GPL-3.0") ||
+      licenseIdentifier.includes("LGPL-3.0") ||
+      licenseIdentifier.includes("AGPL")
+    ) {
       return "error";
-    } else if (licenseIdentifier.includes("MIT") || licenseIdentifier.includes("Apache-2.0") || licenseIdentifier.includes("BSD") || 
-               licenseIdentifier.includes("CC0-1.0") || licenseIdentifier.includes("Unlicense") || licenseIdentifier.includes("ISC") || 
-               licenseIdentifier.includes("0BSD")) {
+    } else if (
+      licenseIdentifier.includes("MIT") ||
+      licenseIdentifier.includes("Apache-2.0") ||
+      licenseIdentifier.includes("BSD") ||
+      licenseIdentifier.includes("CC0-1.0") ||
+      licenseIdentifier.includes("Unlicense") ||
+      licenseIdentifier.includes("ISC") ||
+      licenseIdentifier.includes("0BSD")
+    ) {
       return "success";
     } else {
       return "default";
     }
   }
 }
-

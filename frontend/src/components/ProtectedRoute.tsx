@@ -38,7 +38,7 @@ export default function ProtectedRoute({
   }
 
   // Check admin requirement
-  if (requireAdmin && user.role !== 'admin') {
+  if (requireAdmin && user.role !== "admin") {
     return (
       <Box
         display="flex"
@@ -58,7 +58,7 @@ export default function ProtectedRoute({
   }
 
   // Check approver requirement (approver or admin)
-  if (requireApprover && !(user.role === 'approver' || user.role === 'admin')) {
+  if (requireApprover && !(user.role === "approver" || user.role === "admin")) {
     return (
       <Box
         display="flex"

@@ -10,7 +10,7 @@ import {
   CircularProgress,
   Chip,
 } from "@mui/material";
-import { Settings, Warning, CheckCircle } from "@mui/icons-material";
+import { Settings, Warning } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../services/api";
@@ -38,25 +38,27 @@ export default function ConfigurationStatus() {
       setError("");
       const response = await api.get("/api/admin/config");
       setConfigStatus(response.data.status);
-      
+
       // If user is admin and configuration is incomplete, redirect to settings
-      if (user?.role === 'admin' && !response.data.status.is_complete) {
+      if (user?.role === "admin" && !response.data.status.is_complete) {
         navigate("/settings");
         return;
       }
     } catch (err: any) {
       // If we can't check config status, assume it's incomplete for admin users
-      if (user?.role === 'admin') {
+      if (user?.role === "admin") {
         setConfigStatus({
           is_complete: false,
-          missing_keys: ['source_repository_url', 'target_repository_url'],
-          requires_admin_setup: true
+          missing_keys: ["source_repository_url", "target_repository_url"],
+          requires_admin_setup: true,
         });
         // Redirect admin to settings if we can't check status
         navigate("/settings");
         return;
       }
-      setError(err.response?.data?.error || "Failed to check configuration status");
+      setError(
+        err.response?.data?.error || "Failed to check configuration status"
+      );
     } finally {
       setLoading(false);
     }
@@ -92,7 +94,7 @@ export default function ConfigurationStatus() {
   }
 
   // If user is admin, show configuration prompt
-  if (user?.role === 'admin') {
+  if (user?.role === "admin") {
     return (
       <Card sx={{ m: 2, border: "2px solid", borderColor: "warning.main" }}>
         <CardContent>
@@ -103,21 +105,24 @@ export default function ConfigurationStatus() {
             </Typography>
           </Box>
           <Typography variant="body1" paragraph>
-            The package manager requires repository configuration before it can process packages.
-            Please configure the following settings:
+            The package manager requires repository configuration before it can
+            process packages. Please configure the following settings:
           </Typography>
           <Box display="flex" flexWrap="wrap" gap={1} mb={2}>
-            {configStatus.missing_keys.map((key) => (
+            {configStatus.missing_keys.map(key => (
               <Chip
                 key={key}
-                label={key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                label={key
+                  .replace(/_/g, " ")
+                  .replace(/\b\w/g, l => l.toUpperCase())}
                 color="warning"
                 variant="outlined"
               />
             ))}
           </Box>
           <Typography variant="body2" color="text.secondary">
-            Without proper configuration, package validation and publishing will not work correctly.
+            Without proper configuration, package validation and publishing will
+            not work correctly.
           </Typography>
         </CardContent>
         <CardActions>
@@ -135,7 +140,7 @@ export default function ConfigurationStatus() {
   }
 
   // If user is not admin and configuration is incomplete, redirect to configuration required page
-  if (user?.role !== 'admin' && !configStatus.is_complete) {
+  if (user?.role !== "admin" && !configStatus.is_complete) {
     navigate("/configuration-required");
     return null;
   }

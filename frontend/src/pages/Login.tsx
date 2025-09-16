@@ -9,11 +9,10 @@ import {
   CircularProgress,
 } from "@mui/material";
 import { useAuth } from "../hooks/useAuth";
-import { oauthService } from "../services/oauth";
 
 export default function Login() {
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const { login } = useAuth();
 
   const handleLogin = () => {
@@ -92,8 +91,13 @@ export default function Login() {
             </Button>
           </Box>
 
-          <Typography variant="body2" color="textSecondary" sx={{ mt: 2, textAlign: 'center' }}>
-            This will redirect you to your organization's identity provider for secure authentication.
+          <Typography
+            variant="body2"
+            color="textSecondary"
+            sx={{ mt: 2, textAlign: "center" }}
+          >
+            This will redirect you to your organization's identity provider for
+            secure authentication.
           </Typography>
         </Paper>
       </Box>
