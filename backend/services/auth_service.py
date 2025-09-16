@@ -133,7 +133,9 @@ class AuthService:
             logger.error(f"No user found with ID: {user_id}")
             return None
 
-    def _create_user_from_oauth2_payload(self, payload: Dict[str, Any], username: str) -> User:
+    def _create_user_from_oauth2_payload(
+        self, payload: Dict[str, Any], username: str
+    ) -> User:
         """Create new user from OAuth2 token payload"""
         import logging
 
@@ -151,7 +153,9 @@ class AuthService:
         logger.info(f"Created new user: {user.username} with role: {user.role}")
         return user
 
-    def _update_user_from_oauth2_payload(self, user: User, payload: Dict[str, Any]) -> User:
+    def _update_user_from_oauth2_payload(
+        self, user: User, payload: Dict[str, Any]
+    ) -> User:
         """Update existing user with OAuth2 token data"""
         import logging
 

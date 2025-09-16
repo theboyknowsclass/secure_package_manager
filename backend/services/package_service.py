@@ -3,7 +3,7 @@ import logging
 import os
 import subprocess
 import tempfile
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from config.constants import SECURE_REPO_URL
 from models import (
@@ -110,7 +110,9 @@ class PackageService:
         self._load_config()
         return str(self._config_cache["secure_repo_url"])
 
-    def process_package_lock(self, request_id: int, package_data: Dict[str, Any]) -> Dict[str, Any]:
+    def process_package_lock(
+        self, request_id: int, package_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Process package-lock.json and extract all packages"""
         try:
             # Validate the package-lock.json file
@@ -160,7 +162,9 @@ class PackageService:
                 f"Please upgrade your npm version (npm 8+) and regenerate the lockfile."
             )
 
-    def _extract_packages_from_json(self, package_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _extract_packages_from_json(
+        self, package_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Extract package information from package-lock.json data"""
         packages = package_data.get("packages", {})
         logger.info(
@@ -168,7 +172,9 @@ class PackageService:
         )
         return dict(packages)
 
-    def _filter_new_packages(self, packages: Dict[str, Any], request_id: int) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    def _filter_new_packages(
+        self, packages: Dict[str, Any], request_id: int
+    ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """Filter packages to find new ones that need processing"""
         packages_to_process = []
         existing_packages = []
@@ -226,13 +232,15 @@ class PackageService:
                 "name": package_name,
                 "version": package_version,
                 "package_info": package_info,
-                "request_id": request_id
+                "request_id": request_id,
             }
             packages_to_process.append(package_data)
 
         return packages_to_process, existing_packages
 
-    def _extract_package_name(self, package_path: str, package_info: Dict[str, Any]) -> str | None:
+    def _extract_package_name(
+        self, package_path: str, package_info: Dict[str, Any]
+    ) -> str | None:
         """Extract package name from package info or infer from path"""
         package_name = package_info.get("name")
 
@@ -246,7 +254,11 @@ class PackageService:
         return package_name
 
     def _create_package_object(
-        self, package_name: str, package_version: str, package_info: Dict[str, Any], request_id: int
+        self,
+        package_name: str,
+        package_version: str,
+        package_info: Dict[str, Any],
+        request_id: int,
     ) -> Package:
         """Create a new Package object from package information"""
         return Package(
@@ -259,15 +271,17 @@ class PackageService:
             npm_url=package_info.get("resolved"),
         )
 
-    def _create_package_records(self, packages_to_process: List[Dict[str, Any]]) -> List[Package]:
+    def _create_package_records(
+        self, packages_to_process: List[Dict[str, Any]]
+    ) -> List[Package]:
         """Create database records for new packages"""
         package_objects = []
         for package_data in packages_to_process:
             package = self._create_package_object(
                 package_data["name"],
-                package_data["version"], 
+                package_data["version"],
                 package_data,
-                package_data["request_id"]
+                package_data["request_id"],
             )
             db.session.add(package)
             package_objects.append(package)
@@ -277,7 +291,10 @@ class PackageService:
         return package_objects
 
     def _update_request_metadata(
-        self, request_id: int, packages_to_process: List[Dict[str, Any]], existing_packages: List[Dict[str, Any]]
+        self,
+        request_id: int,
+        packages_to_process: List[Dict[str, Any]],
+        existing_packages: List[Dict[str, Any]],
     ) -> None:
         """Update PackageRequest with total package count and status"""
         package_request = PackageRequest.query.get(request_id)
@@ -356,7 +373,9 @@ class PackageService:
             logger.error(f"Error calculating security score: {str(e)}")
             return 100  # Default to perfect score on error
 
-    def get_package_security_scan_status(self, package_id: int) -> Dict[str, Any] | None:
+    def get_package_security_scan_status(
+        self, package_id: int
+    ) -> Dict[str, Any] | None:
         """Get security scan status for a package"""
         try:
             return self.trivy_service.get_scan_status(package_id)
@@ -366,7 +385,9 @@ class PackageService:
             )
             return None
 
-    def get_package_security_scan_report(self, package_id: int) -> Dict[str, Any] | None:
+    def get_package_security_scan_report(
+        self, package_id: int
+    ) -> Dict[str, Any] | None:
         """Get detailed security scan report for a package"""
         try:
             return self.trivy_service.get_scan_report(package_id)

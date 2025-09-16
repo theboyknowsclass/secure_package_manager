@@ -2,14 +2,12 @@ from datetime import datetime
 from typing import Any
 
 from flask_sqlalchemy import SQLAlchemy
-from flask_sqlalchemy.model import Model
 
 # Create a SQLAlchemy instance that will be initialized by the app
 db = SQLAlchemy()
 
 
-
-class RepositoryConfig(Model):
+class RepositoryConfig(db.Model):
     __tablename__ = "repository_config"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -38,9 +36,13 @@ class RepositoryConfig(Model):
         return config.config_value if config else default
 
     @staticmethod
-    def set_config_value(key: str, value: str, description: str | None = None) -> RepositoryConfig:
+    def set_config_value(
+        key: str, value: str, description: str | None = None
+    ) -> "RepositoryConfig":
         """Set a configuration value by key"""
-        config: RepositoryConfig | None = RepositoryConfig.query.filter_by(config_key=key).first()
+        config: RepositoryConfig | None = RepositoryConfig.query.filter_by(
+            config_key=key
+        ).first()
         if config:
             config.config_value = value
             if description:
@@ -51,12 +53,12 @@ class RepositoryConfig(Model):
                 config_key=key, config_value=value, description=description
             )
             db.session.add(config)
-        
+
         db.session.commit()
         return config
 
 
-class User(Model):
+class User(db.Model):
     __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -123,7 +125,7 @@ class User(Model):
         }
 
 
-class Application(Model):
+class Application(db.Model):
     __tablename__ = "applications"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -153,7 +155,7 @@ class Application(Model):
         }
 
 
-class SupportedLicense(Model):
+class SupportedLicense(db.Model):
     __tablename__ = "supported_licenses"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -182,7 +184,7 @@ class SupportedLicense(Model):
         }
 
 
-class PackageRequest(Model):
+class PackageRequest(db.Model):
     __tablename__ = "package_requests"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -218,7 +220,7 @@ class PackageRequest(Model):
         }
 
 
-class Package(Model):
+class Package(db.Model):
     __tablename__ = "packages"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -281,7 +283,7 @@ class Package(Model):
         }
 
 
-class PackageReference(Model):
+class PackageReference(db.Model):
     __tablename__ = "package_references"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -317,7 +319,7 @@ class PackageReference(Model):
         }
 
 
-class PackageValidation(Model):
+class PackageValidation(db.Model):
     __tablename__ = "package_validations"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -338,7 +340,7 @@ class PackageValidation(Model):
         }
 
 
-class AuditLog(Model):
+class AuditLog(db.Model):
     __tablename__ = "audit_log"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -361,7 +363,7 @@ class AuditLog(Model):
         }
 
 
-class SecurityScan(Model):
+class SecurityScan(db.Model):
     __tablename__ = "security_scans"
 
     id = db.Column(db.Integer, primary_key=True)

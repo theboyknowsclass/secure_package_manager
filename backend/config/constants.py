@@ -135,7 +135,9 @@ FLASK_ENV = get_optional_env("FLASK_ENV", "development")
 FLASK_DEBUG = get_optional_env(
     "FLASK_DEBUG", "1" if FLASK_ENV == "development" else "0"
 )
-MAX_CONTENT_LENGTH = get_optional_env_int("MAX_CONTENT_LENGTH", "16777216")  # 16MB default
+MAX_CONTENT_LENGTH = get_optional_env_int(
+    "MAX_CONTENT_LENGTH", "16777216"
+)  # 16MB default
 SQLALCHEMY_TRACK_MODIFICATIONS = False  # Disable for performance
 
 # =============================================================================

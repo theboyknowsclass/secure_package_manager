@@ -1,7 +1,9 @@
 import json
 import logging
+from typing import Any, Dict, Union
 
 from flask import Blueprint, jsonify, request
+from flask.typing import ResponseReturnValue
 from models import Application, Package, PackageReference, PackageRequest, db
 from services.auth_service import AuthService
 from services.package_service import PackageService
@@ -16,9 +18,9 @@ auth_service = AuthService()
 package_service = PackageService()
 
 
-@package_bp.route("/upload", methods=["POST"])
+@package_bp.route("/upload", methods=["POST"])  # type: ignore[misc]
 @auth_service.require_auth
-def upload_package_lock():
+def upload_package_lock() -> ResponseReturnValue:
     """Upload and process package-lock.json file"""
     try:
         # Validate the uploaded file
@@ -49,7 +51,7 @@ def upload_package_lock():
         return jsonify({"error": "Internal server error"}), 500
 
 
-def _validate_uploaded_file():
+def _validate_uploaded_file() -> Union[Any, ResponseReturnValue]:
     """Validate the uploaded file"""
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
@@ -64,7 +66,7 @@ def _validate_uploaded_file():
     return file
 
 
-def _parse_package_lock_file(file):
+def _parse_package_lock_file(file: Any) -> Union[Dict[str, Any], ResponseReturnValue]:
     """Parse and validate the package-lock.json file"""
     try:
         package_data = json.load(file)
@@ -89,13 +91,13 @@ def _parse_package_lock_file(file):
     return package_data
 
 
-def _get_or_create_application(package_data):
+def _get_or_create_application(package_data: Dict[str, Any]) -> Application:
     """Get existing application or create a new one"""
     app_name = package_data.get("name", "Unknown Application")
     app_version = package_data.get("version", "1.0.0")
 
     # Check if application already exists
-    application = Application.query.filter_by(
+    application: Application | None = Application.query.filter_by(
         name=app_name, version=app_version
     ).first()
 
@@ -112,7 +114,9 @@ def _get_or_create_application(package_data):
     return application
 
 
-def _create_package_request(application, package_data):
+def _create_package_request(
+    application: Application, package_data: Dict[str, Any]
+) -> PackageRequest:
     """Create a new package request record"""
     package_request = PackageRequest(
         application_id=application.id,
@@ -125,7 +129,9 @@ def _create_package_request(application, package_data):
     return package_request
 
 
-def _process_package_validation(package_request, package_data):
+def _process_package_validation(
+    package_request: PackageRequest, package_data: Dict[str, Any]
+) -> ResponseReturnValue | None:
     """Process package validation and handle errors"""
     try:
         package_service.process_package_lock(package_request.id, package_data)
@@ -149,27 +155,34 @@ def _process_package_validation(package_request, package_data):
         )
 
 
-def _create_success_response(package_request, application, package_data):
+def _create_success_response(
+    package_request: PackageRequest,
+    application: Application,
+    package_data: Dict[str, Any],
+) -> ResponseReturnValue:
     """Create success response for package upload"""
     app_name = package_data.get("name", "Unknown Application")
     app_version = package_data.get("version", "1.0.0")
 
-    return jsonify(
-        {
-            "message": "Package lock file uploaded successfully",
-            "request_id": package_request.id,
-            "application": {
-                "id": application.id,
-                "name": app_name,
-                "version": app_version,
-            },
-        }
+    return (
+        jsonify(
+            {
+                "message": "Package lock file uploaded successfully",
+                "request_id": package_request.id,
+                "application": {
+                    "id": application.id,
+                    "name": app_name,
+                    "version": app_version,
+                },
+            }
+        ),
+        200,
     )
 
 
-@package_bp.route("/requests/<int:request_id>", methods=["GET"])
+@package_bp.route("/requests/<int:request_id>", methods=["GET"])  # type: ignore[misc]
 @auth_service.require_auth
-def get_package_request(request_id):
+def get_package_request(request_id: int) -> ResponseReturnValue:
     """Get package request details"""
     try:
         package_request = PackageRequest.query.get_or_404(request_id)
@@ -183,39 +196,42 @@ def get_package_request(request_id):
 
         packages = Package.query.filter_by(package_request_id=request_id).all()
 
-        return jsonify(
-            {
-                "request": {
-                    "id": package_request.id,
-                    "status": package_request.status,
-                    "total_packages": package_request.total_packages,
-                    "validated_packages": package_request.validated_packages,
-                    "created_at": package_request.created_at.isoformat(),
-                    "application": {
-                        "id": package_request.application.id,
-                        "name": package_request.application.name,
-                        "version": package_request.application.version,
+        return (
+            jsonify(
+                {
+                    "request": {
+                        "id": package_request.id,
+                        "status": package_request.status,
+                        "total_packages": package_request.total_packages,
+                        "validated_packages": package_request.validated_packages,
+                        "created_at": package_request.created_at.isoformat(),
+                        "application": {
+                            "id": package_request.application.id,
+                            "name": package_request.application.name,
+                            "version": package_request.application.version,
+                        },
                     },
-                },
-                "packages": [
-                    {
-                        "id": pkg.id,
-                        "name": pkg.name,
-                        "version": pkg.version,
-                        "status": pkg.status,
-                        "security_score": pkg.security_score,
-                        "license_score": pkg.license_score,
-                        "security_scan_status": pkg.security_scan_status,
-                        "vulnerability_count": pkg.vulnerability_count,
-                        "critical_vulnerabilities": pkg.critical_vulnerabilities,
-                        "high_vulnerabilities": pkg.high_vulnerabilities,
-                        "medium_vulnerabilities": pkg.medium_vulnerabilities,
-                        "low_vulnerabilities": pkg.low_vulnerabilities,
-                        "validation_errors": pkg.validation_errors or [],
-                    }
-                    for pkg in packages
-                ],
-            }
+                    "packages": [
+                        {
+                            "id": pkg.id,
+                            "name": pkg.name,
+                            "version": pkg.version,
+                            "status": pkg.status,
+                            "security_score": pkg.security_score,
+                            "license_score": pkg.license_score,
+                            "security_scan_status": pkg.security_scan_status,
+                            "vulnerability_count": pkg.vulnerability_count,
+                            "critical_vulnerabilities": pkg.critical_vulnerabilities,
+                            "high_vulnerabilities": pkg.high_vulnerabilities,
+                            "medium_vulnerabilities": pkg.medium_vulnerabilities,
+                            "low_vulnerabilities": pkg.low_vulnerabilities,
+                            "validation_errors": pkg.validation_errors or [],
+                        }
+                        for pkg in packages
+                    ],
+                }
+            ),
+            200,
         )
 
     except Exception as e:
@@ -223,9 +239,9 @@ def get_package_request(request_id):
         return jsonify({"error": "Internal server error"}), 500
 
 
-@package_bp.route("/requests", methods=["GET"])
+@package_bp.route("/requests", methods=["GET"])  # type: ignore[misc]
 @auth_service.require_auth
-def list_package_requests():
+def list_package_requests() -> ResponseReturnValue:
     """List package requests for the user"""
     try:
         if request.user.is_admin():
@@ -315,16 +331,16 @@ def list_package_requests():
                 }
             )
 
-        return jsonify({"requests": result_requests})
+        return jsonify({"requests": result_requests}), 200
 
     except Exception as e:
         logger.error(f"List requests error: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
 
 
-@package_bp.route("/<int:package_id>/security-scan/status", methods=["GET"])
+@package_bp.route("/<int:package_id>/security-scan/status", methods=["GET"])  # type: ignore[misc]
 @auth_service.require_auth
-def get_package_security_scan_status(package_id):
+def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
     """Get security scan status for a package"""
     try:
         package = Package.query.get_or_404(package_id)
@@ -341,13 +357,16 @@ def get_package_security_scan_status(package_id):
         if not scan_status:
             return jsonify({"error": "No security scan found for this package"}), 404
 
-        return jsonify(
-            {
-                "package_id": package_id,
-                "package_name": package.name,
-                "package_version": package.version,
-                "scan_status": scan_status,
-            }
+        return (
+            jsonify(
+                {
+                    "package_id": package_id,
+                    "package_name": package.name,
+                    "package_version": package.version,
+                    "scan_status": scan_status,
+                }
+            ),
+            200,
         )
 
     except Exception as e:
@@ -355,9 +374,9 @@ def get_package_security_scan_status(package_id):
         return jsonify({"error": "Internal server error"}), 500
 
 
-@package_bp.route("/<int:package_id>/security-scan/report", methods=["GET"])
+@package_bp.route("/<int:package_id>/security-scan/report", methods=["GET"])  # type: ignore[misc]
 @auth_service.require_auth
-def get_package_security_scan_report(package_id):
+def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
     """Get detailed security scan report for a package"""
     try:
         package = Package.query.get_or_404(package_id)
@@ -377,13 +396,16 @@ def get_package_security_scan_report(package_id):
                 404,
             )
 
-        return jsonify(
-            {
-                "package_id": package_id,
-                "package_name": package.name,
-                "package_version": package.version,
-                "scan_report": scan_report,
-            }
+        return (
+            jsonify(
+                {
+                    "package_id": package_id,
+                    "package_name": package.name,
+                    "package_version": package.version,
+                    "scan_report": scan_report,
+                }
+            ),
+            200,
         )
 
     except Exception as e:
@@ -391,9 +413,9 @@ def get_package_security_scan_report(package_id):
         return jsonify({"error": "Internal server error"}), 500
 
 
-@package_bp.route("/<int:package_id>/security-scan/trigger", methods=["POST"])
+@package_bp.route("/<int:package_id>/security-scan/trigger", methods=["POST"])  # type: ignore[misc]
 @auth_service.require_auth
-def trigger_package_security_scan(package_id):
+def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
     """Trigger a new security scan for a package"""
     try:
         package = Package.query.get_or_404(package_id)
@@ -408,13 +430,16 @@ def trigger_package_security_scan(package_id):
         # Trigger new scan
         scan_result = package_service.trivy_service.scan_package(package)
 
-        return jsonify(
-            {
-                "package_id": package_id,
-                "package_name": package.name,
-                "package_version": package.version,
-                "scan_result": scan_result,
-            }
+        return (
+            jsonify(
+                {
+                    "package_id": package_id,
+                    "package_name": package.name,
+                    "package_version": package.version,
+                    "scan_result": scan_result,
+                }
+            ),
+            200,
         )
 
     except Exception as e:

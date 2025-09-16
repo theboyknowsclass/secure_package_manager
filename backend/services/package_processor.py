@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 class PackageProcessor:
     """Processes individual packages through the validation pipeline"""
 
-    def __init__(self, license_service: Any, trivy_service: Any, db_session: Any = None) -> None:
+    def __init__(
+        self, license_service: Any, trivy_service: Any, db_session: Any = None
+    ) -> None:
         self.license_service = license_service
         self.trivy_service = trivy_service
         self.db = db_session or db
@@ -43,7 +45,12 @@ class PackageProcessor:
             f"Processing {len(packages)} pending packages for request {request_id}"
         )
 
-        results: Dict[str, Any] = {"processed": 0, "failed": 0, "errors": [], "packages": []}
+        results: Dict[str, Any] = {
+            "processed": 0,
+            "failed": 0,
+            "errors": [],
+            "packages": [],
+        }
 
         for package in packages:
             try:
@@ -334,8 +341,8 @@ class PackageProcessor:
             }
 
             # Use license service to validate
-            validation_result: Dict[str, Any] = self.license_service.validate_package_license(
-                package_data
+            validation_result: Dict[str, Any] = (
+                self.license_service.validate_package_license(package_data)
             )
 
             return validation_result

@@ -88,7 +88,9 @@ class LicenseService:
             "warnings": ["Package has no license specified"],
         }
 
-    def _lookup_license_in_db(self, license_identifier: str) -> Optional[SupportedLicense]:
+    def _lookup_license_in_db(
+        self, license_identifier: str
+    ) -> Optional[SupportedLicense]:
         """Look up license in database, including variations"""
         # Find the license in the database
         license: Optional[SupportedLicense] = SupportedLicense.query.filter_by(
@@ -111,7 +113,9 @@ class LicenseService:
             ],
         }
 
-    def _validate_license_status(self, license: SupportedLicense, license_identifier: str, package_name: str) -> Dict[str, Any]:
+    def _validate_license_status(
+        self, license: SupportedLicense, license_identifier: str, package_name: str
+    ) -> Dict[str, Any]:
         """Validate license based on its status"""
         if license.status == "blocked":
             return self._create_blocked_license_result(license_identifier)
@@ -146,7 +150,9 @@ class LicenseService:
             ],
         }
 
-    def _create_allowed_license_result(self, license: SupportedLicense, license_identifier: str, package_name: str) -> Dict[str, Any]:
+    def _create_allowed_license_result(
+        self, license: SupportedLicense, license_identifier: str, package_name: str
+    ) -> Dict[str, Any]:
         """Create result for allowed licenses"""
         score = self._calculate_license_score(license)
         result = {"score": score, "errors": [], "warnings": []}
@@ -176,7 +182,9 @@ class LicenseService:
             "warnings": [],
         }
 
-    def _find_license_variation(self, license_identifier: str) -> Optional[SupportedLicense]:
+    def _find_license_variation(
+        self, license_identifier: str
+    ) -> Optional[SupportedLicense]:
         """Find license by common variations"""
         variations = [
             license_identifier.lower(),
@@ -188,7 +196,9 @@ class LicenseService:
         ]
 
         for variation in variations:
-            license: Optional[SupportedLicense] = SupportedLicense.query.filter_by(identifier=variation).first()
+            license: Optional[SupportedLicense] = SupportedLicense.query.filter_by(
+                identifier=variation
+            ).first()
             if license:
                 return license
 
@@ -215,7 +225,9 @@ class LicenseService:
         else:
             return 0
 
-    def get_supported_licenses(self, status: Optional[str] = None) -> List[SupportedLicense]:
+    def get_supported_licenses(
+        self, status: Optional[str] = None
+    ) -> List[SupportedLicense]:
         """Get all supported licenses, optionally filtered by status"""
         try:
             query = SupportedLicense.query
@@ -253,7 +265,9 @@ class LicenseService:
             pattern in license_identifier.upper() for pattern in complex_patterns
         )
 
-    def _validate_complex_license_expression(self, license_expression: str, package_name: str) -> Dict[str, Any]:
+    def _validate_complex_license_expression(
+        self, license_expression: str, package_name: str
+    ) -> Dict[str, Any]:
         """Validate complex license expressions like (MIT OR CC0-1.0)"""
         try:
             # Parse the license expression to extract individual licenses
@@ -316,7 +330,10 @@ class LicenseService:
         return cleaned_licenses
 
     def _validate_or_expression(
-        self, individual_licenses: List[str], original_expression: str, package_name: str
+        self,
+        individual_licenses: List[str],
+        original_expression: str,
+        package_name: str,
     ) -> Dict[str, Any]:
         """Validate OR expression - use the best (highest scoring) license"""
         best_score = 0
@@ -354,7 +371,10 @@ class LicenseService:
             }
 
     def _validate_and_expression(
-        self, individual_licenses: List[str], original_expression: str, package_name: str
+        self,
+        individual_licenses: List[str],
+        original_expression: str,
+        package_name: str,
     ) -> Dict[str, Any]:
         """Validate AND expression - use the worst (lowest scoring) license"""
         worst_score = 100

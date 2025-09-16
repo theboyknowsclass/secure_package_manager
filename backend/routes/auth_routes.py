@@ -1,6 +1,7 @@
 import logging
 
 from flask import Blueprint, jsonify, request
+from flask.typing import ResponseReturnValue
 from models import User, db
 from services.auth_service import AuthService
 
@@ -13,8 +14,8 @@ auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 auth_service = AuthService()
 
 
-@auth_bp.route("/login", methods=["POST"])
-def login():
+@auth_bp.route("/login", methods=["POST"])  # type: ignore[misc]
+def login() -> ResponseReturnValue:
     """Login endpoint - integrates with mock-idp service in dev, ADFS in production"""
     try:
         logger.info(f"Login request received. Content-Type: {request.content_type}")
@@ -54,7 +55,7 @@ def login():
             logger.info("Creating response...")
             response_data = {"token": token, "user": user_dict}
             logger.info("Response data created, returning...")
-            return jsonify(response_data)
+            return jsonify(response_data), 200
         else:
             return jsonify({"error": "Invalid credentials"}), 401
 
@@ -63,13 +64,13 @@ def login():
         return jsonify({"error": "Internal server error"}), 500
 
 
-@auth_bp.route("/userinfo", methods=["GET"])
+@auth_bp.route("/userinfo", methods=["GET"])  # type: ignore[misc]
 @auth_service.require_auth
-def userinfo():
+def userinfo() -> ResponseReturnValue:
     """Get current user information"""
     try:
         logger.info(f"UserInfo request from user: {request.user.username}")
-        return jsonify({"user": request.user.to_dict()})
+        return jsonify({"user": request.user.to_dict()}), 200
     except Exception as e:
         logger.error(f"UserInfo error: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500

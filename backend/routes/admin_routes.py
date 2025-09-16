@@ -1,6 +1,7 @@
 import logging
 
 from flask import Blueprint, jsonify, request
+from flask.typing import ResponseReturnValue
 from models import AuditLog, Package, RepositoryConfig, SupportedLicense, db
 from services.auth_service import AuthService
 from services.package_service import PackageService
@@ -16,9 +17,9 @@ package_service = PackageService()
 
 
 # Package Management Routes
-@admin_bp.route("/packages/approve/<int:package_id>", methods=["POST"])
+@admin_bp.route("/packages/approve/<int:package_id>", methods=["POST"])  # type: ignore[misc]
 @auth_service.require_admin
-def approve_package(package_id):
+def approve_package(package_id: int) -> ResponseReturnValue:
     """Approve a package and automatically publish it"""
     try:
         package = Package.query.get_or_404(package_id)
@@ -68,9 +69,9 @@ def approve_package(package_id):
         return jsonify({"error": "Internal server error"}), 500
 
 
-@admin_bp.route("/packages/reject/<int:package_id>", methods=["POST"])
+@admin_bp.route("/packages/reject/<int:package_id>", methods=["POST"])  # type: ignore[misc]
 @auth_service.require_admin
-def reject_package(package_id):
+def reject_package(package_id: int) -> ResponseReturnValue:
     """Reject a package"""
     try:
         package = Package.query.get_or_404(package_id)
@@ -105,15 +106,14 @@ def reject_package(package_id):
         db.session.commit()
 
         return jsonify({"message": "Package rejected successfully"})
-
     except Exception as e:
         logger.error(f"Reject package error: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
 
 
-@admin_bp.route("/packages/publish/<int:package_id>", methods=["POST"])
+@admin_bp.route("/packages/publish/<int:package_id>", methods=["POST"])  # type: ignore[misc]
 @auth_service.require_admin
-def publish_package(package_id):
+def publish_package(package_id: int) -> ResponseReturnValue:
     """Publish an approved package to the secure repository"""
     try:
         package = Package.query.get_or_404(package_id)
@@ -148,9 +148,9 @@ def publish_package(package_id):
         return jsonify({"error": "Internal server error"}), 500
 
 
-@admin_bp.route("/packages/validated", methods=["GET"])
+@admin_bp.route("/packages/validated", methods=["GET"])  # type: ignore[misc]
 @auth_service.require_admin
-def get_validated_packages():
+def get_validated_packages() -> ResponseReturnValue:
     """Get all packages ready for admin review (pending approval)"""
     try:
         packages = Package.query.filter_by(status="pending_approval").all()
@@ -158,7 +158,6 @@ def get_validated_packages():
         # Handle case when no packages exist
         if not packages:
             return jsonify({"packages": []})
-
         # Build response with proper error handling for relationships
         package_list = []
         for pkg in packages:
@@ -202,16 +201,15 @@ def get_validated_packages():
                 continue
 
         return jsonify({"packages": package_list})
-
     except Exception as e:
         logger.error(f"Get validated packages error: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
 
 
 # License Management Routes
-@admin_bp.route("/licenses", methods=["GET"])
+@admin_bp.route("/licenses", methods=["GET"])  # type: ignore[misc]
 @auth_service.require_auth
-def get_supported_licenses():
+def get_supported_licenses() -> ResponseReturnValue:
     """Get all supported licenses"""
     try:
         status = request.args.get(
@@ -229,9 +227,9 @@ def get_supported_licenses():
         return jsonify({"error": "Internal server error"}), 500
 
 
-@admin_bp.route("/licenses", methods=["POST"])
+@admin_bp.route("/licenses", methods=["POST"])  # type: ignore[misc]
 @auth_service.require_auth
-def create_supported_license():
+def create_supported_license() -> ResponseReturnValue:
     """Create a new supported license"""
     try:
         if not request.user.is_admin():
@@ -288,9 +286,9 @@ def create_supported_license():
         return jsonify({"error": "Internal server error"}), 500
 
 
-@admin_bp.route("/licenses/<int:license_id>", methods=["PUT"])
+@admin_bp.route("/licenses/<int:license_id>", methods=["PUT"])  # type: ignore[misc]
 @auth_service.require_auth
-def update_supported_license(license_id):
+def update_supported_license(license_id: int) -> ResponseReturnValue:
     """Update a supported license"""
     try:
         if not request.user.is_admin():
@@ -321,16 +319,15 @@ def update_supported_license(license_id):
         return jsonify(
             {"message": "License updated successfully", "license": license.to_dict()}
         )
-
     except Exception as e:
         logger.error(f"Update license error: {str(e)}")
         db.session.rollback()
         return jsonify({"error": "Internal server error"}), 500
 
 
-@admin_bp.route("/licenses/<int:license_id>", methods=["DELETE"])
+@admin_bp.route("/licenses/<int:license_id>", methods=["DELETE"])  # type: ignore[misc]
 @auth_service.require_auth
-def delete_supported_license(license_id):
+def delete_supported_license(license_id: int) -> ResponseReturnValue:
     """Delete a supported license"""
     try:
         if not request.user.is_admin():
@@ -367,7 +364,6 @@ def delete_supported_license(license_id):
         db.session.commit()
 
         return jsonify({"message": "License deleted successfully"})
-
     except Exception as e:
         logger.error(f"Delete license error: {str(e)}")
         db.session.rollback()
@@ -375,9 +371,9 @@ def delete_supported_license(license_id):
 
 
 # Repository Configuration Routes
-@admin_bp.route("/repository-config", methods=["GET"])
+@admin_bp.route("/repository-config", methods=["GET"])  # type: ignore[misc]
 @auth_service.require_admin
-def get_repository_config():
+def get_repository_config() -> ResponseReturnValue:
     """Get all repository configuration settings"""
     try:
         configs = RepositoryConfig.query.all()
@@ -387,9 +383,9 @@ def get_repository_config():
         return jsonify({"error": "Internal server error"}), 500
 
 
-@admin_bp.route("/repository-config", methods=["PUT"])
+@admin_bp.route("/repository-config", methods=["PUT"])  # type: ignore[misc]
 @auth_service.require_admin
-def update_repository_config():
+def update_repository_config() -> ResponseReturnValue:
     """Update repository configuration settings"""
     try:
         data = request.get_json()
@@ -427,16 +423,15 @@ def update_repository_config():
                 "configs": updated_configs,
             }
         )
-
     except Exception as e:
         logger.error(f"Update repository config error: {str(e)}")
         db.session.rollback()
         return jsonify({"error": "Internal server error"}), 500
 
 
-@admin_bp.route("/repository-config/<config_key>", methods=["GET"])
+@admin_bp.route("/repository-config/<config_key>", methods=["GET"])  # type: ignore[misc]
 @auth_service.require_auth
-def get_repository_config_value(config_key):
+def get_repository_config_value(config_key: str) -> ResponseReturnValue:
     """Get a specific repository configuration value"""
     try:
         value = RepositoryConfig.get_config_value(config_key)
@@ -444,15 +439,14 @@ def get_repository_config_value(config_key):
             return jsonify({"error": "Configuration key not found"}), 404
 
         return jsonify({"config_key": config_key, "config_value": value})
-
     except Exception as e:
         logger.error(f"Get repository config value error: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
 
 
-@admin_bp.route("/repository-config/status", methods=["GET"])
+@admin_bp.route("/repository-config/status", methods=["GET"])  # type: ignore[misc]
 @auth_service.require_auth
-def get_repository_config_status():
+def get_repository_config_status() -> ResponseReturnValue:
     """Get repository configuration status"""
     try:
         from services.package_service import PackageService

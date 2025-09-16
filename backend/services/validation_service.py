@@ -232,7 +232,7 @@ class ValidationService:
             failed_count = sum(1 for v in validations if v.status == "failed")
             pending_count = sum(1 for v in validations if v.status == "pending")
             passed_count = sum(1 for v in validations if v.status == "passed")
-            
+
             summary = {
                 "total_validations": len(validations),
                 "passed_validations": passed_count,
