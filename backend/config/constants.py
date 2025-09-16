@@ -191,4 +191,7 @@ def is_production() -> bool:
 
 
 # Validate all required environment variables at module load time
-validate_all_required_env()
+# Only validate if not running as a worker (workers may not need all variables)
+import os
+if not os.getenv('WORKER_TYPE'):
+    validate_all_required_env()

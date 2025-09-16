@@ -472,20 +472,14 @@ function getRequestStatusColor(
   | "success"
   | "warning" {
   switch (status) {
-    case PACKAGE_STATUS.REQUESTED:
-      return "default";
-    case PACKAGE_STATUS.LICENCE_CHECKED:
-      return "info";
-    case PACKAGE_STATUS.DOWNLOADED:
-      return "info";
-    case PACKAGE_STATUS.PENDING_APPROVAL:
-      return "warning";
     case PACKAGE_STATUS.APPROVED:
-      return "success";
+      return "success"; // Green
     case PACKAGE_STATUS.REJECTED:
-      return "error";
+      return "error"; // Red
+    case PACKAGE_STATUS.PENDING_APPROVAL:
+      return "info"; // Blue
     default:
-      return "default";
+      return "warning"; // Orange for all others
   }
 }
 
@@ -520,20 +514,14 @@ function getPackageStatusColor(
   | "success"
   | "warning" {
   switch (status) {
-    case PACKAGE_STATUS.REQUESTED:
-      return "default";
-    case PACKAGE_STATUS.LICENCE_CHECKED:
-      return "info";
-    case PACKAGE_STATUS.DOWNLOADED:
-      return "info";
-    case PACKAGE_STATUS.PENDING_APPROVAL:
-      return "warning";
     case PACKAGE_STATUS.APPROVED:
-      return "success";
+      return "success"; // Green
     case PACKAGE_STATUS.REJECTED:
-      return "error";
+      return "error"; // Red
+    case PACKAGE_STATUS.PENDING_APPROVAL:
+      return "info"; // Blue
     default:
-      return "default";
+      return "warning"; // Orange for all others
   }
 }
 

@@ -49,11 +49,14 @@ export const endpoints = {
   },
   admin: {
     validatedPackages: '/api/admin/packages/validated',
-    approvePackage: (id: number) => `/api/admin/packages/approve/${id}`,
-    publishPackage: (id: number) => `/api/admin/packages/publish/${id}`,
+    publishPackage: (id: number) => `/api/approver/packages/publish/${id}`,
     licenses: (status?: string) => 
       status ? `/api/admin/licenses?status=${status}` : "/api/admin/licenses",
     license: (id: number) => `/api/admin/licenses/${id}`,
     config: '/api/admin/config',
+  },
+  approver: {
+    batchApprove: '/api/approver/packages/batch-approve',
+    batchReject: '/api/approver/packages/batch-reject',
   },
 }

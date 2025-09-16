@@ -23,96 +23,7 @@ auth_service = AuthService()
 package_service = PackageService()
 
 
-# Package Approval Routes
-@approver_bp.route("/packages/approve/<int:package_id>", methods=["POST"])  # type: ignore[misc]
-@auth_service.require_admin
-def approve_package(package_id: int) -> ResponseReturnValue:
-    """Approve a package and automatically publish it"""
-    try:
-        package = Package.query.get_or_404(package_id)
-
-        if not package.package_status:
-            return jsonify({"error": "Package status not found"}), 404
-
-        if package.package_status.status != "Pending Approval":
-            return (
-                jsonify(
-                    {
-                        "error": "Package must be pending approval before it can be approved"
-                    }
-                ),
-                400,
-            )
-
-        # Approve the package
-        package.package_status.status = "Approved"
-        db.session.commit()
-
-        # Automatically publish to secure repository
-        success = package_service.publish_to_secure_repo(package)
-
-        if success:
-            # Log the approval and publishing
-            audit_log = AuditLog(
-                user_id=request.user.id,
-                action="approve_and_publish_package",
-                resource_type="package",
-                resource_id=package.id,
-                details=f"Package {package.name}@{package.version} approved and automatically published",
-            )
-            db.session.add(audit_log)
-            db.session.commit()
-
-            return jsonify({"message": "Package approved and published successfully"})
-        else:
-            return jsonify({"error": "Package approved but failed to publish"}), 500
-
-    except Exception as e:
-        logger.error(f"Approve package error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
-
-
-@approver_bp.route("/packages/reject/<int:package_id>", methods=["POST"])  # type: ignore[misc]
-@auth_service.require_admin
-def reject_package(package_id: int) -> ResponseReturnValue:
-    """Reject a package"""
-    try:
-        package = Package.query.get_or_404(package_id)
-
-        if not package.package_status:
-            return jsonify({"error": "Package status not found"}), 404
-
-        if package.package_status.status in ["Approved"]:
-            return (
-                jsonify({"error": "Cannot reject an already approved package"}),
-                400,
-            )
-
-        # Get rejection reason from request body
-        data = request.get_json() or {}
-        rejection_reason = data.get("reason", "Package rejected by administrator")
-
-        # Reject the package
-        package.package_status.status = "Rejected"
-        db.session.commit()
-
-        # Log the rejection
-        audit_log = AuditLog(
-            user_id=request.user.id,
-            action="reject_package",
-            resource_type="package",
-            resource_id=package.id,
-            details=f"Package {package.name}@{package.version} rejected: {rejection_reason}",
-        )
-        db.session.add(audit_log)
-        db.session.commit()
-
-        return jsonify({"message": "Package rejected successfully"})
-    except Exception as e:
-        logger.error(f"Reject package error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
-
-
+# Package Approval Routes - Batch Operations Only
 @approver_bp.route("/packages/publish/<int:package_id>", methods=["POST"])  # type: ignore[misc]
 @auth_service.require_admin
 def publish_package(package_id: int) -> ResponseReturnValue:
@@ -147,6 +58,178 @@ def publish_package(package_id: int) -> ResponseReturnValue:
 
     except Exception as e:
         logger.error(f"Publish package error: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@approver_bp.route("/packages/batch-approve", methods=["POST"])  # type: ignore[misc]
+@auth_service.require_admin
+def batch_approve_packages() -> ResponseReturnValue:
+    """Approve multiple packages at once"""
+    try:
+        data = request.get_json() or {}
+        package_ids = data.get("package_ids", [])
+        reason = data.get("reason", "Approved by administrator")
+        
+        if not package_ids:
+            return jsonify({"error": "No package IDs provided"}), 400
+        
+        if not isinstance(package_ids, list):
+            return jsonify({"error": "package_ids must be an array"}), 400
+        
+        approved_count = 0
+        failed_packages = []
+        
+        for package_id in package_ids:
+            try:
+                package = Package.query.get(package_id)
+                if not package:
+                    failed_packages.append({"id": package_id, "error": "Package not found"})
+                    continue
+                
+                if not package.package_status:
+                    failed_packages.append({"id": package_id, "error": "Package status not found"})
+                    continue
+                
+                if package.package_status.status != "Pending Approval":
+                    failed_packages.append({"id": package_id, "error": "Package must be pending approval"})
+                    continue
+                
+                # Approve the package
+                package.package_status.status = "Approved"
+                approved_count += 1
+                
+                # Log the approval (publishing will be done in batch later)
+                audit_log = AuditLog(
+                    user_id=request.user.id,
+                    action="batch_approve_package",
+                    resource_type="package",
+                    resource_id=package.id,
+                    details=f"Package {package.name}@{package.version} approved: {reason}",
+                )
+                db.session.add(audit_log)
+                
+            except Exception as pkg_error:
+                logger.error(f"Error approving package {package_id}: {str(pkg_error)}")
+                failed_packages.append({"id": package_id, "error": str(pkg_error)})
+        
+        # Create a summary audit log for the batch operation
+        summary_audit_log = AuditLog(
+            user_id=request.user.id,
+            action="batch_approve_packages",
+            resource_type="batch_operation",
+            resource_id=None,  # No single resource ID for batch operations
+            details=f"Batch approval: {approved_count}/{len(package_ids)} packages approved by {request.user.username}. Package IDs: {list(package_ids)}. Reason: {reason}",
+        )
+        db.session.add(summary_audit_log)
+        
+        db.session.commit()
+        
+        # Note: Publishing is handled by the PublishWorker for better performance
+        # Packages are approved immediately and will be published by the background worker
+        logger.info(f"Batch approval completed: {approved_count} packages approved, will be published by background worker")
+        
+        response_data = {
+            "message": f"Batch approval completed - {approved_count} packages approved",
+            "approved_count": approved_count,
+            "total_requested": len(package_ids),
+            "package_ids": list(package_ids),
+            "approved_by": request.user.username,
+            "note": "Packages are approved and ready for publishing. Publishing can be done separately for better performance."
+        }
+        
+        if failed_packages:
+            response_data["failed_packages"] = failed_packages
+        
+        return jsonify(response_data), 200
+        
+    except Exception as e:
+        logger.error(f"Batch approve packages error: {str(e)}")
+        db.session.rollback()
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@approver_bp.route("/packages/batch-reject", methods=["POST"])  # type: ignore[misc]
+@auth_service.require_admin
+def batch_reject_packages() -> ResponseReturnValue:
+    """Reject multiple packages at once"""
+    try:
+        data = request.get_json() or {}
+        package_ids = data.get("package_ids", [])
+        reason = data.get("reason", "Rejected by administrator")
+        
+        if not package_ids:
+            return jsonify({"error": "No package IDs provided"}), 400
+        
+        if not isinstance(package_ids, list):
+            return jsonify({"error": "package_ids must be an array"}), 400
+        
+        if not reason or not reason.strip():
+            return jsonify({"error": "Rejection reason is required"}), 400
+        
+        rejected_count = 0
+        failed_packages = []
+        
+        for package_id in package_ids:
+            try:
+                package = Package.query.get(package_id)
+                if not package:
+                    failed_packages.append({"id": package_id, "error": "Package not found"})
+                    continue
+                
+                if not package.package_status:
+                    failed_packages.append({"id": package_id, "error": "Package status not found"})
+                    continue
+                
+                if package.package_status.status in ["Approved"]:
+                    failed_packages.append({"id": package_id, "error": "Cannot reject an already approved package"})
+                    continue
+                
+                # Reject the package
+                package.package_status.status = "Rejected"
+                rejected_count += 1
+                
+                # Log the rejection
+                audit_log = AuditLog(
+                    user_id=request.user.id,
+                    action="batch_reject_package",
+                    resource_type="package",
+                    resource_id=package.id,
+                    details=f"Package {package.name}@{package.version} rejected: {reason}",
+                )
+                db.session.add(audit_log)
+                
+            except Exception as pkg_error:
+                logger.error(f"Error rejecting package {package_id}: {str(pkg_error)}")
+                failed_packages.append({"id": package_id, "error": str(pkg_error)})
+        
+        # Create a summary audit log for the batch operation
+        summary_audit_log = AuditLog(
+            user_id=request.user.id,
+            action="batch_reject_packages",
+            resource_type="batch_operation",
+            resource_id=None,  # No single resource ID for batch operations
+            details=f"Batch rejection: {rejected_count}/{len(package_ids)} packages rejected by {request.user.username}. Package IDs: {list(package_ids)}. Reason: {reason}",
+        )
+        db.session.add(summary_audit_log)
+        
+        db.session.commit()
+        
+        response_data = {
+            "message": f"Batch rejection completed",
+            "rejected_count": rejected_count,
+            "total_requested": len(package_ids),
+            "package_ids": list(package_ids),
+            "rejected_by": request.user.username
+        }
+        
+        if failed_packages:
+            response_data["failed_packages"] = failed_packages
+        
+        return jsonify(response_data), 200
+        
+    except Exception as e:
+        logger.error(f"Batch reject packages error: {str(e)}")
+        db.session.rollback()
         return jsonify({"error": "Internal server error"}), 500
 
 

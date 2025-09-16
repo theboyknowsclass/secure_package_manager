@@ -3,98 +3,30 @@ import { useQuery } from "react-query";
 import {
   Box,
   Typography,
-  Paper,
-  Button,
   Chip,
   IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   CircularProgress,
-  LinearProgress,
   Tooltip,
   Alert,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Grid,
-  Card,
-  CardContent,
 } from "@mui/material";
 import { MaterialReactTable, type MRT_ColumnDef } from "material-react-table";
 import { 
   Visibility, 
   CheckCircle, 
-  Cancel, 
-  Close,
-  Approval,
   Warning
 } from "@mui/icons-material";
 import { api, endpoints } from "../services/api";
 import { 
   PACKAGE_STATUS, 
-  LICENSE_STATUS,
   type PackageStatus,
-  type LicenseStatus,
-  isPendingApprovalStatus
+  type DetailedRequestResponse,
+  type PackageRequest,
+  type Package
 } from "../types/status";
-
-interface Package {
-  id: number;
-  name: string;
-  version: string;
-  status: string;
-  security_score: number | null;
-  license_identifier: string | null;
-  license_score?: number;
-  security_scan_status: string;
-  type?: "new" | "existing";
-  vulnerability_count?: number;
-  critical_vulnerabilities?: number;
-  selected?: boolean;
-  onSelectChange?: (selected: boolean) => void;
-}
-
-interface PackageRequest {
-  id: number;
-  application_name: string;
-  version: string;
-  status: string;
-  total_packages: number;
-  completion_percentage: number;
-  created_at: string;
-  requestor: {
-    id: number;
-    username: string;
-    full_name: string;
-  };
-  packages: Package[];
-  package_counts: {
-    total: number;
-    Requested: number;
-    "Checking Licence": number;
-    "Licence Checked": number;
-    Downloading: number;
-    Downloaded: number;
-    "Security Scanning": number;
-    "Security Scanned": number;
-    "Pending Approval": number;
-    Approved: number;
-    Rejected: number;
-  };
-}
-
-// Interface for the detailed API response
-interface DetailedRequestResponse {
-  request: PackageRequest;
-  packages: Package[];
-}
+import ApprovalDetailDialog from "../components/ApprovalDetailDialog";
 
 // Define columns for package details table
-const packageColumns: MRT_ColumnDef<Package>[] = [
+const packageColumns: MRT_ColumnDef<Package & { selected?: boolean; onSelectChange?: (selected: boolean) => void }>[] = [
   {
     accessorKey: "select",
     header: "Select",
@@ -252,10 +184,6 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
 export default function ApprovalDashboard() {
   const [selectedRequest, setSelectedRequest] = useState<DetailedRequestResponse | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [approvalReason, setApprovalReason] = useState("");
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedPackages, setSelectedPackages] = useState<Set<number>>(new Set());
 
   const {
     data: requests,
@@ -268,17 +196,14 @@ export default function ApprovalDashboard() {
   });
 
   const handleViewDetails = async (requestId: number) => {
-    // Open modal immediately
     setDetailsOpen(true);
     setSelectedRequest(null); // Show loading state
     
     try {
-      // Fetch detailed request information with packages
       const response = await api.get(endpoints.packages.request(requestId));
       setSelectedRequest(response.data);
     } catch (error) {
       console.error('Failed to fetch request details:', error);
-      // Keep modal open but with null data to show error state
       setSelectedRequest(null);
     }
   };
@@ -286,134 +211,10 @@ export default function ApprovalDashboard() {
   const handleCloseDetails = () => {
     setDetailsOpen(false);
     setSelectedRequest(null);
-    setApprovalReason("");
-    setRejectionReason("");
-    setSelectedPackages(new Set());
   };
 
-  const handlePackageSelect = (packageId: number, selected: boolean) => {
-    setSelectedPackages(prev => {
-      const newSet = new Set(prev);
-      if (selected) {
-        newSet.add(packageId);
-      } else {
-        newSet.delete(packageId);
-      }
-      return newSet;
-    });
-  };
-
-  const handleSelectAll = (selected: boolean) => {
-    if (!selectedRequest) return;
-    const pendingPackageIds = selectedRequest.packages
-      .filter(pkg => pkg.status === "pending_approval")
-      .map(pkg => pkg.id);
-    
-    if (selected) {
-      setSelectedPackages(new Set(pendingPackageIds));
-    } else {
-      setSelectedPackages(new Set());
-    }
-  };
-
-  const getLicenseSummary = (packages: Package[]) => {
-    const licenseCounts: { [key: string]: number } = {};
-    const licenseCategories: { [key: string]: string } = {};
-    
-    const categorizeLicense = (licenseExpression: string): string => {
-      // Handle complex license expressions with OR/AND
-      const hasAllowed = licenseExpression.includes("MIT") || 
-                        licenseExpression.includes("Apache-2.0") || 
-                        licenseExpression.includes("BSD") ||
-                        licenseExpression.includes("CC0-1.0") ||
-                        licenseExpression.includes("Unlicense") ||
-                        licenseExpression.includes("ISC") ||
-                        licenseExpression.includes("0BSD");
-      
-      const hasBlocked = licenseExpression.includes("GPL-3.0") || 
-                        licenseExpression.includes("LGPL-3.0") ||
-                        licenseExpression.includes("AGPL");
-      
-      const hasAvoid = licenseExpression.includes("GPL-2.0") || 
-                      licenseExpression.includes("LGPL-2.0");
-      
-      // If it contains OR and has allowed options, it's generally acceptable
-      if (licenseExpression.includes(" OR ") && hasAllowed && !hasBlocked) {
-        return "Allowed";
-      }
-      
-      // If it contains AND, it's more restrictive
-      if (licenseExpression.includes(" AND ")) {
-        if (hasBlocked) return "Blocked";
-        if (hasAvoid) return "Avoid";
-        return "Review";
-      }
-      
-      // Single license categorization
-      if (["MIT", "Apache-2.0", "BSD", "CC0-1.0", "Unlicense", "ISC", "0BSD"].some(l => licenseExpression.includes(l))) {
-        return "Allowed";
-      } else if (["GPL-3.0", "LGPL-3.0", "AGPL"].some(l => licenseExpression.includes(l))) {
-        return "Blocked";
-      } else if (["GPL-2.0", "LGPL-2.0"].some(l => licenseExpression.includes(l))) {
-        return "Avoid";
-      } else {
-        return "Review";
-      }
-    };
-    
-    packages.forEach(pkg => {
-      const license = pkg.license_identifier || "Unknown";
-      licenseCounts[license] = (licenseCounts[license] || 0) + 1;
-      licenseCategories[license] = categorizeLicense(license);
-    });
-    
-    return { licenseCounts, licenseCategories };
-  };
-
-  const handleApproveRequest = async () => {
-    if (!selectedRequest || selectedPackages.size === 0) return;
-    
-    setIsProcessing(true);
-    try {
-      // Approve only selected packages
-      for (const packageId of selectedPackages) {
-        await api.post(`/api/admin/packages/approve/${packageId}`, {
-          reason: approvalReason || "Approved by administrator"
-        });
-      }
-      
-      // Refresh data
-      await refetch();
-      handleCloseDetails();
-      
-    } catch (error) {
-      console.error("Error approving packages:", error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleRejectRequest = async () => {
-    if (!selectedRequest || selectedPackages.size === 0) return;
-    
-    setIsProcessing(true);
-    try {
-      // Reject only selected packages
-      for (const packageId of selectedPackages) {
-        await api.post(`/api/admin/packages/reject/${packageId}`, {
-          reason: rejectionReason || "Rejected by administrator"
-        });
-      }
-      
-      // Refresh data
-      await refetch();
-      handleCloseDetails();
-      
-    } catch (error) {
-      console.error("Error rejecting packages:", error);
-    } finally {
-      setIsProcessing(false);
-    }
+  const handleApprovalComplete = async () => {
+    await refetch();
   };
 
   // Filter requests that have packages pending approval
@@ -421,21 +222,18 @@ export default function ApprovalDashboard() {
     if (!requests) return [];
     
     return requests.filter(request => 
-      request.packages.some(pkg => 
-        pkg.status === PACKAGE_STATUS.PENDING_APPROVAL
-      )
+      request.package_counts && request.package_counts["Pending Approval"] > 0
     );
   }, [requests]);
 
   // Transform data for the table
   const tableData = useMemo(() => {
     return approvalRequests.map((request) => {
-      const pendingPackages = request.packages.filter(pkg => pkg.status === PACKAGE_STATUS.PENDING_APPROVAL);
-      const approvedPackages = request.packages.filter(pkg => pkg.status === PACKAGE_STATUS.APPROVED);
-      const rejectedPackages = request.packages.filter(pkg => pkg.status === PACKAGE_STATUS.REJECTED);
-      const processingPackages = request.packages.filter(pkg => 
-        ![PACKAGE_STATUS.PENDING_APPROVAL, PACKAGE_STATUS.APPROVED, PACKAGE_STATUS.REJECTED].includes(pkg.status as any)
-      );
+      const packageCounts = request.package_counts || {};
+      const pendingPackages = packageCounts["Pending Approval"] || 0;
+      const approvedPackages = packageCounts["Approved"] || 0;
+      const rejectedPackages = packageCounts["Rejected"] || 0;
+      const processingPackages = request.total_packages - pendingPackages - approvedPackages - rejectedPackages;
       
       return {
         id: request.id,
@@ -445,14 +243,14 @@ export default function ApprovalDashboard() {
         requestorName: request.requestor.full_name || request.requestor.username,
         requestorUsername: request.requestor.username,
         status: request.status,
-        processingCount: processingPackages.length,
-        pendingCount: pendingPackages.length,
-        approvedCount: approvedPackages.length,
-        rejectedCount: rejectedPackages.length,
+        processingCount: processingPackages,
+        pendingCount: pendingPackages,
+        approvedCount: approvedPackages,
+        rejectedCount: rejectedPackages,
         createdAt: request.created_at,
         updatedAt: request.created_at, // Use created_at since updated_at is not in new structure
         totalPackages: request.total_packages,
-        packages: request.packages || [],
+        packages: [], // Will be populated when details are loaded
       };
     });
   }, [approvalRequests]);
@@ -661,321 +459,27 @@ export default function ApprovalDashboard() {
       )}
 
       {/* Package Details Modal */}
-      <Dialog 
-        open={detailsOpen} 
+      <ApprovalDetailDialog
+        open={detailsOpen}
         onClose={handleCloseDetails}
-        maxWidth="lg"
-        fullWidth
-        sx={{ zIndex: 9999 }}
-      >
-        <DialogTitle>
-          <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6">
-              Package Approval {selectedRequest ? `- ID #${selectedRequest.request.id}` : '- Loading...'}
-            </Typography>
-            <IconButton onClick={handleCloseDetails} size="small">
-              <Close />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        
-        <DialogContent>
-          {selectedRequest ? (
-            <Box>
-              {/* Request Summary */}
-              <Box sx={{ mb: 3, p: 2, bgcolor: "grey.50", borderRadius: 1 }}>
-                <Typography variant="h6" gutterBottom>
-                  Request Summary
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={4}>
-                    <Typography variant="caption" color="textSecondary">
-                      Application
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-                      {selectedRequest.request.application_name} v{selectedRequest.request.version}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={4}>
-                    <Typography variant="caption" color="textSecondary">
-                      Requestor
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-                      {selectedRequest.request.requestor.full_name} (@{selectedRequest.request.requestor.username})
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={4}>
-                    <Typography variant="caption" color="textSecondary">
-                      Created
-                    </Typography>
-                    <Typography variant="body2">
-                      {new Date(selectedRequest.request.created_at).toLocaleString()}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </Box>
-
-              {/* License Summary */}
-              <Box sx={{ mb: 3, p: 2, bgcolor: "blue.50", borderRadius: 1 }}>
-                <Typography variant="h6" gutterBottom>
-                  License Summary
-                </Typography>
-                {(() => {
-                  const { licenseCounts, licenseCategories } = getLicenseSummary(selectedRequest.packages);
-                  
-                  // Parse complex license expressions and create individual license counts
-                  const individualLicenseCounts: { [key: string]: number } = {};
-                  
-                  Object.entries(licenseCounts).forEach(([licenseExpression, count]) => {
-                    // Parse the license expression to get individual licenses
-                    const individualLicenses = licenseExpression
-                      .replace(/[()]/g, '') // Remove parentheses
-                      .split(/\s+(?:OR|AND)\s+/i)
-                      .map(license => license.trim())
-                      .filter(license => license.length > 0);
-                    
-                    individualLicenses.forEach(license => {
-                      individualLicenseCounts[license] = (individualLicenseCounts[license] || 0) + count;
-                    });
-                  });
-                  
-                  return (
-                    <Grid container spacing={2}>
-                      {Object.entries(individualLicenseCounts).map(([license, count]) => (
-                        <Grid item xs={3} key={license}>
-                          <Box sx={{ textAlign: "center" }}>
-                            <Chip
-                              label={`${count} ${license}`}
-                              color={getLicenseStatusColor(license)}
-                              size="small"
-                            />
-                            <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 0.5 }}>
-                              {getLicenseCategory(license)}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      ))}
-                    </Grid>
-                  );
-                })()}
-              </Box>
-
-              {/* Approval Actions */}
-              <Box sx={{ mb: 3 }}>
-                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-                  <Typography variant="h6">
-                    Approval Actions
-                  </Typography>
-                  <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-                    <Typography variant="body2" color="textSecondary">
-                      {selectedPackages.size} of {selectedRequest.packages.filter(p => p.status === "pending_approval").length} selected
-                    </Typography>
-                    <Button
-                      size="small"
-                      onClick={() => handleSelectAll(true)}
-                      disabled={selectedPackages.size === selectedRequest.packages.filter(p => p.status === "pending_approval").length}
-                    >
-                      Select All
-                    </Button>
-                    <Button
-                      size="small"
-                      onClick={() => handleSelectAll(false)}
-                      disabled={selectedPackages.size === 0}
-                    >
-                      Clear All
-                    </Button>
-                  </Box>
-                </Box>
-                <Grid container spacing={2}>
-                  <Grid item xs={6}>
-                    <Card sx={{ border: "1px solid", borderColor: "success.main" }}>
-                      <CardContent>
-                        <Box display="flex" alignItems="center" mb={2}>
-                          <CheckCircle color="success" sx={{ mr: 1 }} />
-                          <Typography variant="h6" color="success.main">
-                            Approve Request
-                          </Typography>
-                        </Box>
-                        <TextField
-                          fullWidth
-                          multiline
-                          rows={3}
-                          placeholder="Optional approval reason..."
-                          value={approvalReason}
-                          onChange={(e) => setApprovalReason(e.target.value)}
-                          size="small"
-                        />
-                        <Button
-                          fullWidth
-                          variant="contained"
-                          color="success"
-                          startIcon={<CheckCircle />}
-                          onClick={handleApproveRequest}
-                          disabled={isProcessing || selectedPackages.size === 0}
-                          sx={{ mt: 2 }}
-                        >
-                          Approve Selected ({selectedPackages.size})
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Card sx={{ border: "1px solid", borderColor: "error.main" }}>
-                      <CardContent>
-                        <Box display="flex" alignItems="center" mb={2}>
-                          <Cancel color="error" sx={{ mr: 1 }} />
-                          <Typography variant="h6" color="error.main">
-                            Reject Request
-                          </Typography>
-                        </Box>
-                        <TextField
-                          fullWidth
-                          multiline
-                          rows={3}
-                          placeholder="Rejection reason (required)..."
-                          value={rejectionReason}
-                          onChange={(e) => setRejectionReason(e.target.value)}
-                          size="small"
-                          required
-                        />
-                        <Button
-                          fullWidth
-                          variant="contained"
-                          color="error"
-                          startIcon={<Cancel />}
-                          onClick={handleRejectRequest}
-                          disabled={isProcessing || !rejectionReason.trim() || selectedPackages.size === 0}
-                          sx={{ mt: 2 }}
-                        >
-                          Reject Selected ({selectedPackages.size})
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                </Grid>
-              </Box>
-
-              {/* Packages Table */}
-              <Typography variant="h6" gutterBottom>
-                Packages ({selectedRequest.packages.length})
-              </Typography>
-              
-              <MaterialReactTable
-                columns={packageColumns}
-                data={selectedRequest.packages.map(pkg => ({
-                  ...pkg,
-                  selected: selectedPackages.has(pkg.id),
-                  onSelectChange: (selected: boolean) => handlePackageSelect(pkg.id, selected)
-                }))}
-                enableColumnFilters
-                enableGlobalFilter
-                enableSorting
-                enableColumnResizing
-                enablePagination={false}
-                enableTopToolbar={false}
-                enableBottomToolbar={false}
-                enableColumnFilterModes={false}
-                muiTableProps={{
-                  sx: {
-                    tableLayout: "fixed",
-                  },
-                }}
-                muiTableContainerProps={{
-                  sx: {
-                    maxHeight: "400px",
-                  },
-                }}
-                muiTableHeadProps={{
-                  sx: {
-                    position: "sticky",
-                    top: 0,
-                    zIndex: 1,
-                    backgroundColor: "background.paper",
-                  },
-                }}
-                initialState={{
-                  density: "compact",
-                  showColumnFilters: true,
-                  sorting: [
-                    { id: "name", desc: false },
-                    { id: "version", desc: false },
-                  ],
-                }}
-              />
-            </Box>
-          ) : (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
-              <CircularProgress />
-              <Typography variant="body2" sx={{ ml: 2 }}>
-                Loading package details...
-              </Typography>
-            </Box>
-          )}
-        </DialogContent>
-        
-        <DialogActions>
-          <Button onClick={handleCloseDetails}>Close</Button>
-        </DialogActions>
-      </Dialog>
+        selectedRequest={selectedRequest}
+        onApprovalComplete={handleApprovalComplete}
+      />
     </Box>
   );
 }
 
 // Helper functions
-function getRequestStatusColor(status: string) {
-  switch (status) {
-    case PACKAGE_STATUS.REQUESTED:
-      return "default";
-    case PACKAGE_STATUS.LICENCE_CHECKED:
-      return "info";
-    case PACKAGE_STATUS.DOWNLOADED:
-      return "info";
-    case PACKAGE_STATUS.PENDING_APPROVAL:
-      return "warning";
-    case PACKAGE_STATUS.APPROVED:
-      return "success";
-    case PACKAGE_STATUS.REJECTED:
-      return "error";
-    default:
-      return "default";
-  }
-}
-
-function getRequestStatusLabel(status: string): string {
-  switch (status) {
-    case PACKAGE_STATUS.REQUESTED:
-      return "Requested";
-    case PACKAGE_STATUS.LICENCE_CHECKED:
-      return "License Checked";
-    case PACKAGE_STATUS.DOWNLOADED:
-      return "Downloaded";
-    case PACKAGE_STATUS.PENDING_APPROVAL:
-      return "Pending Approval";
-    case PACKAGE_STATUS.APPROVED:
-      return "Approved";
-    case PACKAGE_STATUS.REJECTED:
-      return "Rejected";
-    default:
-      return status;
-  }
-}
-
 function getPackageStatusColor(status: string) {
   switch (status) {
-    case PACKAGE_STATUS.REQUESTED:
-      return "default";
-    case PACKAGE_STATUS.LICENCE_CHECKED:
-      return "info";
-    case PACKAGE_STATUS.DOWNLOADED:
-      return "info";
-    case PACKAGE_STATUS.PENDING_APPROVAL:
-      return "warning";
     case PACKAGE_STATUS.APPROVED:
-      return "success";
+      return "success"; // Green
     case PACKAGE_STATUS.REJECTED:
-      return "error";
+      return "error"; // Red
+    case PACKAGE_STATUS.PENDING_APPROVAL:
+      return "info"; // Blue
     default:
-      return "default";
+      return "warning"; // Orange for all others
   }
 }
 
@@ -998,28 +502,11 @@ function getPackageStatusLabel(status: string): string {
   }
 }
 
-function getLicenseStatusColor(licenseIdentifier: string, licenseStatus?: LicenseStatus) {
-  // Use database license status if available
-  if (licenseStatus) {
-    switch (licenseStatus) {
-      case LICENSE_STATUS.ALWAYS_ALLOWED:
-      case LICENSE_STATUS.ALLOWED:
-        return "success";
-      case LICENSE_STATUS.AVOID:
-        return "warning";
-      case LICENSE_STATUS.BLOCKED:
-        return "error";
-      default:
-        return "default";
-    }
-  }
-
-  // Fallback to hardcoded logic if no database status
+function getLicenseStatusColor(licenseIdentifier: string) {
   const allowedLicenses = ["MIT", "Apache-2.0", "BSD", "CC0-1.0", "Unlicense", "ISC", "0BSD"];
   const avoidLicenses = ["GPL-3.0", "LGPL-3.0"];
   const blockedLicenses = ["GPL", "GPL-2.0", "AGPL"];
 
-  // Check for exact matches first
   if (allowedLicenses.includes(licenseIdentifier)) {
     return "success";
   } else if (avoidLicenses.includes(licenseIdentifier)) {
@@ -1027,7 +514,6 @@ function getLicenseStatusColor(licenseIdentifier: string, licenseStatus?: Licens
   } else if (blockedLicenses.includes(licenseIdentifier)) {
     return "error";
   } else {
-    // Check for partial matches (e.g., "GPL-2.0" should match "GPL")
     if (licenseIdentifier.includes("GPL-2.0") || licenseIdentifier.includes("LGPL-2.0")) {
       return "warning";
     } else if (licenseIdentifier.includes("GPL-3.0") || licenseIdentifier.includes("LGPL-3.0") || licenseIdentifier.includes("AGPL")) {
@@ -1042,46 +528,3 @@ function getLicenseStatusColor(licenseIdentifier: string, licenseStatus?: Licens
   }
 }
 
-function getLicenseCategory(licenseIdentifier: string, licenseStatus?: LicenseStatus): string {
-  // Use database license status if available
-  if (licenseStatus) {
-    switch (licenseStatus) {
-      case LICENSE_STATUS.ALWAYS_ALLOWED:
-      case LICENSE_STATUS.ALLOWED:
-        return "Allowed";
-      case LICENSE_STATUS.AVOID:
-        return "Avoid";
-      case LICENSE_STATUS.BLOCKED:
-        return "Blocked";
-      default:
-        return "Review";
-    }
-  }
-
-  // Fallback to hardcoded logic if no database status
-  const allowedLicenses = ["MIT", "Apache-2.0", "BSD", "CC0-1.0", "Unlicense", "ISC", "0BSD"];
-  const avoidLicenses = ["GPL-3.0", "LGPL-3.0"];
-  const blockedLicenses = ["GPL", "GPL-2.0", "AGPL"];
-
-  // Check for exact matches first
-  if (allowedLicenses.includes(licenseIdentifier)) {
-    return "Allowed";
-  } else if (avoidLicenses.includes(licenseIdentifier)) {
-    return "Avoid";
-  } else if (blockedLicenses.includes(licenseIdentifier)) {
-    return "Blocked";
-  } else {
-    // Check for partial matches
-    if (licenseIdentifier.includes("GPL-2.0") || licenseIdentifier.includes("LGPL-2.0")) {
-      return "Avoid";
-    } else if (licenseIdentifier.includes("GPL-3.0") || licenseIdentifier.includes("LGPL-3.0") || licenseIdentifier.includes("AGPL")) {
-      return "Blocked";
-    } else if (licenseIdentifier.includes("MIT") || licenseIdentifier.includes("Apache-2.0") || licenseIdentifier.includes("BSD") || 
-               licenseIdentifier.includes("CC0-1.0") || licenseIdentifier.includes("Unlicense") || licenseIdentifier.includes("ISC") || 
-               licenseIdentifier.includes("0BSD")) {
-      return "Allowed";
-    } else {
-      return "Review";
-    }
-  }
-}
