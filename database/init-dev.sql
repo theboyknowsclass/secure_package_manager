@@ -1,5 +1,5 @@
 -- Development database initialization
--- Fresh start every time - no migrations needed
+-- Includes schema + development users + license data
 
 -- Include the base schema
 \i /docker-entrypoint-initdb.d/init.sql
@@ -12,14 +12,7 @@ INSERT INTO users (username, email, full_name, role) VALUES
     ('tester', 'tester@company.com', 'QA Tester', 'user')
 ON CONFLICT (username) DO NOTHING;
 
--- Insert development applications
-INSERT INTO applications (name, version, description, created_by) VALUES
-    ('secure-package-manager-frontend', '0.0.0', 'Frontend application', 1),
-    ('test-application', '1.0.0', 'Test application for development', 3),
-    ('demo-app', '2.1.0', 'Demo application', 4)
-ON CONFLICT (name, version) DO NOTHING;
-
--- Insert default supported licenses with 4-tier status system (dev only)
+-- Insert default supported licenses with 4-tier status system
 INSERT INTO supported_licenses (name, identifier, status, created_by) VALUES
 -- Always Acceptable (highest priority, no restrictions)
 ('MIT License', 'MIT', 'always_allowed', 1),
@@ -44,13 +37,3 @@ INSERT INTO supported_licenses (name, identifier, status, created_by) VALUES
 ('Creative Commons Zero v1.0 Universal', 'CC0-1.0', 'allowed', 1),
 ('Unlicense', 'Unlicense', 'allowed', 1)
 ON CONFLICT (identifier) DO NOTHING;
-
--- Insert default repository configuration and development config
-INSERT INTO repository_config (config_key, config_value, description) VALUES
-    ('source_repository_url', 'https://registry.npmjs.org/', 'Source repository URL for package downloads'),
-    ('target_repository_url', 'http://localhost:8080/', 'Target repository URL for package publishing'),
-    ('npm_registry_url', 'https://registry.npmjs.org/', 'NPM registry URL for development'),
-    ('trivy_timeout', '300', 'Trivy scan timeout in seconds'),
-    ('max_package_size_mb', '50', 'Maximum package size in MB'),
-    ('dev_mode', 'true', 'Development mode flag')
-ON CONFLICT (config_key) DO NOTHING;

@@ -1,4 +1,5 @@
 -- Initialize the secure package manager database
+-- Production schema - simplified and streamlined
 
 -- Create users table
 CREATE TABLE IF NOT EXISTS users (
@@ -12,98 +13,78 @@ CREATE TABLE IF NOT EXISTS users (
     CONSTRAINT users_role_check CHECK (role IN ('user', 'approver', 'admin'))
 );
 
--- Create applications table
-CREATE TABLE IF NOT EXISTS applications (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    version VARCHAR(100) NOT NULL,
-    description TEXT,
-    created_by INTEGER REFERENCES users(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(name, version)
-);
-
 -- Create supported_licenses table
 CREATE TABLE IF NOT EXISTS supported_licenses (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) UNIQUE NOT NULL,
     identifier VARCHAR(100) UNIQUE NOT NULL, -- SPDX identifier (e.g., 'MIT', 'Apache-2.0')
-    status VARCHAR(20) DEFAULT 'allowed' CHECK (status IN ('always_allowed', 'allowed', 'avoid', 'blocked')), -- license status
-    created_by INTEGER REFERENCES users(id),
+    status VARCHAR(20) DEFAULT 'allowed' NOT NULL,
+    created_by INTEGER REFERENCES users(id) ON DELETE RESTRICT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT supported_licenses_status_check CHECK (status IN ('always_allowed', 'allowed', 'avoid', 'blocked'))
 );
 
--- Create package_requests table
-CREATE TABLE IF NOT EXISTS package_requests (
+-- Create requests table (simplified from package_requests + applications)
+CREATE TABLE IF NOT EXISTS requests (
     id SERIAL PRIMARY KEY,
-    application_id INTEGER REFERENCES applications(id),
-    requestor_id INTEGER REFERENCES users(id),
-    package_lock_file TEXT NOT NULL,
-    status VARCHAR(50) DEFAULT 'requested',
-    total_packages INTEGER DEFAULT 0,
-    validated_packages INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    application_name VARCHAR(255) NOT NULL, -- from package-lock.json
+    version VARCHAR(100) NOT NULL, -- from package-lock.json
+    requestor_id INTEGER REFERENCES users(id) ON DELETE RESTRICT,
+    package_lock_file TEXT, -- Store original package-lock.json content
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create packages table
+-- Create packages table (distinct set of packages, unique on name+version)
 CREATE TABLE IF NOT EXISTS packages (
     id SERIAL PRIMARY KEY,
-    package_request_id INTEGER REFERENCES package_requests(id),
     name VARCHAR(255) NOT NULL,
     version VARCHAR(100) NOT NULL,
     npm_url VARCHAR(500),
     local_path VARCHAR(500),
-    file_size BIGINT,
-    checksum VARCHAR(255),
+    integrity VARCHAR(255), -- Package integrity hash from package-lock.json
     license_identifier VARCHAR(100), -- SPDX license identifier from package.json
     license_text TEXT, -- Full license text if available
-    status VARCHAR(50) DEFAULT 'requested',
-    validation_errors TEXT[],
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(name, version)
+);
+
+-- Create request_packages table (many-to-many linking table)
+CREATE TABLE IF NOT EXISTS request_packages (
+    request_id INTEGER REFERENCES requests(id) ON DELETE CASCADE,
+    package_id INTEGER REFERENCES packages(id) ON DELETE CASCADE,
+    PRIMARY KEY (request_id, package_id)
+);
+
+-- Create package_status table (replaces package_validations and status tracking)
+CREATE TABLE IF NOT EXISTS package_status (
+    id SERIAL PRIMARY KEY,
+    package_id INTEGER REFERENCES packages(id) ON DELETE CASCADE,
+    status VARCHAR(50) NOT NULL,
+    file_size BIGINT,
+    checksum VARCHAR(255),
+    license_score INTEGER CHECK (license_score >= 0 AND license_score <= 100),
     security_score INTEGER CHECK (security_score >= 0 AND security_score <= 100),
-    license_score INTEGER CHECK (license_score >= 0 AND license_score <= 100), -- License compliance score
     security_scan_status VARCHAR(50) DEFAULT 'pending',
-    vulnerability_count INTEGER DEFAULT 0,
-    critical_vulnerabilities INTEGER DEFAULT 0,
-    high_vulnerabilities INTEGER DEFAULT 0,
-    medium_vulnerabilities INTEGER DEFAULT 0,
-    low_vulnerabilities INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(name, version, package_request_id)
+    UNIQUE(package_id), -- Only one status record per package
+    CONSTRAINT package_status_status_check CHECK (status IN (
+        'Requested', 
+        'Licence Checked', 
+        'Downloaded', 
+        'Pending Approval', 
+        'Approved', 
+        'Rejected'
+    )),
+    CONSTRAINT package_status_security_scan_status_check CHECK (security_scan_status IN ('pending', 'running', 'completed', 'failed', 'skipped'))
 );
 
--- Create package_references table
-CREATE TABLE IF NOT EXISTS package_references (
-    id SERIAL PRIMARY KEY,
-    package_request_id INTEGER REFERENCES package_requests(id),
-    name VARCHAR(255) NOT NULL,
-    version VARCHAR(100) NOT NULL,
-    npm_url VARCHAR(500),
-    integrity VARCHAR(255),
-    status VARCHAR(50) DEFAULT 'referenced',
-    existing_package_id INTEGER REFERENCES packages(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Create package_validations table
-CREATE TABLE IF NOT EXISTS package_validations (
-    id SERIAL PRIMARY KEY,
-    package_id INTEGER REFERENCES packages(id),
-    validation_type VARCHAR(100) NOT NULL,
-    status VARCHAR(50) NOT NULL,
-    details TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Create security_scans table
+-- Create security_scans table (stores Trivy scan results)
 CREATE TABLE IF NOT EXISTS security_scans (
     id SERIAL PRIMARY KEY,
     package_id INTEGER REFERENCES packages(id) ON DELETE CASCADE,
     scan_type VARCHAR(50) NOT NULL DEFAULT 'trivy',
-    status VARCHAR(50) NOT NULL DEFAULT 'pending',
     scan_result JSONB, -- Store the full Trivy scan result
     vulnerability_count INTEGER DEFAULT 0,
     critical_count INTEGER DEFAULT 0,
@@ -121,7 +102,7 @@ CREATE TABLE IF NOT EXISTS security_scans (
 -- Create audit_log table
 CREATE TABLE IF NOT EXISTS audit_log (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id),
+    user_id INTEGER REFERENCES users(id) ON DELETE RESTRICT,
     action VARCHAR(100) NOT NULL,
     resource_type VARCHAR(100) NOT NULL,
     resource_id INTEGER,
@@ -129,30 +110,18 @@ CREATE TABLE IF NOT EXISTS audit_log (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create repository_config table
-CREATE TABLE IF NOT EXISTS repository_config (
-    id SERIAL PRIMARY KEY,
-    config_key VARCHAR(100) UNIQUE NOT NULL,
-    config_value TEXT NOT NULL,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_packages_status ON packages(status);
-CREATE INDEX IF NOT EXISTS idx_package_requests_status ON package_requests(status);
-CREATE INDEX IF NOT EXISTS idx_packages_name_version ON packages(name, version);
-CREATE INDEX IF NOT EXISTS idx_package_references_status ON package_references(status);
-CREATE INDEX IF NOT EXISTS idx_package_references_name_version ON package_references(name, version);
-CREATE INDEX IF NOT EXISTS idx_audit_log_user_id ON audit_log(user_id);
-CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
-CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+-- Create indexes for better performance (minimal set)
+-- Foreign key indexes for joins
+CREATE INDEX IF NOT EXISTS idx_requests_requestor_id ON requests(requestor_id);
+CREATE INDEX IF NOT EXISTS idx_request_packages_request_id ON request_packages(request_id);
+CREATE INDEX IF NOT EXISTS idx_request_packages_package_id ON request_packages(package_id);
+CREATE INDEX IF NOT EXISTS idx_package_status_package_id ON package_status(package_id);
 CREATE INDEX IF NOT EXISTS idx_security_scans_package_id ON security_scans(package_id);
-CREATE INDEX IF NOT EXISTS idx_security_scans_status ON security_scans(status);
-CREATE INDEX IF NOT EXISTS idx_security_scans_scan_type ON security_scans(scan_type);
-CREATE INDEX IF NOT EXISTS idx_security_scans_created_at ON security_scans(created_at);
-CREATE INDEX IF NOT EXISTS idx_packages_security_scan_status ON packages(security_scan_status);
+
+-- Common query patterns
+CREATE INDEX IF NOT EXISTS idx_packages_name_version ON packages(name, version);
+CREATE INDEX IF NOT EXISTS idx_package_status_status ON package_status(status);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 
 
 -- Create function to update updated_at timestamp
@@ -171,24 +140,12 @@ BEGIN
         CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
     
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_applications_updated_at') THEN
-        CREATE TRIGGER update_applications_updated_at BEFORE UPDATE ON applications FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-    END IF;
-    
     IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_supported_licenses_updated_at') THEN
         CREATE TRIGGER update_supported_licenses_updated_at BEFORE UPDATE ON supported_licenses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
     
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_package_requests_updated_at') THEN
-        CREATE TRIGGER update_package_requests_updated_at BEFORE UPDATE ON package_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-    END IF;
-    
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_packages_updated_at') THEN
-        CREATE TRIGGER update_packages_updated_at BEFORE UPDATE ON packages FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-    END IF;
-    
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_repository_config_updated_at') THEN
-        CREATE TRIGGER update_repository_config_updated_at BEFORE UPDATE ON repository_config FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_package_status_updated_at') THEN
+        CREATE TRIGGER update_package_status_updated_at BEFORE UPDATE ON package_status FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
     
     IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_security_scans_updated_at') THEN
