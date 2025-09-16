@@ -82,73 +82,39 @@ class TrivyService:
         """
         try:
             # Create temporary directory for package
+            # Sanitize package name for use in file paths (replace / with -)
+            safe_package_name = package.name.replace('/', '-').replace('@', '')
             temp_dir = tempfile.mkdtemp(
-                prefix=f"trivy_scan_{package.name}_{package.version}_"
+                prefix=f"trivy_scan_{safe_package_name}_{package.version}_"
             )
 
-            # Try to download the actual package from source repository
-            source_repo_url = SOURCE_REPOSITORY_URL
-
-            try:
-                # Get package metadata from source repository
-                # URL encode the package name to handle scoped packages (e.g., @types/node -> %40types%2Fnode)
-                import urllib.parse
-                encoded_package_name = urllib.parse.quote(package.name, safe='')
-                package_url = f"{source_repo_url}/{encoded_package_name}"
-                logger.info(f"Fetching package metadata from {package_url}")
-                response = requests.get(package_url, timeout=30)
-
+            # Use the stored npm_url from package-lock.json if available
+            if package.npm_url:
+                logger.info(f"Downloading package tarball from stored URL: {package.npm_url}")
+                response = requests.get(package.npm_url, timeout=60)
+                
                 if response.status_code == 200:
-                    package_metadata = response.json()
+                    # Extract tarball to temp directory
+                    import io
+                    import tarfile
 
-                    # Get the specific version
-                    if package.version in package_metadata.get("versions", {}):
-                        version_data = package_metadata["versions"][package.version]
+                    tarball_buffer = io.BytesIO(response.content)
+                    with tarfile.open(
+                        fileobj=tarball_buffer, mode="r:gz"
+                    ) as tar:
+                        tar.extractall(temp_dir)
 
-                        # Download the tarball
-                        dist_url = version_data.get("dist", {}).get("tarball")
-                        if dist_url:
-                            logger.info(f"Downloading package tarball from {dist_url}")
-                            tarball_response = requests.get(dist_url, timeout=60)
-
-                            if tarball_response.status_code == 200:
-                                # Extract tarball to temp directory
-                                import io
-                                import tarfile
-
-                                tarball_buffer = io.BytesIO(tarball_response.content)
-                                with tarfile.open(
-                                    fileobj=tarball_buffer, mode="r:gz"
-                                ) as tar:
-                                    tar.extractall(temp_dir)
-
-                                logger.info(
-                                    f"Successfully downloaded and extracted {package.name}@{package.version}"
-                                )
-                                return temp_dir
-                            else:
-                                logger.error(
-                                    f"Failed to download tarball: HTTP {tarball_response.status_code}"
-                                )
-                                return None
-                        else:
-                            logger.error(
-                                f"No tarball URL found for {package.name}@{package.version}"
-                            )
-                            return None
-                    else:
-                        logger.error(
-                            f"Version {package.version} not found for {package.name}. Available versions: {list(package_metadata.get('versions', {}).keys())[:10]}"
-                        )
-                        return None
+                    logger.info(
+                        f"Successfully downloaded and extracted {package.name}@{package.version}"
+                    )
+                    return temp_dir
                 else:
                     logger.error(
-                        f"Failed to get package metadata: HTTP {response.status_code}"
+                        f"Failed to download tarball from stored URL: HTTP {response.status_code}"
                     )
                     return None
-
-            except Exception as e:
-                logger.error(f"Failed to download real package: {str(e)}")
+            else:
+                logger.error(f"No npm_url available for package {package.name}@{package.version}")
                 return None
 
         except Exception as e:

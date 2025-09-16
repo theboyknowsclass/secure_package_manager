@@ -197,10 +197,20 @@ class PackageService:
 
         # If name is not provided, try to extract it from the path
         if not package_name and package_path.startswith("node_modules/"):
-            # Extract package name from path like "node_modules/lodash" -> "lodash"
+            # Extract package name from path
+            # For regular packages: "node_modules/lodash" -> "lodash"
+            # For scoped packages: "node_modules/@nodelib/package_name" -> "@nodelib/package_name"
             path_parts = package_path.split("/")
             if len(path_parts) >= 2:
-                package_name = path_parts[1]
+                if path_parts[1].startswith("@"):
+                    # Scoped package: take both scope and package name
+                    if len(path_parts) >= 3:
+                        package_name = f"{path_parts[1]}/{path_parts[2]}"
+                    else:
+                        package_name = path_parts[1]
+                else:
+                    # Regular package: take just the package name
+                    package_name = path_parts[1]
 
         return package_name
 
