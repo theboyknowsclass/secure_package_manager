@@ -2,7 +2,7 @@ import json
 import logging
 import subprocess
 import tempfile
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import requests
 from config.constants import NPM_PROXY_URL, TRIVY_MAX_RETRIES, TRIVY_TIMEOUT, TRIVY_URL
@@ -12,12 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 class TrivyService:
-    def __init__(self):
+    def __init__(self) -> None:
         self.trivy_url = TRIVY_URL
         self.timeout = TRIVY_TIMEOUT
         self.max_retries = TRIVY_MAX_RETRIES
 
-    def scan_package(self, package: Package) -> Dict:
+    def scan_package(self, package: Package) -> Dict[str, Any]:
         """
         Scan a package for vulnerabilities using Trivy
 
@@ -124,18 +124,22 @@ class TrivyService:
                                 logger.warning(
                                     f"Failed to download tarball: {tarball_response.status_code}"
                                 )
+                                return None
                         else:
                             logger.warning(
                                 f"No tarball URL found for {package.name}@{package.version}"
                             )
+                            return None
                     else:
                         logger.warning(
                             f"Version {package.version} not found for {package.name}"
                         )
+                        return None
                 else:
                     logger.warning(
                         f"Failed to get package metadata: {response.status_code}"
                     )
+                    return None
 
             except Exception as e:
                 logger.error(f"Failed to download real package: {str(e)}")
@@ -424,7 +428,7 @@ class TrivyService:
             score -= security_scan.low_count * 3  # -3 per low
 
             # Ensure score is between 0 and 100
-            return max(0, min(100, score))
+            return int(max(0, min(100, score)))
 
         except Exception as e:
             logger.error(f"Error calculating security score: {str(e)}")

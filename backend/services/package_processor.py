@@ -6,7 +6,7 @@ including license validation, security scanning, and status updates.
 """
 
 import logging
-from typing import Dict
+from typing import Any, Dict
 
 from models import Package, db
 
@@ -16,12 +16,12 @@ logger = logging.getLogger(__name__)
 class PackageProcessor:
     """Processes individual packages through the validation pipeline"""
 
-    def __init__(self, license_service, trivy_service, db_session=None):
+    def __init__(self, license_service: Any, trivy_service: Any, db_session: Any = None) -> None:
         self.license_service = license_service
         self.trivy_service = trivy_service
         self.db = db_session or db
 
-    def process_pending_packages(self, request_id: int) -> Dict[str, any]:
+    def process_pending_packages(self, request_id: int) -> Dict[str, Any]:
         """
         Process all pending packages for a request
 
@@ -43,7 +43,7 @@ class PackageProcessor:
             f"Processing {len(packages)} pending packages for request {request_id}"
         )
 
-        results = {"processed": 0, "failed": 0, "errors": [], "packages": []}
+        results: Dict[str, Any] = {"processed": 0, "failed": 0, "errors": [], "packages": []}
 
         for package in packages:
             try:
@@ -81,7 +81,7 @@ class PackageProcessor:
 
         return results
 
-    def _process_single_package(self, package: Package) -> Dict[str, any]:
+    def _process_single_package(self, package: Package) -> Dict[str, Any]:
         """
         Process a single package through the validation pipeline
 
@@ -315,7 +315,7 @@ class PackageProcessor:
             logger.error(f"Error simulating package download: {str(e)}")
             return False
 
-    def _validate_package_license(self, package: Package) -> Dict[str, any]:
+    def _validate_package_license(self, package: Package) -> Dict[str, Any]:
         """
         Validate package license information
 
@@ -334,7 +334,7 @@ class PackageProcessor:
             }
 
             # Use license service to validate
-            validation_result = self.license_service.validate_package_license(
+            validation_result: Dict[str, Any] = self.license_service.validate_package_license(
                 package_data
             )
 

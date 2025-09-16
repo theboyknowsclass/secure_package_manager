@@ -1,4 +1,5 @@
 import logging
+from typing import Any, Dict, List, Optional
 
 from models import SupportedLicense
 
@@ -8,10 +9,10 @@ logger = logging.getLogger(__name__)
 class LicenseService:
     """Service for license validation and management"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = logger
 
-    def validate_package_license(self, package_data):
+    def validate_package_license(self, package_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Validate a package's license against 4-tier status system
 
@@ -56,7 +57,7 @@ class LicenseService:
                 "warnings": [],
             }
 
-    def _parse_license_info(self, package_data):
+    def _parse_license_info(self, package_data: Dict[str, Any]) -> Optional[str]:
         """Parse and normalize license information from package data"""
         license_identifier = package_data.get("license")
 
@@ -79,7 +80,7 @@ class LicenseService:
 
         return license_identifier if license_identifier else None
 
-    def _create_no_license_result(self):
+    def _create_no_license_result(self) -> Dict[str, Any]:
         """Create result for packages with no license information"""
         return {
             "score": 0,
@@ -87,10 +88,10 @@ class LicenseService:
             "warnings": ["Package has no license specified"],
         }
 
-    def _lookup_license_in_db(self, license_identifier):
+    def _lookup_license_in_db(self, license_identifier: str) -> Optional[SupportedLicense]:
         """Look up license in database, including variations"""
         # Find the license in the database
-        license = SupportedLicense.query.filter_by(
+        license: Optional[SupportedLicense] = SupportedLicense.query.filter_by(
             identifier=license_identifier
         ).first()
 
@@ -100,7 +101,7 @@ class LicenseService:
 
         return license
 
-    def _create_unknown_license_result(self, license_identifier):
+    def _create_unknown_license_result(self, license_identifier: str) -> Dict[str, Any]:
         """Create result for unknown licenses"""
         return {
             "score": 0,
@@ -110,7 +111,7 @@ class LicenseService:
             ],
         }
 
-    def _validate_license_status(self, license, license_identifier, package_name):
+    def _validate_license_status(self, license: SupportedLicense, license_identifier: str, package_name: str) -> Dict[str, Any]:
         """Validate license based on its status"""
         if license.status == "blocked":
             return self._create_blocked_license_result(license_identifier)
@@ -127,7 +128,7 @@ class LicenseService:
         else:
             return self._create_unknown_status_result(license_identifier)
 
-    def _create_blocked_license_result(self, license_identifier):
+    def _create_blocked_license_result(self, license_identifier: str) -> Dict[str, Any]:
         """Create result for blocked licenses"""
         return {
             "score": 0,
@@ -135,7 +136,7 @@ class LicenseService:
             "warnings": [f'License "{license_identifier}" is explicitly prohibited'],
         }
 
-    def _create_avoid_license_result(self, license_identifier):
+    def _create_avoid_license_result(self, license_identifier: str) -> Dict[str, Any]:
         """Create result for avoided licenses"""
         return {
             "score": 30,
@@ -145,7 +146,7 @@ class LicenseService:
             ],
         }
 
-    def _create_allowed_license_result(self, license, license_identifier, package_name):
+    def _create_allowed_license_result(self, license: SupportedLicense, license_identifier: str, package_name: str) -> Dict[str, Any]:
         """Create result for allowed licenses"""
         score = self._calculate_license_score(license)
         result = {"score": score, "errors": [], "warnings": []}
@@ -156,8 +157,8 @@ class LicenseService:
         return result
 
     def _create_always_allowed_license_result(
-        self, license, license_identifier, package_name
-    ):
+        self, license: SupportedLicense, license_identifier: str, package_name: str
+    ) -> Dict[str, Any]:
         """Create result for always allowed licenses"""
         score = self._calculate_license_score(license)
         result = {"score": score, "errors": [], "warnings": []}
@@ -167,7 +168,7 @@ class LicenseService:
         )
         return result
 
-    def _create_unknown_status_result(self, license_identifier):
+    def _create_unknown_status_result(self, license_identifier: str) -> Dict[str, Any]:
         """Create result for licenses with unknown status"""
         return {
             "score": 0,
@@ -175,7 +176,7 @@ class LicenseService:
             "warnings": [],
         }
 
-    def _find_license_variation(self, license_identifier):
+    def _find_license_variation(self, license_identifier: str) -> Optional[SupportedLicense]:
         """Find license by common variations"""
         variations = [
             license_identifier.lower(),
@@ -187,12 +188,12 @@ class LicenseService:
         ]
 
         for variation in variations:
-            license = SupportedLicense.query.filter_by(identifier=variation).first()
+            license: Optional[SupportedLicense] = SupportedLicense.query.filter_by(identifier=variation).first()
             if license:
                 return license
 
         # Try partial matches
-        licenses = SupportedLicense.query.filter(
+        licenses: List[SupportedLicense] = SupportedLicense.query.filter(
             SupportedLicense.identifier.ilike(f"%{license_identifier}%")
         ).all()
 
@@ -201,7 +202,7 @@ class LicenseService:
 
         return None
 
-    def _calculate_license_score(self, supported_license):
+    def _calculate_license_score(self, supported_license: SupportedLicense) -> int:
         """Calculate license compliance score based on status"""
         if supported_license.status == "always_allowed":
             return 100
@@ -214,18 +215,18 @@ class LicenseService:
         else:
             return 0
 
-    def get_supported_licenses(self, status=None):
+    def get_supported_licenses(self, status: Optional[str] = None) -> List[SupportedLicense]:
         """Get all supported licenses, optionally filtered by status"""
         try:
             query = SupportedLicense.query
             if status:
                 query = query.filter_by(status=status)
-            return query.all()
+            return list(query.all())
         except Exception as e:
             self.logger.error(f"Error getting supported licenses: {str(e)}")
             return []
 
-    def is_license_allowed(self, license_identifier):
+    def is_license_allowed(self, license_identifier: str) -> bool:
         """Check if a license is allowed (not blocked)"""
         try:
             license = SupportedLicense.query.filter_by(
@@ -240,7 +241,7 @@ class LicenseService:
             self.logger.error(f"Error checking license support: {str(e)}")
             return False
 
-    def _is_complex_license_expression(self, license_identifier):
+    def _is_complex_license_expression(self, license_identifier: str) -> bool:
         """Check if the license identifier is a complex expression with OR/AND operators"""
         if not license_identifier:
             return False
@@ -252,7 +253,7 @@ class LicenseService:
             pattern in license_identifier.upper() for pattern in complex_patterns
         )
 
-    def _validate_complex_license_expression(self, license_expression, package_name):
+    def _validate_complex_license_expression(self, license_expression: str, package_name: str) -> Dict[str, Any]:
         """Validate complex license expressions like (MIT OR CC0-1.0)"""
         try:
             # Parse the license expression to extract individual licenses
@@ -287,7 +288,7 @@ class LicenseService:
                 "warnings": [],
             }
 
-    def _parse_license_expression(self, license_expression):
+    def _parse_license_expression(self, license_expression: str) -> List[str]:
         """Parse a license expression to extract individual license identifiers"""
         # Remove parentheses and normalize
         cleaned = license_expression.replace("(", "").replace(")", "").strip()
@@ -315,8 +316,8 @@ class LicenseService:
         return cleaned_licenses
 
     def _validate_or_expression(
-        self, individual_licenses, original_expression, package_name
-    ):
+        self, individual_licenses: List[str], original_expression: str, package_name: str
+    ) -> Dict[str, Any]:
         """Validate OR expression - use the best (highest scoring) license"""
         best_score = 0
         best_result = None
@@ -353,8 +354,8 @@ class LicenseService:
             }
 
     def _validate_and_expression(
-        self, individual_licenses, original_expression, package_name
-    ):
+        self, individual_licenses: List[str], original_expression: str, package_name: str
+    ) -> Dict[str, Any]:
         """Validate AND expression - use the worst (lowest scoring) license"""
         worst_score = 100
         worst_result = None

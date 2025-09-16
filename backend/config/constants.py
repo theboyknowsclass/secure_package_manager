@@ -13,7 +13,7 @@ import os
 # =============================================================================
 
 
-def get_required_env(key: str, description: str = None) -> str:
+def get_required_env(key: str, description: str | None = None) -> str:
     """
     Get a required environment variable or add to missing list.
 
@@ -22,17 +22,17 @@ def get_required_env(key: str, description: str = None) -> str:
         description: Optional description for error message
 
     Returns:
-        Environment variable value or None if missing
+        Environment variable value (guaranteed to be non-None)
     """
     value = os.getenv(key)
     if not value:
         desc = f" ({description})" if description else ""
         _missing_env_vars.append(f"  - {key}{desc}")
-        return None
+        return ""  # Return empty string as placeholder
     return value
 
 
-def get_optional_env(key: str, default: str = None) -> str:
+def get_optional_env(key: str, default: str | None = None) -> str | None:
     """
     Get an optional environment variable with a default value.
     Only use this for truly optional configuration.
@@ -47,7 +47,22 @@ def get_optional_env(key: str, default: str = None) -> str:
     return os.getenv(key, default)
 
 
-def validate_all_required_env():
+def get_optional_env_int(key: str, default: str) -> int:
+    """
+    Get an optional environment variable as an integer with a default value.
+
+    Args:
+        key: Environment variable name
+        default: Default value if not set
+
+    Returns:
+        Environment variable value as integer or default
+    """
+    value = os.getenv(key, default)
+    return int(value)
+
+
+def validate_all_required_env() -> None:
     """
     Validate that all required environment variables are set.
     Raises ValueError with all missing variables if any are missing.
@@ -62,7 +77,7 @@ def validate_all_required_env():
 
 
 # Global list to collect missing environment variables
-_missing_env_vars = []
+_missing_env_vars: list[str] = []
 
 # =============================================================================
 # APPLICATION CONFIGURATION
@@ -120,9 +135,7 @@ FLASK_ENV = get_optional_env("FLASK_ENV", "development")
 FLASK_DEBUG = get_optional_env(
     "FLASK_DEBUG", "1" if FLASK_ENV == "development" else "0"
 )
-MAX_CONTENT_LENGTH = int(
-    get_optional_env("MAX_CONTENT_LENGTH", "16777216")
-)  # 16MB default
+MAX_CONTENT_LENGTH = get_optional_env_int("MAX_CONTENT_LENGTH", "16777216")  # 16MB default
 SQLALCHEMY_TRACK_MODIFICATIONS = False  # Disable for performance
 
 # =============================================================================
@@ -130,8 +143,8 @@ SQLALCHEMY_TRACK_MODIFICATIONS = False  # Disable for performance
 # =============================================================================
 
 # Trivy Service Configuration
-TRIVY_TIMEOUT = int(get_optional_env("TRIVY_TIMEOUT", "300"))  # 5 minutes default
-TRIVY_MAX_RETRIES = int(get_optional_env("TRIVY_MAX_RETRIES", "3"))
+TRIVY_TIMEOUT = get_optional_env_int("TRIVY_TIMEOUT", "300")  # 5 minutes default
+TRIVY_MAX_RETRIES = get_optional_env_int("TRIVY_MAX_RETRIES", "3")
 
 # =============================================================================
 # DATABASE CONFIGURATION
@@ -169,12 +182,12 @@ DEFAULT_ADMIN_EMAIL = get_required_env("DEFAULT_ADMIN_EMAIL", "Default admin ema
 # =============================================================================
 
 
-def is_development():
+def is_development() -> bool:
     """Check if running in development mode"""
     return os.getenv("FLASK_ENV", "development") == "development"
 
 
-def is_production():
+def is_production() -> bool:
     """Check if running in production mode"""
     return os.getenv("FLASK_ENV", "development") == "production"
 
@@ -184,7 +197,7 @@ def is_production():
 # =============================================================================
 
 
-def validate_config():
+def validate_config() -> None:
     """Validate that all required configuration is present"""
     required_vars = ["JWT_SECRET", "FLASK_SECRET_KEY", "POSTGRES_PASSWORD"]
 
@@ -197,5 +210,3 @@ def validate_config():
         raise ValueError(
             f"Missing required environment variables: {', '.join(missing_vars)}"
         )
-
-    return True

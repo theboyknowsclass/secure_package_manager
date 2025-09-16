@@ -3,6 +3,7 @@ import logging
 import os
 import subprocess
 import tempfile
+from typing import Any, Dict, List, Optional
 
 from config.constants import SECURE_REPO_URL
 from models import (
@@ -21,14 +22,14 @@ logger = logging.getLogger(__name__)
 
 
 class PackageService:
-    def __init__(self):
+    def __init__(self) -> None:
         # Don't initialize any config values - they'll be loaded dynamically
         self._config_loaded = False
-        self._config_cache = {}
+        self._config_cache: Dict[str, Any] = {}
         self.license_service = LicenseService()
         self.trivy_service = TrivyService()
 
-    def _load_config(self):
+    def _load_config(self) -> None:
         """Load repository configuration from database (only when needed)"""
         if self._config_loaded:
             return
@@ -77,39 +78,39 @@ class PackageService:
             }
             self._config_loaded = True
 
-    def refresh_config(self):
+    def refresh_config(self) -> None:
         """Refresh repository configuration from database"""
         self._config_loaded = False
         self._load_config()
 
-    def is_configuration_complete(self):
+    def is_configuration_complete(self) -> bool:
         """Check if repository configuration is complete"""
         self._load_config()
         required_keys = ["source_repo_url", "target_repo_url"]
         return all(self._config_cache.get(key) for key in required_keys)
 
-    def get_missing_config_keys(self):
+    def get_missing_config_keys(self) -> List[str]:
         """Get list of missing configuration keys"""
         self._load_config()
         required_keys = ["source_repo_url", "target_repo_url"]
         return [key for key in required_keys if not self._config_cache.get(key)]
 
     @property
-    def source_repo_url(self):
+    def source_repo_url(self) -> str:
         self._load_config()
-        return self._config_cache["source_repo_url"]
+        return str(self._config_cache["source_repo_url"])
 
     @property
-    def target_repo_url(self):
+    def target_repo_url(self) -> str:
         self._load_config()
-        return self._config_cache["target_repo_url"]
+        return str(self._config_cache["target_repo_url"])
 
     @property
-    def secure_repo_url(self):
+    def secure_repo_url(self) -> str:
         self._load_config()
-        return self._config_cache["secure_repo_url"]
+        return str(self._config_cache["secure_repo_url"])
 
-    def process_package_lock(self, request_id, package_data):
+    def process_package_lock(self, request_id: int, package_data: Dict[str, Any]) -> Dict[str, Any]:
         """Process package-lock.json and extract all packages"""
         try:
             # Validate the package-lock.json file
@@ -144,7 +145,7 @@ class PackageService:
             logger.error(f"Error processing package-lock.json: {str(e)}")
             raise e
 
-    def _validate_package_lock_file(self, package_data):
+    def _validate_package_lock_file(self, package_data: Dict[str, Any]) -> None:
         """Validate that the package data is a valid package-lock.json file"""
         if "lockfileVersion" not in package_data:
             raise ValueError(
@@ -152,22 +153,22 @@ class PackageService:
             )
 
         lockfile_version = package_data.get("lockfileVersion")
-        if lockfile_version < 3:
+        if lockfile_version is None or lockfile_version < 3:
             raise ValueError(
                 f"Unsupported lockfile version: {lockfile_version}. "
                 f"This system only supports package-lock.json files with lockfileVersion 3 or higher. "
                 f"Please upgrade your npm version (npm 8+) and regenerate the lockfile."
             )
 
-    def _extract_packages_from_json(self, package_data):
+    def _extract_packages_from_json(self, package_data: Dict[str, Any]) -> Dict[str, Any]:
         """Extract package information from package-lock.json data"""
         packages = package_data.get("packages", {})
         logger.info(
             f"Processing package-lock.json with {len(packages)} package entries"
         )
-        return packages
+        return dict(packages)
 
-    def _filter_new_packages(self, packages, request_id):
+    def _filter_new_packages(self, packages: Dict[str, Any], request_id: int) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """Filter packages to find new ones that need processing"""
         packages_to_process = []
         existing_packages = []
@@ -221,14 +222,17 @@ class PackageService:
                 continue
 
             # Create new package object
-            package = self._create_package_object(
-                package_name, package_version, package_info, request_id
-            )
-            packages_to_process.append(package)
+            package_data = {
+                "name": package_name,
+                "version": package_version,
+                "package_info": package_info,
+                "request_id": request_id
+            }
+            packages_to_process.append(package_data)
 
         return packages_to_process, existing_packages
 
-    def _extract_package_name(self, package_path, package_info):
+    def _extract_package_name(self, package_path: str, package_info: Dict[str, Any]) -> str | None:
         """Extract package name from package info or infer from path"""
         package_name = package_info.get("name")
 
@@ -242,8 +246,8 @@ class PackageService:
         return package_name
 
     def _create_package_object(
-        self, package_name, package_version, package_info, request_id
-    ):
+        self, package_name: str, package_version: str, package_info: Dict[str, Any], request_id: int
+    ) -> Package:
         """Create a new Package object from package information"""
         return Package(
             name=package_name,
@@ -255,17 +259,26 @@ class PackageService:
             npm_url=package_info.get("resolved"),
         )
 
-    def _create_package_records(self, packages_to_process):
+    def _create_package_records(self, packages_to_process: List[Dict[str, Any]]) -> List[Package]:
         """Create database records for new packages"""
-        for package in packages_to_process:
+        package_objects = []
+        for package_data in packages_to_process:
+            package = self._create_package_object(
+                package_data["name"],
+                package_data["version"], 
+                package_data,
+                package_data["request_id"]
+            )
             db.session.add(package)
+            package_objects.append(package)
             logger.info(
                 f"Added package for processing: {package.name}@{package.version}"
             )
+        return package_objects
 
     def _update_request_metadata(
-        self, request_id, packages_to_process, existing_packages
-    ):
+        self, request_id: int, packages_to_process: List[Dict[str, Any]], existing_packages: List[Dict[str, Any]]
+    ) -> None:
         """Update PackageRequest with total package count and status"""
         package_request = PackageRequest.query.get(request_id)
         if package_request:
@@ -277,7 +290,7 @@ class PackageService:
             )  # Start with existing validated packages
             db.session.commit()
 
-    def _process_packages_async(self, request_id):
+    def _process_packages_async(self, request_id: int) -> None:
         """Process packages asynchronously (refactored version)"""
         try:
             # Initialize services
@@ -310,7 +323,7 @@ class PackageService:
             )
             self._handle_processing_error(request_id, e)
 
-    def _handle_processing_error(self, request_id: int, error: Exception):
+    def _handle_processing_error(self, request_id: int, error: Exception) -> None:
         """Handle errors during package processing"""
         try:
             package_request = PackageRequest.query.get(request_id)
@@ -325,7 +338,7 @@ class PackageService:
                 f"Failed to update request status after error: {str(commit_error)}"
             )
 
-    def _calculate_security_score(self, package):
+    def _calculate_security_score(self, package: Package) -> int:
         """Calculate security score for package based on Trivy scan results"""
         try:
             # Use Trivy service to calculate security score from vulnerabilities
@@ -343,7 +356,7 @@ class PackageService:
             logger.error(f"Error calculating security score: {str(e)}")
             return 100  # Default to perfect score on error
 
-    def get_package_security_scan_status(self, package_id):
+    def get_package_security_scan_status(self, package_id: int) -> Dict[str, Any] | None:
         """Get security scan status for a package"""
         try:
             return self.trivy_service.get_scan_status(package_id)
@@ -353,7 +366,7 @@ class PackageService:
             )
             return None
 
-    def get_package_security_scan_report(self, package_id):
+    def get_package_security_scan_report(self, package_id: int) -> Dict[str, Any] | None:
         """Get detailed security scan report for a package"""
         try:
             return self.trivy_service.get_scan_report(package_id)
@@ -363,7 +376,7 @@ class PackageService:
             )
             return None
 
-    def publish_to_secure_repo(self, package):
+    def publish_to_secure_repo(self, package: Package) -> bool:
         """Publish package to secure repository using real npm publish"""
         try:
 

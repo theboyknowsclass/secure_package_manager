@@ -1,4 +1,5 @@
 from functools import wraps
+from typing import Any, Callable, Dict, Optional
 
 import jwt
 from config.constants import JWT_SECRET, OAUTH_AUDIENCE, OAUTH_ISSUER
@@ -7,10 +8,10 @@ from models import User, db
 
 
 class AuthService:
-    def __init__(self):
-        self.secret_key = JWT_SECRET
+    def __init__(self) -> None:
+        self.secret_key = JWT_SECRET or ""
 
-    def generate_token(self, user):
+    def generate_token(self, user: User) -> str:
         """Generate JWT token for user"""
         payload = {
             "user_id": user.id,
@@ -20,9 +21,9 @@ class AuthService:
             "aud": OAUTH_AUDIENCE,  # OAuth2 audience
             "iss": OAUTH_ISSUER,  # OAuth2 issuer
         }
-        return jwt.encode(payload, self.secret_key, algorithm="HS256")
+        return str(jwt.encode(payload, self.secret_key, algorithm="HS256"))
 
-    def verify_token(self, token):
+    def verify_token(self, token: str) -> Optional[User]:
         """Verify JWT token and return user"""
         import logging
 
@@ -56,7 +57,7 @@ class AuthService:
         logger.error("Token verification failed - no valid user found")
         return None
 
-    def _decode_jwt_token(self, token):
+    def _decode_jwt_token(self, token: str) -> Optional[Dict[str, Any]]:
         """Decode and validate JWT token"""
         import logging
 
@@ -71,9 +72,9 @@ class AuthService:
             issuer=OAUTH_ISSUER,
         )
         logger.info(f"Token decoded successfully. Payload: {payload}")
-        return payload
+        return dict(payload)
 
-    def _get_user_from_token(self, payload):
+    def _get_user_from_token(self, payload: Dict[str, Any]) -> Optional[User]:
         """Get user from token payload (OAuth2 or legacy)"""
         import logging
 
@@ -88,7 +89,7 @@ class AuthService:
             logger.error("Token payload contains neither 'sub' nor 'user_id' field")
             return None
 
-    def _handle_oauth2_token(self, payload):
+    def _handle_oauth2_token(self, payload: Dict[str, Any]) -> Optional[User]:
         """Handle OAuth2 token and return user"""
         import logging
 
@@ -110,7 +111,7 @@ class AuthService:
 
         return user
 
-    def _handle_legacy_token(self, payload):
+    def _handle_legacy_token(self, payload: Dict[str, Any]) -> Optional[User]:
         """Handle legacy token and return user"""
         import logging
 
@@ -124,7 +125,7 @@ class AuthService:
             logger.error("No user_id found in legacy token payload")
             return None
 
-        user = User.query.get(user_id)
+        user: Optional[User] = User.query.get(user_id)
         if user:
             logger.info(f"Found user by ID: {user.username} with role: {user.role}")
             return user
@@ -132,7 +133,7 @@ class AuthService:
             logger.error(f"No user found with ID: {user_id}")
             return None
 
-    def _create_user_from_oauth2_payload(self, payload, username):
+    def _create_user_from_oauth2_payload(self, payload: Dict[str, Any], username: str) -> User:
         """Create new user from OAuth2 token payload"""
         import logging
 
@@ -150,7 +151,7 @@ class AuthService:
         logger.info(f"Created new user: {user.username} with role: {user.role}")
         return user
 
-    def _update_user_from_oauth2_payload(self, user, payload):
+    def _update_user_from_oauth2_payload(self, user: User, payload: Dict[str, Any]) -> User:
         """Update existing user with OAuth2 token data"""
         import logging
 
@@ -165,11 +166,11 @@ class AuthService:
         logger.info(f"Updated existing user: {user.username} with role: {user.role}")
         return user
 
-    def require_auth(self, f):
+    def require_auth(self, f: Callable[..., Any]) -> Callable[..., Any]:
         """Decorator to require authentication"""
 
         @wraps(f)
-        def decorated_function(*args, **kwargs):
+        def decorated_function(*args: Any, **kwargs: Any) -> Any:
             import logging
 
             logger = logging.getLogger(__name__)
@@ -223,11 +224,11 @@ class AuthService:
 
         return decorated_function
 
-    def require_admin(self, f):
+    def require_admin(self, f: Callable[..., Any]) -> Callable[..., Any]:
         """Decorator to require admin privileges"""
 
         @wraps(f)
-        def decorated_function(*args, **kwargs):
+        def decorated_function(*args: Any, **kwargs: Any) -> Any:
             # First check authentication
             auth_result = self.require_auth(f)(*args, **kwargs)
 
@@ -244,11 +245,11 @@ class AuthService:
 
         return decorated_function
 
-    def require_approver(self, f):
+    def require_approver(self, f: Callable[..., Any]) -> Callable[..., Any]:
         """Decorator to require approver or admin privileges"""
 
         @wraps(f)
-        def decorated_function(*args, **kwargs):
+        def decorated_function(*args: Any, **kwargs: Any) -> Any:
             # First check authentication
             auth_result = self.require_auth(f)(*args, **kwargs)
 
@@ -265,12 +266,12 @@ class AuthService:
 
         return decorated_function
 
-    def require_permission(self, permission):
+    def require_permission(self, permission: str) -> Callable[..., Any]:
         """Decorator factory to require specific permission"""
 
-        def decorator(f):
+        def decorator(f: Callable[..., Any]) -> Callable[..., Any]:
             @wraps(f)
-            def decorated_function(*args, **kwargs):
+            def decorated_function(*args: Any, **kwargs: Any) -> Any:
                 # First check authentication
                 auth_result = self.require_auth(f)(*args, **kwargs)
 

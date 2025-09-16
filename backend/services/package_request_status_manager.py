@@ -6,7 +6,7 @@ based on the states of individual packages within the request.
 """
 
 import logging
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from models import Package, PackageRequest, db
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class PackageRequestStatusManager:
     """Manages package request status updates based on package states"""
 
-    def __init__(self, db_session=None):
+    def __init__(self, db_session: Any = None) -> None:
         self.db = db_session or db
 
     def update_request_status(self, request_id: int) -> Optional[str]:
@@ -119,7 +119,7 @@ class PackageRequestStatusManager:
             ).count(),
         }
 
-    def get_request_status_summary(self, request_id: int) -> Dict[str, any]:
+    def get_request_status_summary(self, request_id: int) -> Dict[str, Any]:
         """
         Get a summary of the request status and package counts
 

@@ -1,12 +1,15 @@
 from datetime import datetime
+from typing import Any
 
 from flask_sqlalchemy import SQLAlchemy
+from flask_sqlalchemy.model import Model
 
 # Create a SQLAlchemy instance that will be initialized by the app
 db = SQLAlchemy()
 
 
-class RepositoryConfig(db.Model):
+
+class RepositoryConfig(Model):
     __tablename__ = "repository_config"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -18,7 +21,7 @@ class RepositoryConfig(db.Model):
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "config_key": self.config_key,
@@ -29,15 +32,15 @@ class RepositoryConfig(db.Model):
         }
 
     @staticmethod
-    def get_config_value(key, default=None):
+    def get_config_value(key: str, default: str | None = None) -> str | None:
         """Get a configuration value by key"""
         config = RepositoryConfig.query.filter_by(config_key=key).first()
         return config.config_value if config else default
 
     @staticmethod
-    def set_config_value(key, value, description=None):
+    def set_config_value(key: str, value: str, description: str | None = None) -> RepositoryConfig:
         """Set a configuration value by key"""
-        config = RepositoryConfig.query.filter_by(config_key=key).first()
+        config: RepositoryConfig | None = RepositoryConfig.query.filter_by(config_key=key).first()
         if config:
             config.config_value = value
             if description:
@@ -48,11 +51,12 @@ class RepositoryConfig(db.Model):
                 config_key=key, config_value=value, description=description
             )
             db.session.add(config)
+        
         db.session.commit()
         return config
 
 
-class User(db.Model):
+class User(Model):
     __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -76,16 +80,16 @@ class User(db.Model):
     )
 
     # Role helper methods
-    def is_user(self):
-        return self.role == "user"
+    def is_user(self) -> bool:
+        return str(self.role) == "user"
 
-    def is_approver(self):
-        return self.role == "approver"
+    def is_approver(self) -> bool:
+        return str(self.role) == "approver"
 
-    def is_admin(self):
-        return self.role == "admin"
+    def is_admin(self) -> bool:
+        return str(self.role) == "admin"
 
-    def has_permission(self, permission):
+    def has_permission(self, permission: str) -> bool:
         """Check if user has specific permission based on role hierarchy"""
         role_hierarchy = {
             "user": ["view_packages", "request_packages"],
@@ -107,7 +111,7 @@ class User(db.Model):
         }
         return permission in role_hierarchy.get(self.role, [])
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "username": self.username,
@@ -119,7 +123,7 @@ class User(db.Model):
         }
 
 
-class Application(db.Model):
+class Application(Model):
     __tablename__ = "applications"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -137,7 +141,7 @@ class Application(db.Model):
         "PackageRequest", backref="application", lazy=True
     )
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "name": self.name,
@@ -149,7 +153,7 @@ class Application(db.Model):
         }
 
 
-class SupportedLicense(db.Model):
+class SupportedLicense(Model):
     __tablename__ = "supported_licenses"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -166,7 +170,7 @@ class SupportedLicense(db.Model):
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "name": self.name,
@@ -178,7 +182,7 @@ class SupportedLicense(db.Model):
         }
 
 
-class PackageRequest(db.Model):
+class PackageRequest(Model):
     __tablename__ = "package_requests"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -201,7 +205,7 @@ class PackageRequest(db.Model):
         "PackageReference", backref="package_request", lazy=True
     )
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "application_id": self.application_id,
@@ -214,7 +218,7 @@ class PackageRequest(db.Model):
         }
 
 
-class Package(db.Model):
+class Package(Model):
     __tablename__ = "packages"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -250,7 +254,7 @@ class Package(db.Model):
     validations = db.relationship("PackageValidation", backref="package", lazy=True)
     security_scans = db.relationship("SecurityScan", backref="package", lazy=True)
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "package_request_id": self.package_request_id,
@@ -277,7 +281,7 @@ class Package(db.Model):
         }
 
 
-class PackageReference(db.Model):
+class PackageReference(Model):
     __tablename__ = "package_references"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -299,7 +303,7 @@ class PackageReference(db.Model):
     # Relationships
     existing_package = db.relationship("Package", foreign_keys=[existing_package_id])
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "package_request_id": self.package_request_id,
@@ -313,7 +317,7 @@ class PackageReference(db.Model):
         }
 
 
-class PackageValidation(db.Model):
+class PackageValidation(Model):
     __tablename__ = "package_validations"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -323,7 +327,7 @@ class PackageValidation(db.Model):
     details = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "package_id": self.package_id,
@@ -334,7 +338,7 @@ class PackageValidation(db.Model):
         }
 
 
-class AuditLog(db.Model):
+class AuditLog(Model):
     __tablename__ = "audit_log"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -345,7 +349,7 @@ class AuditLog(db.Model):
     details = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "user_id": self.user_id,
@@ -357,7 +361,7 @@ class AuditLog(db.Model):
         }
 
 
-class SecurityScan(db.Model):
+class SecurityScan(Model):
     __tablename__ = "security_scans"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -385,7 +389,7 @@ class SecurityScan(db.Model):
     )
     completed_at = db.Column(db.DateTime)
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "package_id": self.package_id,
