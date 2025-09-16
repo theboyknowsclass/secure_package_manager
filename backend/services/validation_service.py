@@ -155,13 +155,14 @@ class ValidationService:
     def _validate_license(self, package: Package) -> Dict[str, Any]:
         """Check package license compliance"""
         try:
-            # In production, this would analyze package.json and license files
-            # For now, simulate license check
-
+            # License validation is now handled by LicenseWorker
+            # This method is deprecated and should not be used
+            logger.warning("_validate_license is deprecated - license validation is handled by LicenseWorker")
+            
             return {
                 "type": "license_check",
-                "status": "passed",
-                "details": "License check completed - compliant with organization policy",
+                "status": "deprecated",
+                "details": "License validation is handled by LicenseWorker",
             }
 
         except Exception as e:
@@ -174,13 +175,14 @@ class ValidationService:
     def _validate_dependencies(self, package: Package) -> Dict[str, Any]:
         """Analyze package dependencies"""
         try:
-            # In production, this would analyze package dependencies for known vulnerabilities
-            # For now, simulate dependency analysis
-
+            # Dependency analysis is now handled by TrivyService
+            # This method is deprecated and should not be used
+            logger.warning("_validate_dependencies is deprecated - dependency analysis is handled by TrivyService")
+            
             return {
                 "type": "dependency_analysis",
-                "status": "passed",
-                "details": "Dependency analysis completed - no known vulnerabilities",
+                "status": "deprecated",
+                "details": "Dependency analysis is handled by TrivyService",
             }
 
         except Exception as e:
@@ -193,18 +195,14 @@ class ValidationService:
     def _validate_malware_scan(self, package: Package) -> Dict[str, Any]:
         """Run malware scan on package"""
         try:
-            # In production, this would integrate with malware scanning tools
-            # For now, simulate malware scan
-
-            # Simulate scan delay
-            import time
-
-            time.sleep(0.2)
-
+            # Malware scanning is now handled by TrivyService
+            # This method is deprecated and should not be used
+            logger.warning("_validate_malware_scan is deprecated - malware scanning is handled by TrivyService")
+            
             return {
                 "type": "malware_scan",
-                "status": "passed",
-                "details": "Malware scan completed - no malicious code detected",
+                "status": "deprecated",
+                "details": "Malware scanning is handled by TrivyService",
             }
 
         except Exception as e:
@@ -217,13 +215,14 @@ class ValidationService:
     def _validate_vulnerabilities(self, package: Package) -> Dict[str, Any]:
         """Assess package for known vulnerabilities"""
         try:
-            # In production, this would check against vulnerability databases
-            # For now, simulate vulnerability assessment
-
+            # Vulnerability assessment is now handled by TrivyService
+            # This method is deprecated and should not be used
+            logger.warning("_validate_vulnerabilities is deprecated - vulnerability assessment is handled by TrivyService")
+            
             return {
                 "type": "vulnerability_assessment",
-                "status": "passed",
-                "details": "Vulnerability assessment completed - no known vulnerabilities",
+                "status": "deprecated",
+                "details": "Vulnerability assessment is handled by TrivyService",
             }
 
         except Exception as e:
@@ -236,7 +235,7 @@ class ValidationService:
     def get_validation_summary(self, package: Package) -> Dict[str, Any]:
         """Get summary of all validations for a package"""
         try:
-            # Since we removed PackageValidation table, we'll simulate validation summary
+            # Since we removed PackageValidation table, we'll generate validation summary
             # based on package status
             if not package.package_status:
                 return {

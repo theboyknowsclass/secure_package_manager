@@ -15,7 +15,6 @@ from models import (
 )
 
 from .license_service import LicenseService
-from .package_processor import PackageProcessor
 from .package_request_status_manager import PackageRequestStatusManager
 from .trivy_service import TrivyService
 
@@ -273,38 +272,6 @@ class PackageService:
         db.session.commit()
         return package_objects
 
-    def _process_packages_async(self, request_id: int) -> None:
-        """Process packages asynchronously (refactored version)"""
-        try:
-            # Initialize services
-            status_manager = PackageRequestStatusManager(db)
-            package_processor = PackageProcessor(
-                self.license_service, self.trivy_service, db
-            )
-
-            # Process pending packages
-            processing_results = package_processor.process_pending_packages(request_id)
-
-            # Update request status based on results
-            new_status = status_manager.update_request_status(request_id)
-
-            # Log results
-            logger.info(
-                f"Processed {processing_results['processed']} packages for request {request_id}, "
-                f"new status: {new_status}"
-            )
-
-            if processing_results["failed"] > 0:
-                logger.warning(
-                    f"Failed to process {processing_results['failed']} packages: "
-                    f"{processing_results['errors']}"
-                )
-
-        except Exception as e:
-            logger.error(
-                f"Error processing packages for request {request_id}: {str(e)}"
-            )
-            self._handle_processing_error(request_id, e)
 
     def _handle_processing_error(self, request_id: int, error: Exception) -> None:
         """Handle errors during package processing"""

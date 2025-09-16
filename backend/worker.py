@@ -30,19 +30,21 @@ def main():
     worker_type = os.getenv('WORKER_TYPE', 'package_processor')
     sleep_interval = int(os.getenv('WORKER_SLEEP_INTERVAL', '10'))
     max_packages_per_cycle = int(os.getenv('WORKER_MAX_PACKAGES_PER_CYCLE', '5'))
+    max_license_groups_per_cycle = int(os.getenv('WORKER_MAX_LICENSE_GROUPS_PER_CYCLE', '20'))
     
     logger.info(f"Starting {worker_type} worker...")
     logger.info(f"Worker configuration:")
     logger.info(f"  - Type: {worker_type}")
     logger.info(f"  - Sleep interval: {sleep_interval} seconds")
     logger.info(f"  - Max packages per cycle: {max_packages_per_cycle}")
+    logger.info(f"  - Max license groups per cycle: {max_license_groups_per_cycle}")
     
     try:
         # Import and create the appropriate worker based on type
         if worker_type == 'license_checker':
             from workers.license_worker import LicenseWorker
             worker = LicenseWorker(sleep_interval=sleep_interval)
-            worker.max_packages_per_cycle = max_packages_per_cycle
+            worker.max_license_groups_per_cycle = max_license_groups_per_cycle
             
         elif worker_type == 'package_processor':
             from workers.package_worker import PackageWorker

@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import subprocess
 import tempfile
 from datetime import datetime
@@ -72,53 +73,76 @@ class TrivyService:
 
     def _download_package_for_scanning(self, package: Package) -> Optional[str]:
         """
-        Download package to a temporary location for scanning
+        Get package path for scanning (package should already be downloaded by PackageWorker)
 
         Args:
             package: Package object
 
         Returns:
-            Path to downloaded package or None if failed
+            Path to downloaded package or None if not available
+        """
+        try:
+            # Import here to avoid circular imports
+            from .download_service import DownloadService
+            
+            download_service = DownloadService()
+            package_path = download_service.get_package_path(package)
+            
+            if package_path and os.path.exists(package_path):
+                logger.info(f"Using cached package for scanning: {package_path}")
+                return package_path
+            else:
+                logger.warning(f"Package {package.name}@{package.version} not found in cache, downloading for scan")
+                # Fallback: download to temp directory for scanning
+                return self._download_to_temp_for_scanning(package)
+
+        except Exception as e:
+            logger.error(f"Error getting package path for scanning: {str(e)}")
+            return None
+
+    def _download_to_temp_for_scanning(self, package: Package) -> Optional[str]:
+        """
+        Download package to temporary directory for scanning (fallback method)
+
+        Args:
+            package: Package object
+
+        Returns:
+            Path to temporary package directory or None if failed
         """
         try:
             # Create temporary directory for package
-            # Sanitize package name for use in file paths (replace / with -)
             safe_package_name = package.name.replace('/', '-').replace('@', '')
             temp_dir = tempfile.mkdtemp(
                 prefix=f"trivy_scan_{safe_package_name}_{package.version}_"
             )
 
-            # Use the stored npm_url from package-lock.json if available
-            if package.npm_url:
-                logger.info(f"Downloading package tarball from stored URL: {package.npm_url}")
-                response = requests.get(package.npm_url, timeout=60)
-                
-                if response.status_code == 200:
-                    # Extract tarball to temp directory
-                    import io
-                    import tarfile
-
-                    tarball_buffer = io.BytesIO(response.content)
-                    with tarfile.open(
-                        fileobj=tarball_buffer, mode="r:gz"
-                    ) as tar:
-                        tar.extractall(temp_dir)
-
-                    logger.info(
-                        f"Successfully downloaded and extracted {package.name}@{package.version}"
-                    )
-                    return temp_dir
-                else:
-                    logger.error(
-                        f"Failed to download tarball from stored URL: HTTP {response.status_code}"
-                    )
-                    return None
-            else:
+            if not package.npm_url:
                 logger.error(f"No npm_url available for package {package.name}@{package.version}")
                 return None
 
+            logger.info(f"Downloading package tarball for scanning: {package.npm_url}")
+            response = requests.get(package.npm_url, timeout=60)
+            
+            if response.status_code != 200:
+                logger.error(f"Failed to download tarball: HTTP {response.status_code}")
+                return None
+
+            # Extract tarball to temp directory
+            import io
+            import tarfile
+
+            tarball_buffer = io.BytesIO(response.content)
+            with tarfile.open(fileobj=tarball_buffer, mode="r:gz") as tar:
+                tar.extractall(temp_dir)
+
+            # Return path to the extracted package directory
+            package_path = os.path.join(temp_dir, "package")
+            logger.info(f"Downloaded package for scanning to: {package_path}")
+            return package_path
+
         except Exception as e:
-            logger.error(f"Error creating package structure for scanning: {str(e)}")
+            logger.error(f"Error downloading package for scanning: {str(e)}")
             return None
 
 

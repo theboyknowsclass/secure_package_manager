@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from models import Package, PackageStatus, Request, RequestPackage, db
-from services.license_service import LicenseService
+from services.download_service import DownloadService
 from services.trivy_service import TrivyService
 from workers.base_worker import BaseWorker
 
@@ -22,7 +22,7 @@ class PackageWorker(BaseWorker):
 
     def __init__(self, sleep_interval: int = 10):
         super().__init__("PackageProcessor", sleep_interval)
-        self.license_service = None
+        self.download_service = None
         self.trivy_service = None
         self.max_packages_per_cycle = 5  # Process max 5 packages per cycle
         self.stuck_package_timeout = timedelta(minutes=30)  # Consider packages stuck after 30 minutes
@@ -30,7 +30,7 @@ class PackageWorker(BaseWorker):
     def initialize(self) -> None:
         """Initialize services"""
         logger.info("Initializing PackageWorker services...")
-        self.license_service = LicenseService()
+        self.download_service = DownloadService()
         self.trivy_service = TrivyService()
         logger.info("PackageWorker services initialized")
 
@@ -78,13 +78,13 @@ class PackageWorker(BaseWorker):
             db.session.rollback()
 
     def _process_pending_packages(self) -> None:
-        """Process packages that are in Requested status"""
+        """Process packages that are in Licence Checked status (ready for next pipeline steps)"""
         try:
-            # Get packages that need processing
+            # Get packages that need processing (after license checking is complete)
             pending_packages = (
                 db.session.query(Package)
                 .join(PackageStatus)
-                .filter(PackageStatus.status == "Requested")
+                .filter(PackageStatus.status == "Licence Checked")
                 .limit(self.max_packages_per_cycle)
                 .all()
             )
@@ -108,70 +108,48 @@ class PackageWorker(BaseWorker):
             db.session.rollback()
 
     def _process_single_package(self, package: Package) -> None:
-        """Process a single package through the validation pipeline"""
-        logger.info(f"Processing package {package.name}@{package.version}")
+        """Process a single package through the validation pipeline (after license checking)"""
+        logger.info(f"Processing package {package.name}@{package.version} (license already checked)")
         
-        # Step 1: License check
-        if not self._perform_license_check(package):
-            self._mark_package_failed(package, "License validation failed")
-            return
-        
-        # Step 2: Mark as downloaded
+        # Step 1: Mark as downloaded (license check already done by LicenseWorker)
         if not self._mark_as_downloaded(package):
             self._mark_package_failed(package, "Failed to mark as downloaded")
             return
         
-        # Step 3: Security scan
+        # Step 2: Security scan
         if not self._perform_security_scan(package):
             self._mark_package_failed(package, "Security scan failed")
             return
         
-        # Step 4: Mark as ready for approval
+        # Step 3: Mark as ready for approval
         if package.package_status:
             package.package_status.status = "Pending Approval"
             package.package_status.updated_at = datetime.utcnow()
         
         logger.info(f"Successfully processed package {package.name}@{package.version}")
 
-    def _perform_license_check(self, package: Package) -> bool:
-        """Perform license validation for a package"""
-        try:
-            if not package.package_status:
-                return False
-            
-            # Update status to checking license
-            package.package_status.status = "Checking Licence"
-            package.package_status.updated_at = datetime.utcnow()
-            db.session.commit()
-            
-            # Validate package information (license check)
-            if not self._validate_package_info(package):
-                return False
-            
-            # Update status to license checked
-            package.package_status.status = "Licence Checked"
-            package.package_status.updated_at = datetime.utcnow()
-            db.session.commit()
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"License check failed for {package.name}@{package.version}: {str(e)}")
-            return False
-
     def _mark_as_downloaded(self, package: Package) -> bool:
-        """Mark package as downloaded"""
+        """Download package from npm registry and mark as downloaded"""
         try:
             if not package.package_status:
                 return False
+            
+            # Check if package is already downloaded
+            if self.download_service.is_package_downloaded(package):
+                logger.info(f"Package {package.name}@{package.version} already downloaded, skipping download")
+                package.package_status.status = "Downloaded"
+                package.package_status.updated_at = datetime.utcnow()
+                db.session.commit()
+                return True
             
             # Update status to downloading
             package.package_status.status = "Downloading"
             package.package_status.updated_at = datetime.utcnow()
             db.session.commit()
             
-            # Simulate download process (in production, this would download from registry)
-            if not self._simulate_package_download(package):
+            # Download package from npm registry
+            if not self.download_service.download_package(package):
+                logger.error(f"Failed to download package {package.name}@{package.version}")
                 return False
             
             # Update status to downloaded
@@ -179,10 +157,11 @@ class PackageWorker(BaseWorker):
             package.package_status.updated_at = datetime.utcnow()
             db.session.commit()
             
+            logger.info(f"Successfully downloaded package {package.name}@{package.version}")
             return True
             
         except Exception as e:
-            logger.error(f"Error marking package as downloaded: {str(e)}")
+            logger.error(f"Error downloading package {package.name}@{package.version}: {str(e)}")
             return False
 
     def _perform_security_scan(self, package: Package) -> bool:
@@ -224,73 +203,8 @@ class PackageWorker(BaseWorker):
             db.session.commit()
             return False
 
-    def _validate_package_info(self, package: Package) -> bool:
-        """Validate package information (license check)"""
-        try:
-            # Basic validation - check if we have the required information
-            if not package.name or not package.version:
-                logger.warning(f"Package {package.name}@{package.version} missing required information")
-                return False
-            
-            # Simulate package download (in production, this would download from registry)
-            if not self._simulate_package_download(package):
-                logger.warning(f"Failed to download package {package.name}@{package.version}")
-                return False
-            
-            # Validate license information
-            license_validation = self._validate_package_license(package)
-            
-            # Store the license score
-            if package.package_status:
-                package.package_status.license_score = license_validation["score"]
-                package.package_status.updated_at = datetime.utcnow()
-                db.session.commit()
-            
-            if license_validation["score"] == 0:
-                # For testing, allow packages with missing licenses to proceed
-                logger.warning(f"Package {package.name}@{package.version} has license issues but allowing for testing: {license_validation['errors']}")
-            
-            logger.info(f"Package {package.name}@{package.version} validated successfully (License: {package.license_identifier}, Score: {package.package_status.license_score if package.package_status else 'N/A'})")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error validating package info for {package.name}@{package.version}: {str(e)}")
-            return False
 
-    def _simulate_package_download(self, package: Package) -> bool:
-        """Simulate downloading package from source repository"""
-        try:
-            # In production, this would download from npm registry
-            # For now, just simulate success
-            logger.info(f"Simulating download for {package.name}@{package.version}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error simulating package download: {str(e)}")
-            return False
 
-    def _validate_package_license(self, package: Package) -> Dict[str, Any]:
-        """Validate package license information"""
-        try:
-            # Get package data from npm registry or package-lock.json
-            package_data = {
-                "name": package.name,
-                "version": package.version,
-                "license": package.license_identifier,  # This should be populated from package-lock.json
-            }
-            
-            # Use license service to validate
-            validation_result: Dict[str, Any] = self.license_service.validate_package_license(package_data)
-            
-            return validation_result
-            
-        except Exception as e:
-            logger.error(f"Error validating package license for {package.name}@{package.version}: {str(e)}")
-            return {
-                "score": 0,
-                "errors": [f"License validation failed: {str(e)}"],
-                "warnings": [],
-            }
 
     def _mark_package_failed(self, package: Package, error_message: str) -> None:
         """Mark a package as failed with error message"""
