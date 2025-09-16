@@ -3,9 +3,13 @@
 
 Write-Host "🔄 Completely resetting development environment..." -ForegroundColor Yellow
 
+# Ensure we're using the correct Docker context
+Write-Host "🔧 Setting Docker context..." -ForegroundColor Yellow
+docker context use default
+
 # Stop and remove all containers and volumes
 Write-Host "📦 Stopping containers and removing volumes..." -ForegroundColor Yellow
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml down -v
+docker compose --env-file .env.development -f docker-compose.base.yml -f docker-compose.dev.yml down -v
 
 # Remove any dangling images and build cache
 Write-Host "🧹 Cleaning up Docker resources..." -ForegroundColor Yellow

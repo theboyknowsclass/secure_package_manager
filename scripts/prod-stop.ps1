@@ -2,9 +2,13 @@
 
 Write-Host "🛑 Stopping production environment..." -ForegroundColor Yellow
 
+# Ensure we're using the correct Docker context
+Write-Host "🔧 Setting Docker context..." -ForegroundColor Yellow
+docker context use default
+
 # Stop and remove all containers
 Write-Host "📦 Stopping containers..." -ForegroundColor Yellow
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml down
+docker compose --env-file .env.production -f docker-compose.base.yml -f docker-compose.prod.yml down
 
 Write-Host "✅ Production environment stopped!" -ForegroundColor Green
 Write-Host "💡 To start again, run: .\scripts\prod-start.ps1" -ForegroundColor Cyan

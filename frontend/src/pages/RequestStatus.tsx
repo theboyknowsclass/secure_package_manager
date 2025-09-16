@@ -33,8 +33,9 @@ interface Package {
   version: string;
   status: string;
   security_score: number | null;
+  license_score: number | null;
+  security_scan_status: string;
   license_identifier: string | null;
-  validation_errors: string[];
   type?: "new" | "existing";
   vulnerability_count?: number;
   critical_vulnerabilities?: number;
@@ -42,20 +43,36 @@ interface Package {
 
 interface PackageRequest {
   id: number;
+  application_name: string;
+  version: string;
   status: string;
   total_packages: number;
-  validated_packages: number;
+  completion_percentage: number;
   created_at: string;
-  updated_at: string;
   requestor: {
     id: number;
     username: string;
     full_name: string;
   };
-  application: {
-    name: string;
-    version: string;
+  packages: Package[];
+  package_counts: {
+    total: number;
+    Requested: number;
+    "Checking Licence": number;
+    "Licence Checked": number;
+    Downloading: number;
+    Downloaded: number;
+    "Security Scanning": number;
+    "Security Scanned": number;
+    "Pending Approval": number;
+    Approved: number;
+    Rejected: number;
   };
+}
+
+// Interface for the detailed API response
+interface DetailedRequestResponse {
+  request: PackageRequest;
   packages: Package[];
 }
 
@@ -188,7 +205,7 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
 ];
 
 export default function RequestStatus() {
-  const [selectedRequest, setSelectedRequest] = useState<PackageRequest | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<DetailedRequestResponse | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   const {
@@ -200,17 +217,19 @@ export default function RequestStatus() {
     return response.data.requests;
   });
 
-  const handleViewDetails = (requestId: number) => {
+  const handleViewDetails = async (requestId: number) => {
     // Open modal immediately
     setDetailsOpen(true);
+    setSelectedRequest(null); // Show loading state
     
-    // Find and set the request data
-    const request = requests?.find(r => r.id === requestId);
-    if (request) {
-      setSelectedRequest(request);
-    } else {
-      // If request not found, close modal
-      setDetailsOpen(false);
+    try {
+      // Fetch detailed request information with packages
+      const response = await api.get(endpoints.packages.request(requestId));
+      setSelectedRequest(response.data);
+    } catch (error) {
+      console.error('Failed to fetch request details:', error);
+      // Keep modal open but with null data to show error state
+      setSelectedRequest(null);
     }
   };
 
@@ -231,16 +250,16 @@ export default function RequestStatus() {
     return requests.map((request) => ({
       id: request.id,
       requestId: request.id,
-      applicationName: request.application.name,
-      applicationVersion: request.application.version,
+      applicationName: request.application_name,
+      applicationVersion: request.version,
       requestorName: request.requestor.full_name || request.requestor.username,
       requestorUsername: request.requestor.username,
       status: request.status,
-      progress: `${request.validated_packages}/${request.total_packages}`,
+      progress: `${Math.round((request.completion_percentage / 100) * request.total_packages)}/${request.total_packages}`,
       createdAt: request.created_at,
-      updatedAt: request.updated_at,
+      updatedAt: request.created_at, // Use created_at since updated_at is not in new structure
       totalPackages: request.total_packages,
-      validatedPackages: request.validated_packages,
+      validatedPackages: Math.round((request.completion_percentage / 100) * request.total_packages),
       packages: request.packages || [],
     }));
   }, [requests]);
@@ -459,7 +478,7 @@ export default function RequestStatus() {
         <DialogTitle>
           <Box display="flex" justifyContent="space-between" alignItems="center">
             <Typography variant="h6">
-              Package Details {selectedRequest ? `- ID #${selectedRequest.id}` : '- Loading...'}
+              Package Details {selectedRequest ? `- ID #${selectedRequest.request.id}` : '- Loading...'}
             </Typography>
             <IconButton onClick={handleCloseDetails} size="small">
               <Close />
@@ -481,7 +500,7 @@ export default function RequestStatus() {
                       Application
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-                      {selectedRequest.application.name} v{selectedRequest.application.version}
+                      {selectedRequest.request.application_name} v{selectedRequest.request.version}
                     </Typography>
                   </Box>
                   <Box>
@@ -489,7 +508,7 @@ export default function RequestStatus() {
                       Requestor
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-                      {selectedRequest.requestor.full_name} (@{selectedRequest.requestor.username})
+                      {selectedRequest.request.requestor.full_name} (@{selectedRequest.request.requestor.username})
                     </Typography>
                   </Box>
                   <Box>
@@ -498,8 +517,8 @@ export default function RequestStatus() {
                     </Typography>
                     <Box sx={{ mt: 0.5 }}>
                       <Chip
-                        label={getRequestStatusLabel(selectedRequest.status)}
-                        color={getRequestStatusColor(selectedRequest.status)}
+                        label={getRequestStatusLabel(selectedRequest.request.status)}
+                        color={getRequestStatusColor(selectedRequest.request.status)}
                         size="small"
                       />
                     </Box>
@@ -509,7 +528,7 @@ export default function RequestStatus() {
                       Created
                     </Typography>
                     <Typography variant="body2">
-                      {new Date(selectedRequest.created_at).toLocaleString()}
+                      {new Date(selectedRequest.request.created_at).toLocaleString()}
                     </Typography>
                   </Box>
                   <Box>
@@ -518,11 +537,11 @@ export default function RequestStatus() {
                     </Typography>
                     <Box>
                       <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-                        {selectedRequest.validated_packages}/{selectedRequest.total_packages} packages
+                        {Math.round((selectedRequest.request.completion_percentage / 100) * selectedRequest.request.total_packages)}/{selectedRequest.request.total_packages} packages
                       </Typography>
                       <LinearProgress 
                         variant="determinate" 
-                        value={(selectedRequest.validated_packages / selectedRequest.total_packages) * 100}
+                        value={selectedRequest.request.completion_percentage}
                         sx={{ mt: 0.5 }}
                       />
                     </Box>
@@ -593,7 +612,7 @@ export default function RequestStatus() {
 }
 
 function getRequestStatusColor(
-  status: PackageStatus
+  status: string
 ):
   | "default"
   | "primary"
@@ -605,13 +624,9 @@ function getRequestStatusColor(
   switch (status) {
     case PACKAGE_STATUS.REQUESTED:
       return "default";
-    case PACKAGE_STATUS.PERFORMING_LICENCE_CHECK:
-      return "warning";
-    case PACKAGE_STATUS.LICENCE_CHECK_COMPLETE:
+    case PACKAGE_STATUS.LICENCE_CHECKED:
       return "info";
-    case PACKAGE_STATUS.PERFORMING_SECURITY_SCAN:
-      return "warning";
-    case PACKAGE_STATUS.SECURITY_SCAN_COMPLETE:
+    case PACKAGE_STATUS.DOWNLOADED:
       return "info";
     case PACKAGE_STATUS.PENDING_APPROVAL:
       return "warning";
@@ -624,18 +639,14 @@ function getRequestStatusColor(
   }
 }
 
-function getRequestStatusLabel(status: PackageStatus): string {
+function getRequestStatusLabel(status: string): string {
   switch (status) {
     case PACKAGE_STATUS.REQUESTED:
       return "Requested";
-    case PACKAGE_STATUS.PERFORMING_LICENCE_CHECK:
-      return "Checking Licenses";
-    case PACKAGE_STATUS.LICENCE_CHECK_COMPLETE:
-      return "License Check Complete";
-    case PACKAGE_STATUS.PERFORMING_SECURITY_SCAN:
-      return "Scanning Security";
-    case PACKAGE_STATUS.SECURITY_SCAN_COMPLETE:
-      return "Security Scan Complete";
+    case PACKAGE_STATUS.LICENCE_CHECKED:
+      return "License Checked";
+    case PACKAGE_STATUS.DOWNLOADED:
+      return "Downloaded";
     case PACKAGE_STATUS.PENDING_APPROVAL:
       return "Pending Approval";
     case PACKAGE_STATUS.APPROVED:
@@ -648,7 +659,7 @@ function getRequestStatusLabel(status: PackageStatus): string {
 }
 
 function getPackageStatusColor(
-  status: PackageStatus
+  status: string
 ):
   | "default"
   | "primary"
@@ -660,13 +671,9 @@ function getPackageStatusColor(
   switch (status) {
     case PACKAGE_STATUS.REQUESTED:
       return "default";
-    case PACKAGE_STATUS.PERFORMING_LICENCE_CHECK:
-      return "warning";
-    case PACKAGE_STATUS.LICENCE_CHECK_COMPLETE:
+    case PACKAGE_STATUS.LICENCE_CHECKED:
       return "info";
-    case PACKAGE_STATUS.PERFORMING_SECURITY_SCAN:
-      return "warning";
-    case PACKAGE_STATUS.SECURITY_SCAN_COMPLETE:
+    case PACKAGE_STATUS.DOWNLOADED:
       return "info";
     case PACKAGE_STATUS.PENDING_APPROVAL:
       return "warning";
@@ -679,18 +686,14 @@ function getPackageStatusColor(
   }
 }
 
-function getPackageStatusLabel(status: PackageStatus): string {
+function getPackageStatusLabel(status: string): string {
   switch (status) {
     case PACKAGE_STATUS.REQUESTED:
       return "Requested";
-    case PACKAGE_STATUS.PERFORMING_LICENCE_CHECK:
-      return "Checking License";
-    case PACKAGE_STATUS.LICENCE_CHECK_COMPLETE:
-      return "License OK";
-    case PACKAGE_STATUS.PERFORMING_SECURITY_SCAN:
-      return "Scanning";
-    case PACKAGE_STATUS.SECURITY_SCAN_COMPLETE:
-      return "Scan Complete";
+    case PACKAGE_STATUS.LICENCE_CHECKED:
+      return "License Checked";
+    case PACKAGE_STATUS.DOWNLOADED:
+      return "Downloaded";
     case PACKAGE_STATUS.PENDING_APPROVAL:
       return "Pending Approval";
     case PACKAGE_STATUS.APPROVED:

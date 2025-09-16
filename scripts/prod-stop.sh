@@ -3,9 +3,13 @@
 
 echo "🛑 Stopping production environment..."
 
+# Ensure we're using the correct Docker context
+echo "🔧 Setting Docker context..."
+docker context use default
+
 # Stop and remove all containers
 echo "📦 Stopping containers..."
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml down
+docker compose --env-file .env.production -f docker-compose.base.yml -f docker-compose.prod.yml down
 
 echo "✅ Production environment stopped!"
 echo "💡 To start again, run: ./scripts/prod-start.sh"

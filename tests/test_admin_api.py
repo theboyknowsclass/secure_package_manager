@@ -96,31 +96,37 @@ class AdminAPITester:
             print(f"❌ Validated packages error: {str(e)}")
             return False
 
-    def test_repository_config(self) -> bool:
-        """Test repository config endpoint"""
-        print("\nTesting repository config endpoint...")
+    def test_config(self) -> bool:
+        """Test config endpoint"""
+        print("\nTesting config endpoint...")
         try:
             headers = {"Authorization": f"Bearer {self.token}"}
             response = self.session.get(
-                f"{BASE_URL}/api/admin/repository-config", headers=headers, timeout=10
+                f"{BASE_URL}/api/admin/config", headers=headers, timeout=10
             )
 
             if response.status_code == 200:
                 data = response.json()
-                configs = data.get("configs", [])
+                config = data.get("config", {})
+                status = data.get("status", {})
                 print(
-                    f"✅ Repository config endpoint working - found {len(configs)} configs"
+                    f"✅ Config endpoint working - config sections: {list(config.keys())}"
                 )
 
-                # Check if we have the expected configs
-                expected_keys = {"source_repository_url", "target_repository_url"}
-                actual_keys = {config.get("config_key") for config in configs}
-                if expected_keys.issubset(actual_keys):
-                    print("✅ Repository config has expected keys")
+                # Check if we have the expected config sections
+                expected_sections = {"repository", "services", "security", "trivy", "environment"}
+                actual_sections = set(config.keys())
+                if expected_sections.issubset(actual_sections):
+                    print("✅ Config has expected sections")
                 else:
                     print(
-                        f"⚠️  Missing expected config keys. Expected: {expected_keys}, Found: {actual_keys}"
+                        f"⚠️  Missing expected config sections. Expected: {expected_sections}, Found: {actual_sections}"
                     )
+
+                # Check status information
+                is_complete = status.get("is_complete", False)
+                missing_keys = status.get("missing_keys", [])
+                print(f"✅ Config status - complete: {is_complete}, missing: {missing_keys}")
 
                 return True
             else:
@@ -169,33 +175,6 @@ class AdminAPITester:
             print(f"❌ Licenses error: {str(e)}")
             return False
 
-    def test_config_status(self) -> bool:
-        """Test repository config status endpoint"""
-        print("\nTesting repository config status endpoint...")
-        try:
-            headers = {"Authorization": f"Bearer {self.token}"}
-            response = self.session.get(
-                f"{BASE_URL}/api/admin/repository-config/status",
-                headers=headers,
-                timeout=10,
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                is_complete = data.get("is_complete", False)
-                missing_keys = data.get("missing_keys", [])
-                print(
-                    f"✅ Config status endpoint working - complete: {is_complete}, missing: {missing_keys}"
-                )
-                return True
-            else:
-                print(
-                    f"❌ Config status endpoint failed: {response.status_code} - {response.text}"
-                )
-                return False
-        except Exception as e:
-            print(f"❌ Config status error: {str(e)}")
-            return False
 
     def run_all_tests(self) -> bool:
         """Run all tests and return success status"""
@@ -210,9 +189,8 @@ class AdminAPITester:
         # Test all endpoints
         tests = [
             self.test_validated_packages,
-            self.test_repository_config,
+            self.test_config,
             self.test_licenses,
-            self.test_config_status,
         ]
 
         passed = 0

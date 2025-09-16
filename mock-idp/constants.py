@@ -48,24 +48,47 @@ def get_optional_env(key: str, default: str = None) -> str:
 
 
 # =============================================================================
+# APPLICATION CONFIGURATION
+# =============================================================================
+
+# Application Name (used for both backend and frontend)
+APP_NAME = get_required_env("APP_NAME", "Application name")
+FRONTEND_APP_NAME = f"{APP_NAME}-frontend"
+
+# =============================================================================
 # SECURITY CONFIGURATION
 # =============================================================================
 
-# JWT Configuration
+# JWT & Flask Secrets
 JWT_SECRET = get_required_env("JWT_SECRET", "JWT signing secret")
 IDP_SECRET_KEY = get_required_env("IDP_SECRET_KEY", "Identity Provider secret key")
 
-# OAuth Configuration
+# OAuth & IDP Configuration
 OAUTH_AUDIENCE = get_required_env("OAUTH_AUDIENCE", "OAuth audience")
 OAUTH_ISSUER = get_required_env("OAUTH_ISSUER", "OAuth issuer URL")
 
+# ADFS Configuration
+ADFS_ENTITY_ID = get_optional_env("ADFS_ENTITY_ID", "http://localhost:3000")
+ADFS_SSO_URL = get_optional_env("ADFS_SSO_URL", "http://localhost:8081/sso")
+ADFS_CERT_PATH = get_optional_env("ADFS_CERT_PATH", "/app/certs/adfs.crt")
+
 # =============================================================================
-# NETWORK CONFIGURATION
+# FLASK CONFIGURATION
 # =============================================================================
 
-# Frontend URL
-FRONTEND_URL = get_required_env("FRONTEND_URL", "Frontend URL")
+# Flask Ports & Network
+IDP_PORT = int(get_required_env("IDP_PORT", "Identity Provider port"))
+FRONTEND_PORT = int(get_required_env("FRONTEND_PORT", "Frontend port"))
 
-# IDP Configuration
-IDP_ENTITY_ID = get_required_env("IDP_ENTITY_ID", "IDP entity ID")
-IDP_SSO_URL = get_required_env("IDP_SSO_URL", "IDP SSO URL")
+# Hosts
+LOCALHOST = get_required_env("LOCALHOST", "Localhost address") or "localhost"
+
+# URLs (constructed from hosts and ports)
+FRONTEND_URL = f"http://{LOCALHOST}:{FRONTEND_PORT}"
+IDP_URL = f"http://{LOCALHOST}:{IDP_PORT}"
+
+# Flask App Configuration
+FLASK_ENV = get_optional_env("FLASK_ENV", "development")
+FLASK_DEBUG = get_optional_env(
+    "FLASK_DEBUG", "1" if FLASK_ENV == "development" else "0"
+)

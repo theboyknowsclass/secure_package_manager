@@ -23,13 +23,10 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Tabs,
-  Tab,
 } from "@mui/material";
 import { MaterialReactTable, type MRT_ColumnDef } from "material-react-table";
 import { Add, Edit, Delete, CheckCircle, Warning, Info, Error } from "@mui/icons-material";
 import { api, endpoints } from "../services/api";
-import RepositoryConfigComponent from "../components/RepositoryConfig";
 
 interface SupportedLicense {
   id: number;
@@ -58,7 +55,6 @@ const getStatusDisplay = (status: string) => {
 };
 
 export default function LicenseManagement() {
-  const [tabValue, setTabValue] = useState(0);
   const [selectedLicenses, setSelectedLicenses] = useState<SupportedLicense[]>([]);
   const [rowSelection, setRowSelection] = useState({});
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -314,21 +310,12 @@ export default function LicenseManagement() {
           Settings
         </Typography>
         <Typography variant="body1" color="textSecondary">
-          Manage license policies, repository configuration, and system settings.
+          Manage license policies and system settings.
         </Typography>
       </Box>
 
-      <Tabs
-        value={tabValue}
-        onChange={(_, newValue) => setTabValue(newValue)}
-        sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}
-      >
-        <Tab label="License Management" />
-        <Tab label="Repository Configuration" />
-      </Tabs>
 
-      {tabValue === 0 && (
-        <Box>
+      <Box>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
             <Button
               variant="contained"
@@ -568,11 +555,6 @@ export default function LicenseManagement() {
             </Alert>
           </Snackbar>
         </Box>
-      )}
-
-      {tabValue === 1 && (
-        <RepositoryConfigComponent />
-      )}
     </Box>
   );
 }

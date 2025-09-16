@@ -2,7 +2,7 @@ import logging
 import os
 from typing import Any, Dict, List
 
-from models import Package, PackageValidation
+from models import Package
 
 logger = logging.getLogger(__name__)
 
@@ -83,17 +83,21 @@ class ValidationService:
                 }
 
             # Check file size
-            if package.file_size and package.file_size > 0:
+            if (
+                package.package_status
+                and package.package_status.file_size
+                and package.package_status.file_size > 0
+            ):
                 actual_size = os.path.getsize(package.local_path)
-                if actual_size != package.file_size:
+                if actual_size != package.package_status.file_size:
                     return {
                         "type": "file_integrity",
                         "status": "failed",
-                        "details": f"File size mismatch: expected {package.file_size}, got {actual_size}",
+                        "details": f"File size mismatch: expected {package.package_status.file_size}, got {actual_size}",
                     }
 
             # Check checksum if available
-            if package.checksum:
+            if package.package_status and package.package_status.checksum:
                 # For now, skip checksum validation as it's not implemented
                 # In production, this would calculate and compare checksums
                 pass
@@ -116,13 +120,19 @@ class ValidationService:
         # Security scanning is handled by the Trivy service
         # This validation just checks if the scan was completed
         try:
-            if package.security_scan_status == "completed":
+            if (
+                package.package_status
+                and package.package_status.security_scan_status == "completed"
+            ):
                 return {
                     "type": "security_scan",
                     "status": "passed",
                     "details": "Security scan completed successfully",
                 }
-            elif package.security_scan_status == "failed":
+            elif (
+                package.package_status
+                and package.package_status.security_scan_status == "failed"
+            ):
                 return {
                     "type": "security_scan",
                     "status": "failed",
@@ -226,28 +236,45 @@ class ValidationService:
     def get_validation_summary(self, package: Package) -> Dict[str, Any]:
         """Get summary of all validations for a package"""
         try:
-            validations = PackageValidation.query.filter_by(package_id=package.id).all()
+            # Since we removed PackageValidation table, we'll simulate validation summary
+            # based on package status
+            if not package.package_status:
+                return {
+                    "overall_status": "pending",
+                    "total_validations": 0,
+                    "passed_validations": 0,
+                    "failed_validations": 0,
+                    "pending_validations": 0,
+                }
 
-            # Count validations by status
-            failed_count = sum(1 for v in validations if v.status == "failed")
-            pending_count = sum(1 for v in validations if v.status == "pending")
-            passed_count = sum(1 for v in validations if v.status == "passed")
+            # Determine overall status based on package status
+            if package.package_status.status == "Rejected":
+                overall_status = "failed"
+                failed_count = 1
+                passed_count = 0
+                pending_count = 0
+            elif package.package_status.status in ["Approved", "Downloaded"]:
+                overall_status = "passed"
+                failed_count = 0
+                passed_count = 1
+                pending_count = 0
+            else:
+                overall_status = "pending"
+                failed_count = 0
+                passed_count = 0
+                pending_count = 1
 
             summary = {
-                "total_validations": len(validations),
+                "total_validations": 1,
                 "passed_validations": passed_count,
                 "failed_validations": failed_count,
                 "pending_validations": pending_count,
-                "validation_details": [v.to_dict() for v in validations],
+                "overall_status": overall_status,
+                "package_status": package.package_status.status,
+                "security_scan_status": package.package_status.security_scan_status,
+                "license_score": package.package_status.license_score,
+                "security_score": package.package_status.security_score,
             }
-
-            # Calculate overall status
-            if failed_count > 0:
-                summary["overall_status"] = "failed"
-            elif pending_count > 0:
-                summary["overall_status"] = "pending"
-            else:
-                summary["overall_status"] = "passed"
 
             return summary
 

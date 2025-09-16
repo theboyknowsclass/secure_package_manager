@@ -14,13 +14,17 @@ if [ -z "$ADFS_ENTITY_ID" ] || [ -z "$ADFS_SSO_URL" ]; then
     exit 1
 fi
 
+# Ensure we're using the correct Docker context
+echo "🔧 Setting Docker context..."
+docker context use default
+
 # Stop any existing containers
 echo "📦 Stopping existing containers..."
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml down
+docker compose --env-file .env.production -f docker-compose.base.yml -f docker-compose.prod.yml down
 
 # Start services with production configuration
 echo "🔄 Starting production services..."
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose --env-file .env.production -f docker-compose.base.yml -f docker-compose.prod.yml up -d --build
 
 # Wait for services to be healthy
 echo "⏳ Waiting for services to be ready..."
@@ -28,15 +32,15 @@ sleep 15
 
 # Check if services are running
 echo "🔍 Checking service status..."
-services=$(docker-compose -f docker-compose.yml -f docker-compose.prod.yml ps --services | wc -l)
-running=$(docker-compose -f docker-compose.yml -f docker-compose.prod.yml ps --services --filter "status=running" | wc -l)
+services=$(docker compose --env-file .env.production -f docker-compose.base.yml -f docker-compose.prod.yml ps --services | wc -l)
+running=$(docker compose --env-file .env.production -f docker-compose.base.yml -f docker-compose.prod.yml ps --services --filter "status=running" | wc -l)
 
 if [ "$services" -eq "$running" ]; then
     echo "✅ Production environment started successfully!"
     echo "🔧 Services are running in detached mode"
-    echo "📊 Use 'docker-compose -f docker-compose.yml -f docker-compose.prod.yml logs -f' to view logs"
+    echo "📊 Use 'docker compose --env-file .env.production -f docker-compose.base.yml -f docker-compose.prod.yml logs -f' to view logs"
 else
     echo "❌ Some services failed to start. Check logs with:"
-    echo "   docker-compose -f docker-compose.yml -f docker-compose.prod.yml logs"
+    echo "   docker compose --env-file .env.production -f docker-compose.base.yml -f docker-compose.prod.yml logs"
     exit 1
 fi

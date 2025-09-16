@@ -25,9 +25,13 @@ if (-not $env:ADFS_ENTITY_ID -or -not $env:ADFS_SSO_URL) {
     exit 1
 }
 
+# Ensure we're using the correct Docker context
+Write-Host "🔧 Setting Docker context..." -ForegroundColor Yellow
+docker context use default
+
 # Stop and remove all containers and volumes
 Write-Host "📦 Stopping containers and removing volumes..." -ForegroundColor Yellow
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml down -v
+docker compose --env-file .env.production -f docker-compose.base.yml -f docker-compose.prod.yml down -v
 
 # Remove any dangling images and build cache
 Write-Host "🧹 Cleaning up Docker resources..." -ForegroundColor Yellow

@@ -54,5 +54,6 @@ export const endpoints = {
     licenses: (status?: string) => 
       status ? `/api/admin/licenses?status=${status}` : "/api/admin/licenses",
     license: (id: number) => `/api/admin/licenses/${id}`,
+    config: '/api/admin/config',
   },
 }

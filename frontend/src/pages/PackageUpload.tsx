@@ -192,8 +192,8 @@ export default function PackageUpload() {
             </Typography>
 
             <Typography variant="body2" paragraph>
-              <strong>Application:</strong> {uploadResult.application.name} v
-              {uploadResult.application.version}
+              <strong>Application:</strong> {uploadResult.application_name} v
+              {uploadResult.version}
             </Typography>
 
             <Typography variant="body2" color="textSecondary">

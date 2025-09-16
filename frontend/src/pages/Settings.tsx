@@ -8,7 +8,7 @@ import {
   Container,
 } from "@mui/material";
 import { Settings as SettingsIcon, Storage, Gavel } from "@mui/icons-material";
-import RepositoryConfiguration from "./RepositoryConfiguration";
+import RepositoryConfig from "../components/RepositoryConfig";
 import LicenseManagementTab from "./LicenseManagementTab";
 
 interface TabPanelProps {
@@ -85,7 +85,7 @@ export default function Settings() {
           </Box>
           
           <TabPanel value={tabValue} index={0}>
-            <RepositoryConfiguration />
+            <RepositoryConfig />
           </TabPanel>
           
           <TabPanel value={tabValue} index={1}>

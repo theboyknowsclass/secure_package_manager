@@ -1,7 +1,8 @@
 import logging
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from models import SupportedLicense
+from models import PackageStatus, SupportedLicense, db
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,51 @@ class LicenseService:
                 "errors": [f"License validation failed: {str(e)}"],
                 "warnings": [],
             }
+
+    def update_package_license_status(
+        self,
+        package_id: int,
+        license_score: int,
+        errors: List[str] | None = None,
+        warnings: List[str] | None = None,
+    ) -> None:
+        """
+        Update package status with license validation results
+
+        Args:
+            package_id: The package ID to update
+            license_score: The calculated license score
+            errors: List of validation errors
+            warnings: List of validation warnings
+        """
+        try:
+            package_status = PackageStatus.query.filter_by(
+                package_id=package_id
+            ).first()
+            if package_status:
+                package_status.license_score = license_score
+                # Update status based on license score
+                if license_score >= 80:
+                    package_status.status = "Licence Checked"
+                elif license_score >= 30:
+                    package_status.status = "Licence Checked"  # Still allow but with warning
+                else:
+                    package_status.status = "Rejected"
+
+                package_status.updated_at = datetime.utcnow()
+                db.session.commit()
+
+                self.logger.info(
+                    f"Updated package {package_id} license status: score={license_score}, status={package_status.status}"
+                )
+            else:
+                self.logger.warning(
+                    f"Package status not found for package {package_id}"
+                )
+
+        except Exception as e:
+            self.logger.error(f"Error updating package license status: {str(e)}")
+            db.session.rollback()
 
     def _parse_license_info(self, package_data: Dict[str, Any]) -> Optional[str]:
         """Parse and normalize license information from package data"""

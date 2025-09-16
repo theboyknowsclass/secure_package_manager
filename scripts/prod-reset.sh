@@ -25,9 +25,13 @@ if [ -z "$ADFS_ENTITY_ID" ] || [ -z "$ADFS_SSO_URL" ]; then
     exit 1
 fi
 
+# Ensure we're using the correct Docker context
+echo "🔧 Setting Docker context..."
+docker context use default
+
 # Stop and remove all containers and volumes
 echo "📦 Stopping containers and removing volumes..."
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml down -v
+docker compose --env-file .env.production -f docker-compose.base.yml -f docker-compose.prod.yml down -v
 
 # Remove any dangling images and build cache
 echo "🧹 Cleaning up Docker resources..."

@@ -71,8 +71,12 @@ CREATE TABLE IF NOT EXISTS package_status (
     UNIQUE(package_id), -- Only one status record per package
     CONSTRAINT package_status_status_check CHECK (status IN (
         'Requested', 
+        'Checking Licence',
         'Licence Checked', 
+        'Downloading',
         'Downloaded', 
+        'Security Scanning',
+        'Security Scanned',
         'Pending Approval', 
         'Approved', 
         'Rejected'

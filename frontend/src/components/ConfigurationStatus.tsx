@@ -36,11 +36,11 @@ export default function ConfigurationStatus() {
     try {
       setLoading(true);
       setError("");
-      const response = await api.get("/api/admin/repository-config/status");
-      setConfigStatus(response.data);
+      const response = await api.get("/api/admin/config");
+      setConfigStatus(response.data.status);
       
       // If user is admin and configuration is incomplete, redirect to settings
-      if (user?.role === 'admin' && !response.data.is_complete) {
+      if (user?.role === 'admin' && !response.data.status.is_complete) {
         navigate("/settings");
         return;
       }

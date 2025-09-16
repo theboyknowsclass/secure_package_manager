@@ -46,12 +46,11 @@ interface Package {
   id: number;
   name: string;
   version: string;
-  status: PackageStatus;
+  status: string;
   security_score: number | null;
   license_identifier: string | null;
-  license_status?: LicenseStatus;
   license_score?: number;
-  validation_errors: string[];
+  security_scan_status: string;
   type?: "new" | "existing";
   vulnerability_count?: number;
   critical_vulnerabilities?: number;
@@ -61,20 +60,36 @@ interface Package {
 
 interface PackageRequest {
   id: number;
-  status: PackageStatus;
+  application_name: string;
+  version: string;
+  status: string;
   total_packages: number;
-  validated_packages: number;
+  completion_percentage: number;
   created_at: string;
-  updated_at: string;
   requestor: {
     id: number;
     username: string;
     full_name: string;
   };
-  application: {
-    name: string;
-    version: string;
+  packages: Package[];
+  package_counts: {
+    total: number;
+    Requested: number;
+    "Checking Licence": number;
+    "Licence Checked": number;
+    Downloading: number;
+    Downloaded: number;
+    "Security Scanning": number;
+    "Security Scanned": number;
+    "Pending Approval": number;
+    Approved: number;
+    Rejected: number;
   };
+}
+
+// Interface for the detailed API response
+interface DetailedRequestResponse {
+  request: PackageRequest;
   packages: Package[];
 }
 
@@ -167,7 +182,7 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
             <Chip
               key={index}
               label={license}
-              color={getLicenseStatusColor(license, pkg.license_status)}
+              color={getLicenseStatusColor(license)}
               size="small"
             />
           ))}
@@ -235,7 +250,7 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
 ];
 
 export default function ApprovalDashboard() {
-  const [selectedRequest, setSelectedRequest] = useState<PackageRequest | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<DetailedRequestResponse | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [approvalReason, setApprovalReason] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
@@ -252,17 +267,19 @@ export default function ApprovalDashboard() {
     return response.data.requests;
   });
 
-  const handleViewDetails = (requestId: number) => {
+  const handleViewDetails = async (requestId: number) => {
     // Open modal immediately
     setDetailsOpen(true);
+    setSelectedRequest(null); // Show loading state
     
-    // Find and set the request data
-    const request = requests?.find(r => r.id === requestId);
-    if (request) {
-      setSelectedRequest(request);
-    } else {
-      // If request not found, close modal
-      setDetailsOpen(false);
+    try {
+      // Fetch detailed request information with packages
+      const response = await api.get(endpoints.packages.request(requestId));
+      setSelectedRequest(response.data);
+    } catch (error) {
+      console.error('Failed to fetch request details:', error);
+      // Keep modal open but with null data to show error state
+      setSelectedRequest(null);
     }
   };
 
@@ -405,7 +422,7 @@ export default function ApprovalDashboard() {
     
     return requests.filter(request => 
       request.packages.some(pkg => 
-        isPendingApprovalStatus(pkg.status)
+        pkg.status === PACKAGE_STATUS.PENDING_APPROVAL
       )
     );
   }, [requests]);
@@ -417,14 +434,14 @@ export default function ApprovalDashboard() {
       const approvedPackages = request.packages.filter(pkg => pkg.status === PACKAGE_STATUS.APPROVED);
       const rejectedPackages = request.packages.filter(pkg => pkg.status === PACKAGE_STATUS.REJECTED);
       const processingPackages = request.packages.filter(pkg => 
-        ![PACKAGE_STATUS.PENDING_APPROVAL, PACKAGE_STATUS.APPROVED, PACKAGE_STATUS.REJECTED].includes(pkg.status)
+        ![PACKAGE_STATUS.PENDING_APPROVAL, PACKAGE_STATUS.APPROVED, PACKAGE_STATUS.REJECTED].includes(pkg.status as any)
       );
       
       return {
         id: request.id,
         requestId: request.id,
-        applicationName: request.application.name,
-        applicationVersion: request.application.version,
+        applicationName: request.application_name,
+        applicationVersion: request.version,
         requestorName: request.requestor.full_name || request.requestor.username,
         requestorUsername: request.requestor.username,
         status: request.status,
@@ -433,7 +450,7 @@ export default function ApprovalDashboard() {
         approvedCount: approvedPackages.length,
         rejectedCount: rejectedPackages.length,
         createdAt: request.created_at,
-        updatedAt: request.updated_at,
+        updatedAt: request.created_at, // Use created_at since updated_at is not in new structure
         totalPackages: request.total_packages,
         packages: request.packages || [],
       };
@@ -593,7 +610,7 @@ export default function ApprovalDashboard() {
   if (error) {
     return (
       <Alert severity="error" sx={{ mt: 2 }}>
-        Error loading approval requests: {error.message}
+        Error loading approval requests: {error instanceof Error ? error.message : 'Unknown error'}
       </Alert>
     );
   }
@@ -654,7 +671,7 @@ export default function ApprovalDashboard() {
         <DialogTitle>
           <Box display="flex" justifyContent="space-between" alignItems="center">
             <Typography variant="h6">
-              Package Approval {selectedRequest ? `- ID #${selectedRequest.id}` : '- Loading...'}
+              Package Approval {selectedRequest ? `- ID #${selectedRequest.request.id}` : '- Loading...'}
             </Typography>
             <IconButton onClick={handleCloseDetails} size="small">
               <Close />
@@ -676,7 +693,7 @@ export default function ApprovalDashboard() {
                       Application
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-                      {selectedRequest.application.name} v{selectedRequest.application.version}
+                      {selectedRequest.request.application_name} v{selectedRequest.request.version}
                     </Typography>
                   </Grid>
                   <Grid item xs={4}>
@@ -684,7 +701,7 @@ export default function ApprovalDashboard() {
                       Requestor
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-                      {selectedRequest.requestor.full_name} (@{selectedRequest.requestor.username})
+                      {selectedRequest.request.requestor.full_name} (@{selectedRequest.request.requestor.username})
                     </Typography>
                   </Grid>
                   <Grid item xs={4}>
@@ -692,7 +709,7 @@ export default function ApprovalDashboard() {
                       Created
                     </Typography>
                     <Typography variant="body2">
-                      {new Date(selectedRequest.created_at).toLocaleString()}
+                      {new Date(selectedRequest.request.created_at).toLocaleString()}
                     </Typography>
                   </Grid>
                 </Grid>
@@ -907,21 +924,17 @@ export default function ApprovalDashboard() {
 // Helper functions
 function getRequestStatusColor(status: string) {
   switch (status) {
-    case "requested":
+    case PACKAGE_STATUS.REQUESTED:
       return "default";
-    case "performing_licence_check":
-      return "warning";
-    case "licence_check_complete":
+    case PACKAGE_STATUS.LICENCE_CHECKED:
       return "info";
-    case "performing_security_scan":
-      return "warning";
-    case "security_scan_complete":
+    case PACKAGE_STATUS.DOWNLOADED:
       return "info";
-    case "pending_approval":
+    case PACKAGE_STATUS.PENDING_APPROVAL:
       return "warning";
-    case "approved":
+    case PACKAGE_STATUS.APPROVED:
       return "success";
-    case "rejected":
+    case PACKAGE_STATUS.REJECTED:
       return "error";
     default:
       return "default";
@@ -930,21 +943,17 @@ function getRequestStatusColor(status: string) {
 
 function getRequestStatusLabel(status: string): string {
   switch (status) {
-    case "requested":
+    case PACKAGE_STATUS.REQUESTED:
       return "Requested";
-    case "performing_licence_check":
-      return "Checking Licenses";
-    case "licence_check_complete":
-      return "License Check Complete";
-    case "performing_security_scan":
-      return "Scanning Security";
-    case "security_scan_complete":
-      return "Security Scan Complete";
-    case "pending_approval":
+    case PACKAGE_STATUS.LICENCE_CHECKED:
+      return "License Checked";
+    case PACKAGE_STATUS.DOWNLOADED:
+      return "Downloaded";
+    case PACKAGE_STATUS.PENDING_APPROVAL:
       return "Pending Approval";
-    case "approved":
+    case PACKAGE_STATUS.APPROVED:
       return "Approved";
-    case "rejected":
+    case PACKAGE_STATUS.REJECTED:
       return "Rejected";
     default:
       return status;
@@ -953,21 +962,17 @@ function getRequestStatusLabel(status: string): string {
 
 function getPackageStatusColor(status: string) {
   switch (status) {
-    case "requested":
+    case PACKAGE_STATUS.REQUESTED:
       return "default";
-    case "performing_licence_check":
-      return "warning";
-    case "licence_check_complete":
+    case PACKAGE_STATUS.LICENCE_CHECKED:
       return "info";
-    case "performing_security_scan":
-      return "warning";
-    case "security_scan_complete":
+    case PACKAGE_STATUS.DOWNLOADED:
       return "info";
-    case "pending_approval":
+    case PACKAGE_STATUS.PENDING_APPROVAL:
       return "warning";
-    case "approved":
+    case PACKAGE_STATUS.APPROVED:
       return "success";
-    case "rejected":
+    case PACKAGE_STATUS.REJECTED:
       return "error";
     default:
       return "default";
@@ -976,21 +981,17 @@ function getPackageStatusColor(status: string) {
 
 function getPackageStatusLabel(status: string): string {
   switch (status) {
-    case "requested":
+    case PACKAGE_STATUS.REQUESTED:
       return "Requested";
-    case "performing_licence_check":
-      return "Checking License";
-    case "licence_check_complete":
-      return "License OK";
-    case "performing_security_scan":
-      return "Scanning";
-    case "security_scan_complete":
-      return "Scan Complete";
-    case "pending_approval":
+    case PACKAGE_STATUS.LICENCE_CHECKED:
+      return "License Checked";
+    case PACKAGE_STATUS.DOWNLOADED:
+      return "Downloaded";
+    case PACKAGE_STATUS.PENDING_APPROVAL:
       return "Pending Approval";
-    case "approved":
+    case PACKAGE_STATUS.APPROVED:
       return "Approved";
-    case "rejected":
+    case PACKAGE_STATUS.REJECTED:
       return "Rejected";
     default:
       return status;

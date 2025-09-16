@@ -1,93 +1,24 @@
-# Production Docker Compose Configuration
-# Production-specific overrides and optimizations
-
-version: '3.8'
+# Production-specific overrides
+# Use with: docker compose -f docker-compose.base.yml -f docker-compose.prod.yml up
 
 services:
-  # Production database configuration
-  db:
-    environment:
-      - POSTGRES_DB=${POSTGRES_DB:-secure_package_manager}
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-    volumes:
-      # Use production init script
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    # Remove port exposure in production (use internal networking)
-    ports: []
-    # Production database settings
-    command: >
-      postgres
-      -c shared_preload_libraries=pg_stat_statements
-      -c pg_stat_statements.track=all
-      -c max_connections=200
-      -c shared_buffers=256MB
-      -c effective_cache_size=1GB
-      -c maintenance_work_mem=64MB
-      -c checkpoint_completion_target=0.9
-      -c wal_buffers=16MB
-      -c default_statistics_target=100
-
-  # Production API configuration
+  # Production API overrides (if needed)
   api:
+    # Production-specific environment overrides can go here
+    # For example, different logging levels, etc.
     environment:
       - FLASK_ENV=production
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-secure_package_manager}
-      - NPM_PROXY_URL=${NPM_PROXY_URL}
-      - SECURE_REPO_URL=${SECURE_REPO_URL}
-      - ADFS_ENTITY_ID=${ADFS_ENTITY_ID}
-      - ADFS_SSO_URL=${ADFS_SSO_URL}
-      - ADFS_CERT_PATH=${ADFS_CERT_PATH:-/app/certs/adfs.crt}
-      - TRIVY_URL=${TRIVY_URL:-http://trivy:4954}
-      - TRIVY_TIMEOUT=${TRIVY_TIMEOUT:-300}
-      - TRIVY_MAX_RETRIES=${TRIVY_MAX_RETRIES:-3}
-    volumes:
-      # Remove source code mounting in production
-      - ./certs:/app/certs:ro
-      - package_cache:/app/package_cache
-    # Remove port exposure in production (use reverse proxy)
-    ports: []
-    # Production resource limits
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '0.5'
-        reservations:
-          memory: 512M
-          cpus: '0.25'
+      - FLASK_DEBUG=0
 
-  # Production frontend configuration
+  # Production frontend overrides (if needed)
   frontend:
+    # Production-specific frontend overrides can go here
+    # For example, different build args, etc.
     environment:
       - NODE_ENV=production
-      - VITE_API_URL=${FRONTEND_API_URL}
-      - VITE_ADFS_ENTITY_ID=${ADFS_ENTITY_ID}
-      - VITE_ADFS_SSO_URL=${ADFS_SSO_URL}
-    volumes:
-      # Remove source code mounting in production
-    # Remove port exposure in production (use reverse proxy)
-    ports: []
-    # Production resource limits
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '0.25'
-        reservations:
-          memory: 256M
-          cpus: '0.1'
 
-  # Production Trivy configuration
+  # Production Trivy overrides (if needed)
   trivy:
-    # Remove port exposure in production (use internal networking)
-    ports: []
-    # Production resource limits
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-          cpus: '1.0'
-        reservations:
-          memory: 1G
-          cpus: '0.5'
+    # Production-specific Trivy configuration can go here
+    # For example, different cache settings, etc.
+    restart: always

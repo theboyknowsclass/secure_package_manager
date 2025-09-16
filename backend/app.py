@@ -10,7 +10,7 @@ from config.constants import (
     validate_all_required_env,
 )
 from dotenv import load_dotenv
-from flask import Flask, jsonify
+from flask import Flask, Response, jsonify
 from flask_cors import CORS
 
 # Load environment variables
@@ -25,8 +25,12 @@ app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = SQLALCHEMY_TRACK_MODIFICATIONS
 app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 
-# Initialize extensions
-CORS(app)
+# Initialize extensions with explicit CORS configuration
+CORS(app, 
+     origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+     supports_credentials=True)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -34,12 +38,10 @@ logger = logging.getLogger(__name__)
 
 # Import models first (they create the db instance)
 from models import (
-    Application,
     AuditLog,
     Package,
-    PackageReference,
-    PackageRequest,
-    PackageValidation,
+    Request,
+    SecurityScan,
     SupportedLicense,
     User,
     db,
@@ -49,6 +51,7 @@ from models import (
 db.init_app(app)
 
 from routes.admin_routes import admin_bp
+from routes.approver_routes import approver_bp
 
 # Import and register blueprints
 from routes.auth_routes import auth_bp
@@ -57,15 +60,16 @@ from routes.package_routes import package_bp
 app.register_blueprint(auth_bp)
 app.register_blueprint(package_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(approver_bp)
 
 
 @app.route("/health", methods=["GET"])
-def health_check():
+def health_check() -> Response:
     """Health check endpoint"""
     return jsonify({"status": "healthy", "timestamp": datetime.utcnow().isoformat()})
 
 
-def wait_for_db(max_retries=30, delay=2):
+def wait_for_db(max_retries: int = 30, delay: int = 2) -> bool:
     """Wait for database to be ready"""
     import time
 
@@ -85,6 +89,7 @@ def wait_for_db(max_retries=30, delay=2):
             else:
                 logger.error("Failed to connect to database after all retries")
                 raise e
+    return False
 
 
 if __name__ == "__main__":

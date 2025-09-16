@@ -32,34 +32,29 @@ def get_required_env(key: str, description: str | None = None) -> str:
     return value
 
 
-def get_optional_env(key: str, default: str | None = None) -> str | None:
+def get_required_env_int(key: str, description: str | None = None) -> int:
     """
-    Get an optional environment variable with a default value.
-    Only use this for truly optional configuration.
+    Get a required environment variable as an integer or add to missing list.
 
     Args:
         key: Environment variable name
-        default: Default value if not set
+        description: Optional description for error message
 
     Returns:
-        Environment variable value or default
+        Environment variable value as integer (guaranteed to be valid)
     """
-    return os.getenv(key, default)
-
-
-def get_optional_env_int(key: str, default: str) -> int:
-    """
-    Get an optional environment variable as an integer with a default value.
-
-    Args:
-        key: Environment variable name
-        default: Default value if not set
-
-    Returns:
-        Environment variable value as integer or default
-    """
-    value = os.getenv(key, default)
-    return int(value)
+    value = os.getenv(key)
+    if not value:
+        desc = f" ({description})" if description else ""
+        _missing_env_vars.append(f"  - {key}{desc}")
+        return 0  # Return 0 as placeholder (will be caught by validation)
+    
+    try:
+        return int(value)
+    except ValueError:
+        desc = f" ({description})" if description else ""
+        _missing_env_vars.append(f"  - {key}{desc} (invalid integer value: '{value}')")
+        return 0  # Return 0 as placeholder
 
 
 def validate_all_required_env() -> None:
@@ -83,87 +78,83 @@ _missing_env_vars: list[str] = []
 # APPLICATION CONFIGURATION
 # =============================================================================
 
-# Application Names
+# Application Name (used for both backend and frontend)
 APP_NAME = get_required_env("APP_NAME", "Application name")
-FRONTEND_APP_NAME = get_required_env("FRONTEND_APP_NAME", "Frontend application name")
-
-# =============================================================================
-# NETWORK CONFIGURATION
-# =============================================================================
-
-# Ports
-FRONTEND_PORT = int(get_required_env("FRONTEND_PORT", "Frontend port"))
-API_PORT = int(get_required_env("API_PORT", "API port"))
-DATABASE_PORT = int(get_required_env("DATABASE_PORT", "Database port"))
-IDP_PORT = int(get_required_env("IDP_PORT", "Identity Provider port"))
-NPM_REGISTRY_PORT = int(get_required_env("NPM_REGISTRY_PORT", "NPM registry port"))
-TRIVY_PORT = int(get_required_env("TRIVY_PORT", "Trivy port"))
-
-# Hosts
-LOCALHOST = get_required_env("LOCALHOST", "Localhost address") or "localhost"
-DOCKER_HOST = get_required_env("DOCKER_HOST", "Docker host address") or "localhost"
-
-# URLs (constructed from hosts and ports)
-FRONTEND_URL = f"http://{LOCALHOST}:{FRONTEND_PORT}"
-API_URL = f"http://{LOCALHOST}:{API_PORT}"
-DATABASE_URL = get_required_env("DATABASE_URL", "Database connection URL")
-IDP_URL = f"http://{LOCALHOST}:{IDP_PORT}"
-NPM_REGISTRY_URL = f"http://{LOCALHOST}:{NPM_REGISTRY_PORT}"
-TRIVY_URL = get_required_env("TRIVY_URL", "Trivy service URL")
-SECURE_REPO_URL = get_required_env("SECURE_REPO_URL", "Secure repository URL")
-NPM_PROXY_URL = get_optional_env("NPM_PROXY_URL", "https://registry.npmjs.org")
+FRONTEND_APP_NAME = f"{APP_NAME}-frontend"
 
 # =============================================================================
 # SECURITY CONFIGURATION
 # =============================================================================
 
-# JWT Configuration
+# JWT & Flask Secrets
 JWT_SECRET = get_required_env("JWT_SECRET", "JWT signing secret")
 FLASK_SECRET_KEY = get_required_env("FLASK_SECRET_KEY", "Flask secret key")
 IDP_SECRET_KEY = get_required_env("IDP_SECRET_KEY", "Identity Provider secret key")
 
-# OAuth Configuration
+# OAuth & IDP Configuration
 OAUTH_AUDIENCE = get_required_env("OAUTH_AUDIENCE", "OAuth audience")
 OAUTH_ISSUER = get_required_env("OAUTH_ISSUER", "OAuth issuer URL")
+IDP_PORT = get_required_env_int("IDP_PORT", "Identity Provider port")
 
-# =============================================================================
-# FLASK CONFIGURATION
-# =============================================================================
-
-# Flask App Configuration
-FLASK_ENV = get_optional_env("FLASK_ENV", "development")
-FLASK_DEBUG = get_optional_env(
-    "FLASK_DEBUG", "1" if FLASK_ENV == "development" else "0"
-)
-MAX_CONTENT_LENGTH = get_optional_env_int(
-    "MAX_CONTENT_LENGTH", "16777216"
-)  # 16MB default
-SQLALCHEMY_TRACK_MODIFICATIONS = False  # Disable for performance
-
-# =============================================================================
-# TRIVY CONFIGURATION
-# =============================================================================
-
-# Trivy Service Configuration
-TRIVY_TIMEOUT = get_optional_env_int("TRIVY_TIMEOUT", "300")  # 5 minutes default
-TRIVY_MAX_RETRIES = get_optional_env_int("TRIVY_MAX_RETRIES", "3")
+# ADFS Configuration
+ADFS_ENTITY_ID = get_required_env("ADFS_ENTITY_ID", "ADFS entity ID")
+ADFS_SSO_URL = get_required_env("ADFS_SSO_URL", "ADFS SSO URL")
+ADFS_CERT_PATH = get_required_env("ADFS_CERT_PATH", "ADFS certificate path")
 
 # =============================================================================
 # DATABASE CONFIGURATION
 # =============================================================================
+
+# Database Port & Connection
+DATABASE_PORT = get_required_env_int("DATABASE_PORT", "PostgreSQL database port")
+DATABASE_URL = get_required_env("DATABASE_URL", "Database connection URL")
 
 # Database Credentials
 POSTGRES_USER = get_required_env("POSTGRES_USER", "PostgreSQL username")
 POSTGRES_PASSWORD = get_required_env("POSTGRES_PASSWORD", "PostgreSQL password")
 POSTGRES_DB = get_required_env("POSTGRES_DB", "PostgreSQL database name")
 
+# =============================================================================
+# EXTERNAL SERVICES CONFIGURATION
+# =============================================================================
+
+# Trivy Service
+TRIVY_PORT = get_required_env_int("TRIVY_PORT", "Trivy security scanner port")
+TRIVY_URL = get_required_env("TRIVY_URL", "Trivy service URL")
+TRIVY_TIMEOUT = get_required_env_int("TRIVY_TIMEOUT", "Trivy timeout in seconds")
+TRIVY_MAX_RETRIES = get_required_env_int("TRIVY_MAX_RETRIES", "Trivy maximum retry attempts")
+
+# Repository Configuration
+SOURCE_REPOSITORY_URL = get_required_env("SOURCE_REPOSITORY_URL", "Source repository URL (e.g., https://registry.npmjs.org)")
+TARGET_REPOSITORY_URL = get_required_env("TARGET_REPOSITORY_URL", "Target repository URL (e.g., http://localhost:8080)")
+
+# =============================================================================
+# FLASK CONFIGURATION
+# =============================================================================
+
+# Flask Ports & Network
+API_PORT = get_required_env_int("API_PORT", "Backend API port")
+FRONTEND_PORT = get_required_env_int("FRONTEND_PORT", "Frontend application port")
+
+# Hosts
+LOCALHOST = get_required_env("LOCALHOST", "Localhost hostname")
+DOCKER_HOST = get_required_env("DOCKER_HOST", "Docker hostname")
+
+# URLs (constructed from hosts and ports)
+FRONTEND_URL = f"http://{LOCALHOST}:{FRONTEND_PORT}"
+API_URL = f"http://{LOCALHOST}:{API_PORT}"
+IDP_URL = f"http://{LOCALHOST}:{IDP_PORT}"
+
+# Flask App Configuration
+FLASK_ENV = get_required_env("FLASK_ENV", "Flask environment (development/production)")
+FLASK_DEBUG = get_required_env("FLASK_DEBUG", "Flask debug mode (0/1)")
+MAX_CONTENT_LENGTH = get_required_env_int("MAX_CONTENT_LENGTH", "Maximum content length in bytes")
+SQLALCHEMY_TRACK_MODIFICATIONS = False  # Disable for performance
+
+
 # Internal Docker URLs (for container-to-container communication)
 INTERNAL_API_URL = f"http://api:{API_PORT}"
-INTERNAL_DATABASE_URL = (
-    f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@db:{DATABASE_PORT}/{POSTGRES_DB}"
-)
 INTERNAL_IDP_URL = f"http://idp:{IDP_PORT}"
-INTERNAL_NPM_REGISTRY_URL = f"http://npm-registry:{NPM_REGISTRY_PORT}"
 INTERNAL_TRIVY_URL = f"http://trivy:{TRIVY_PORT}"
 
 # =============================================================================
@@ -199,16 +190,5 @@ def is_production() -> bool:
 # =============================================================================
 
 
-def validate_config() -> None:
-    """Validate that all required configuration is present"""
-    required_vars = ["JWT_SECRET", "FLASK_SECRET_KEY", "POSTGRES_PASSWORD"]
-
-    missing_vars = []
-    for var in required_vars:
-        if not os.getenv(var):
-            missing_vars.append(var)
-
-    if missing_vars:
-        raise ValueError(
-            f"Missing required environment variables: {', '.join(missing_vars)}"
-        )
+# Validate all required environment variables at module load time
+validate_all_required_env()

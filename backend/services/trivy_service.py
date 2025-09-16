@@ -2,10 +2,11 @@ import json
 import logging
 import subprocess
 import tempfile
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 import requests
-from config.constants import NPM_PROXY_URL, TRIVY_MAX_RETRIES, TRIVY_TIMEOUT, TRIVY_URL
+from config.constants import SOURCE_REPOSITORY_URL, TRIVY_MAX_RETRIES, TRIVY_TIMEOUT, TRIVY_URL
 from models import Package, SecurityScan, db
 
 logger = logging.getLogger(__name__)
@@ -29,15 +30,16 @@ class TrivyService:
         """
         try:
             # Create security scan record
-            security_scan = SecurityScan(
-                package_id=package.id, scan_type="trivy", status="running"
-            )
+            security_scan = SecurityScan(package_id=package.id, scan_type="trivy")
             db.session.add(security_scan)
             db.session.commit()
 
             # Update package security scan status
-            package.security_scan_status = "scanning"
-            db.session.commit()
+            if package.package_status:
+                package.package_status.status = "Security Scanning"
+                package.package_status.security_scan_status = "running"
+                package.package_status.updated_at = datetime.utcnow()
+                db.session.commit()
 
             logger.info(
                 f"Starting Trivy scan for package {package.name}@{package.version}"
@@ -84,12 +86,12 @@ class TrivyService:
                 prefix=f"trivy_scan_{package.name}_{package.version}_"
             )
 
-            # Try to download the actual package from NPM registry
-            npm_proxy_url = NPM_PROXY_URL
+            # Try to download the actual package from source repository
+            source_repo_url = SOURCE_REPOSITORY_URL
 
             try:
-                # Get package metadata from NPM
-                package_url = f"{npm_proxy_url}/{package.name}"
+                # Get package metadata from source repository
+                package_url = f"{source_repo_url}/{package.name}"
                 response = requests.get(package_url, timeout=30)
 
                 if response.status_code == 200:
@@ -357,7 +359,6 @@ class TrivyService:
             summary = scan_result.get("summary", {})
 
             # Update security scan record
-            security_scan.status = "completed"
             security_scan.scan_result = scan_result
             security_scan.vulnerability_count = summary.get("total", 0)
             security_scan.critical_count = summary.get("critical", 0)
@@ -367,20 +368,16 @@ class TrivyService:
             security_scan.info_count = summary.get("info", 0)
             security_scan.scan_duration_ms = scan_result.get("scan_duration_ms", 0)
             security_scan.trivy_version = scan_result.get("trivy_version", "unknown")
-            security_scan.completed_at = db.func.current_timestamp()
+            security_scan.completed_at = datetime.utcnow()
 
-            # Update package with scan results
-            package.security_scan_status = "completed"
-            package.vulnerability_count = security_scan.vulnerability_count
-            package.critical_vulnerabilities = security_scan.critical_count
-            package.high_vulnerabilities = security_scan.high_count
-            package.medium_vulnerabilities = security_scan.medium_count
-            package.low_vulnerabilities = security_scan.low_count
-
-            # Update security score based on vulnerabilities
-            package.security_score = (
-                self._calculate_security_score_from_vulnerabilities(security_scan)
-            )
+            # Update package status with scan results
+            if package.package_status:
+                package.package_status.status = "Security Scanned"
+                package.package_status.security_scan_status = "completed"
+                package.package_status.security_score = (
+                    self._calculate_security_score_from_vulnerabilities(security_scan)
+                )
+                package.package_status.updated_at = datetime.utcnow()
 
             db.session.commit()
 
@@ -395,7 +392,11 @@ class TrivyService:
                 "high_count": security_scan.high_count,
                 "medium_count": security_scan.medium_count,
                 "low_count": security_scan.low_count,
-                "security_score": package.security_score,
+                "security_score": (
+                    package.package_status.security_score
+                    if package.package_status
+                    else 100
+                ),
                 "scan_duration_ms": security_scan.scan_duration_ms,
             }
 
@@ -450,12 +451,14 @@ class TrivyService:
         """
         try:
             # Update security scan record
-            security_scan.status = "failed"
             security_scan.scan_result = {"error": error_message}
-            security_scan.completed_at = db.func.current_timestamp()
+            security_scan.completed_at = datetime.utcnow()
 
             # Update package status
-            package.security_scan_status = "failed"
+            if package.package_status:
+                package.package_status.status = "Security Scanned"  # Still mark as scanned even if failed
+                package.package_status.security_scan_status = "failed"
+                package.package_status.updated_at = datetime.utcnow()
 
             db.session.commit()
 
@@ -500,7 +503,11 @@ class TrivyService:
                 return None
 
             return {
-                "status": security_scan.status,
+                "status": (
+                    security_scan.status
+                    if hasattr(security_scan, "status")
+                    else "completed"
+                ),
                 "vulnerability_count": security_scan.vulnerability_count,
                 "critical_count": security_scan.critical_count,
                 "high_count": security_scan.high_count,
@@ -549,7 +556,11 @@ class TrivyService:
             return {
                 "scan_id": security_scan.id,
                 "package_id": package_id,
-                "status": security_scan.status,
+                "status": (
+                    security_scan.status
+                    if hasattr(security_scan, "status")
+                    else "completed"
+                ),
                 "scan_result": security_scan.scan_result,
                 "vulnerability_count": security_scan.vulnerability_count,
                 "critical_count": security_scan.critical_count,

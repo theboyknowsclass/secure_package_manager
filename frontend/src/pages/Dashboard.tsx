@@ -23,11 +23,27 @@ interface PackageRequest {
   id: number;
   status: PackageStatus;
   total_packages: number;
-  validated_packages: number;
+  completion_percentage: number;
   created_at: string;
-  application: {
-    name: string;
-    version: string;
+  application_name: string;
+  version: string;
+  requestor: {
+    id: number;
+    username: string;
+    full_name: string;
+  };
+  package_counts: {
+    total: number;
+    Requested: number;
+    "Checking Licence": number;
+    "Licence Checked": number;
+    Downloading: number;
+    Downloaded: number;
+    "Security Scanning": number;
+    "Security Scanned": number;
+    "Pending Approval": number;
+    Approved: number;
+    Rejected: number;
   };
 }
 
@@ -144,7 +160,7 @@ export default function Dashboard() {
                   mb={1}
                 >
                   <Typography variant="h6">
-                    {request.application.name} v{request.application.version}
+                    {request.application_name} v{request.version}
                   </Typography>
                   <Typography
                     variant="body2"

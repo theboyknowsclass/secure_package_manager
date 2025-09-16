@@ -6,9 +6,10 @@ including license validation, security scanning, and status updates.
 """
 
 import logging
+from datetime import datetime
 from typing import Any, Dict
 
-from models import Package, db
+from models import Package, PackageStatus, RequestPackage, db
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +34,16 @@ class PackageProcessor:
         Returns:
             Dictionary with processing results
         """
-        packages = Package.query.filter_by(
-            package_request_id=request_id, status="requested"
-        ).all()
+        # Get packages for this request through the many-to-many relationship
+        packages = (
+            self.db.session.query(Package)
+            .join(RequestPackage)
+            .filter(RequestPackage.request_id == request_id)
+            .all()
+        )
+        
+        # Filter packages that have "Requested" status
+        packages = [pkg for pkg in packages if pkg.package_status and pkg.package_status.status == "Requested"]
 
         if not packages:
             logger.info(f"No pending packages found for request {request_id}")
@@ -73,8 +81,9 @@ class PackageProcessor:
 
                 # Update package status to failed
                 try:
-                    package.status = "rejected"
-                    package.validation_errors = [str(e)]
+                    if package.package_status:
+                        package.package_status.status = "Rejected"
+                        package.package_status.updated_at = datetime.utcnow()
                     self.db.session.commit()
                 except Exception as commit_error:
                     logger.error(
@@ -113,11 +122,11 @@ class PackageProcessor:
                     "package_version": package.version,
                 }
 
-            # Step 2: Create validation records
-            if not self._create_validation_records(package):
+            # Step 2: Update status to downloaded
+            if not self._mark_as_downloaded(package):
                 return {
                     "success": False,
-                    "error": "Failed to create validation records",
+                    "error": "Failed to update package status",
                     "package_id": package.id,
                     "package_name": package.name,
                     "package_version": package.version,
@@ -134,8 +143,10 @@ class PackageProcessor:
                 }
 
             # Step 4: Mark as ready for approval
-            package.status = "pending_approval"
-            self.db.session.commit()
+            if package.package_status:
+                package.package_status.status = "Pending Approval"
+                package.package_status.updated_at = datetime.utcnow()
+                self.db.session.commit()
 
             logger.info(
                 f"Successfully processed package {package.name}@{package.version}"
@@ -146,7 +157,11 @@ class PackageProcessor:
                 "package_id": package.id,
                 "package_name": package.name,
                 "package_version": package.version,
-                "final_status": package.status,
+                "final_status": (
+                    package.package_status.status
+                    if package.package_status
+                    else "Unknown"
+                ),
             }
 
         except Exception as e:
@@ -172,20 +187,25 @@ class PackageProcessor:
             True if license validation passed, False otherwise
         """
         try:
-            # Update status to performing license check
-            package.status = "performing_licence_check"
-            self.db.session.commit()
+            # Update status to checking license
+            if package.package_status:
+                package.package_status.status = "Checking Licence"
+                package.package_status.updated_at = datetime.utcnow()
+                self.db.session.commit()
 
             # Validate package information (license check)
             if not self._validate_package_info(package):
-                package.status = "rejected"
-                package.validation_errors = ["Package validation failed"]
+                if package.package_status:
+                    package.package_status.status = "Rejected"
+                    package.package_status.updated_at = datetime.utcnow()
                 self.db.session.commit()
                 return False
 
-            # Update status to license check complete
-            package.status = "licence_check_complete"
-            self.db.session.commit()
+            # Update status to license checked
+            if package.package_status:
+                package.package_status.status = "Licence Checked"
+                package.package_status.updated_at = datetime.utcnow()
+                self.db.session.commit()
 
             return True
 
@@ -193,8 +213,49 @@ class PackageProcessor:
             logger.error(
                 f"License check failed for {package.name}@{package.version}: {str(e)}"
             )
-            package.status = "rejected"
-            package.validation_errors = [str(e)]
+            if package.package_status:
+                package.package_status.status = "Rejected"
+                package.package_status.updated_at = datetime.utcnow()
+            self.db.session.commit()
+            return False
+
+    def _mark_as_downloaded(self, package: Package) -> bool:
+        """
+        Mark package as downloaded
+
+        Args:
+            package: The package to mark as downloaded
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Update status to downloading
+            if package.package_status:
+                package.package_status.status = "Downloading"
+                package.package_status.updated_at = datetime.utcnow()
+                self.db.session.commit()
+
+            # Simulate download process
+            if not self._simulate_package_download(package):
+                if package.package_status:
+                    package.package_status.status = "Rejected"
+                    package.package_status.updated_at = datetime.utcnow()
+                self.db.session.commit()
+                return False
+
+            # Update status to downloaded
+            if package.package_status:
+                package.package_status.status = "Downloaded"
+                package.package_status.updated_at = datetime.utcnow()
+                self.db.session.commit()
+            return True
+
+        except Exception as e:
+            logger.error(f"Error marking package as downloaded: {str(e)}")
+            if package.package_status:
+                package.package_status.status = "Rejected"
+                package.package_status.updated_at = datetime.utcnow()
             self.db.session.commit()
             return False
 
@@ -209,9 +270,12 @@ class PackageProcessor:
             True if security scan completed (even with vulnerabilities), False if failed
         """
         try:
-            # Update status to performing security scan
-            package.status = "performing_security_scan"
-            self.db.session.commit()
+            # Update status to security scanning
+            if package.package_status:
+                package.package_status.status = "Security Scanning"
+                package.package_status.security_scan_status = "running"
+                package.package_status.updated_at = datetime.utcnow()
+                self.db.session.commit()
 
             logger.info(
                 f"Starting security scan for package {package.name}@{package.version}"
@@ -223,20 +287,25 @@ class PackageProcessor:
                     f"Security scan failed for {package.name}@{package.version}: "
                     f"{scan_result.get('error', 'Unknown error')}"
                 )
+                if package.package_status:
+                    package.package_status.status = "Security Scanned"  # Still mark as scanned even if failed
+                    package.package_status.security_scan_status = "failed"
+                    package.package_status.updated_at = datetime.utcnow()
+                self.db.session.commit()
                 # Don't fail the package validation if security scan fails, just log it
-                package.validation_errors = package.validation_errors or []
-                package.validation_errors.append(
-                    f"Security scan failed: {scan_result.get('error', 'Unknown error')}"
-                )
             else:
                 logger.info(
                     f"Security scan completed for {package.name}@{package.version}: "
                     f"{scan_result.get('vulnerability_count', 0)} vulnerabilities found"
                 )
-
-            # Update status to security scan complete
-            package.status = "security_scan_complete"
-            self.db.session.commit()
+                if package.package_status:
+                    package.package_status.status = "Security Scanned"
+                    package.package_status.security_scan_status = "completed"
+                    package.package_status.security_score = scan_result.get(
+                        "security_score", 100
+                    )
+                    package.package_status.updated_at = datetime.utcnow()
+                self.db.session.commit()
 
             return True
 
@@ -244,9 +313,10 @@ class PackageProcessor:
             logger.error(
                 f"Security scan failed for {package.name}@{package.version}: {str(e)}"
             )
-            package.status = "rejected"
-            package.validation_errors = package.validation_errors or []
-            package.validation_errors.append(f"Security scan failed: {str(e)}")
+            if package.package_status:
+                package.package_status.status = "Security Scanned"  # Still mark as scanned even if failed
+                package.package_status.security_scan_status = "failed"
+                package.package_status.updated_at = datetime.utcnow()
             self.db.session.commit()
             return False
 
@@ -273,14 +343,14 @@ class PackageProcessor:
                 logger.warning(
                     f"Failed to download package {package.name}@{package.version}"
                 )
-                package.validation_errors = ["Failed to download package"]
                 return False
 
             # Validate license information
             license_validation = self._validate_package_license(package)
 
             # Store the license score
-            package.license_score = license_validation["score"]
+            if package.package_status:
+                package.package_status.license_score = license_validation["score"]
 
             if license_validation["score"] == 0:
                 # For testing, allow packages with missing licenses to proceed
@@ -292,7 +362,7 @@ class PackageProcessor:
 
             logger.info(
                 f"Package {package.name}@{package.version} validated successfully "
-                f"(License: {package.license_identifier}, Score: {package.license_score})"
+                f"(License: {package.license_identifier}, Score: {package.package_status.license_score if package.package_status else 'N/A'})"
             )
             return True
 
@@ -356,25 +426,3 @@ class PackageProcessor:
                 "errors": [f"License validation failed: {str(e)}"],
                 "warnings": [],
             }
-
-    def _create_validation_records(self, package: Package) -> bool:
-        """
-        Create validation records for a package
-
-        Args:
-            package: The package to create records for
-
-        Returns:
-            True if records created successfully, False otherwise
-        """
-        try:
-            # In production, this would create detailed validation records
-            # For now, just simulate success
-            logger.info(
-                f"Creating validation records for {package.name}@{package.version}"
-            )
-            return True
-
-        except Exception as e:
-            logger.error(f"Error creating validation records: {str(e)}")
-            return False

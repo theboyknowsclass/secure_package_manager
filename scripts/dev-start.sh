@@ -5,16 +5,20 @@ echo "🚀 Starting development environment with fresh database..."
 
 # Stop and remove all containers
 echo "📦 Stopping existing containers..."
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml down -v
+docker compose --env-file .env.development -f docker-compose.base.yml -f docker-compose.dev.yml down -v
 
 # Remove any existing database volumes to ensure fresh start
 echo "🗑️  Removing database volumes..."
 docker volume rm secure_package_manager_postgres_data 2>/dev/null || true
 docker volume rm secure_package_manager_npm_storage 2>/dev/null || true
 
+# Ensure we're using the correct Docker context
+echo "🔧 Setting Docker context..."
+docker context use default
+
 # Start services with dev configuration
 echo "🔄 Starting services..."
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+docker compose --env-file .env.development -f docker-compose.base.yml -f docker-compose.dev.yml up --build -d
 
 # Wait for services to be healthy
 echo "⏳ Waiting for services to be ready..."
@@ -22,8 +26,8 @@ sleep 10
 
 # Check if services are running
 echo "🔍 Checking service status..."
-services=$(docker-compose -f docker-compose.yml -f docker-compose.dev.yml ps --services | wc -l)
-running=$(docker-compose -f docker-compose.yml -f docker-compose.dev.yml ps --services --filter "status=running" | wc -l)
+services=$(docker compose --env-file .env.development -f docker-compose.base.yml -f docker-compose.dev.yml ps --services | wc -l)
+running=$(docker compose --env-file .env.development -f docker-compose.base.yml -f docker-compose.dev.yml ps --services --filter "status=running" | wc -l)
 
 if [ "$services" -eq "$running" ]; then
     echo "✅ Development environment started successfully!"
@@ -35,6 +39,6 @@ if [ "$services" -eq "$running" ]; then
     echo "📦 Mock NPM Registry: http://localhost:8080"
 else
     echo "❌ Some services failed to start. Check logs with:"
-    echo "   docker-compose -f docker-compose.yml -f docker-compose.dev.yml logs"
+    echo "   docker compose --env-file .env.development -f docker-compose.base.yml -f docker-compose.dev.yml logs"
     exit 1
 fi

@@ -3,13 +3,14 @@ import logging
 import os
 import subprocess
 import tempfile
+from datetime import datetime
 from typing import Any, Dict, List
 
-from config.constants import SECURE_REPO_URL
+from config.constants import TARGET_REPOSITORY_URL
 from models import (
     Package,
-    PackageRequest,
-    RepositoryConfig,
+    PackageStatus,
+    RequestPackage,
     db,
 )
 
@@ -23,92 +24,34 @@ logger = logging.getLogger(__name__)
 
 class PackageService:
     def __init__(self) -> None:
-        # Don't initialize any config values - they'll be loaded dynamically
-        self._config_loaded = False
-        self._config_cache: Dict[str, Any] = {}
+        # Repository configuration moved to environment variables
         self.license_service = LicenseService()
         self.trivy_service = TrivyService()
 
-    def _load_config(self) -> None:
-        """Load repository configuration from database (only when needed)"""
-        if self._config_loaded:
-            return
-
-        try:
-            # Load from database - use None as defaults to detect missing configuration
-            self._config_cache = {
-                "source_repo_url": RepositoryConfig.get_config_value(
-                    "source_repository_url"
-                ),
-                "target_repo_url": RepositoryConfig.get_config_value(
-                    "target_repository_url"
-                ),
-            }
-
-            # Set secure_repo_url based on target_repo_url or environment
-            if self._config_cache["target_repo_url"]:
-                self._config_cache["secure_repo_url"] = SECURE_REPO_URL
-            else:
-                self._config_cache["secure_repo_url"] = SECURE_REPO_URL
-
-            self._config_loaded = True
-
-            # Log configuration status
-            if all(
-                self._config_cache[key]
-                for key in ["source_repo_url", "target_repo_url"]
-            ):
-                logger.info(
-                    f"Loaded repository configuration: source={self._config_cache['source_repo_url']}, target={self._config_cache['target_repo_url']}"
-                )
-            else:
-                logger.warning(
-                    "Repository configuration is incomplete - some values are missing"
-                )
-
-        except Exception as e:
-            logger.warning(
-                f"Could not load repository config from database: {e}. Configuration will be None."
-            )
-            # Set all values to None to indicate missing configuration
-            self._config_cache = {
-                "source_repo_url": None,
-                "target_repo_url": None,
-                "secure_repo_url": SECURE_REPO_URL,
-            }
-            self._config_loaded = True
-
-    def refresh_config(self) -> None:
-        """Refresh repository configuration from database"""
-        self._config_loaded = False
-        self._load_config()
-
     def is_configuration_complete(self) -> bool:
-        """Check if repository configuration is complete"""
-        self._load_config()
-        required_keys = ["source_repo_url", "target_repo_url"]
-        return all(self._config_cache.get(key) for key in required_keys)
+        """Check if repository configuration is complete (now from environment variables)"""
+        # Check environment variables instead of database
+        source_repo_url = os.getenv("SOURCE_REPOSITORY_URL")
+        target_repo_url = os.getenv("TARGET_REPOSITORY_URL")
+        return bool(source_repo_url and target_repo_url)
 
     def get_missing_config_keys(self) -> List[str]:
-        """Get list of missing configuration keys"""
-        self._load_config()
-        required_keys = ["source_repo_url", "target_repo_url"]
-        return [key for key in required_keys if not self._config_cache.get(key)]
+        """Get list of missing configuration keys (now from environment variables)"""
+        missing = []
+        if not os.getenv("SOURCE_REPOSITORY_URL"):
+            missing.append("SOURCE_REPOSITORY_URL")
+        if not os.getenv("TARGET_REPOSITORY_URL"):
+            missing.append("TARGET_REPOSITORY_URL")
+        return missing
 
     @property
     def source_repo_url(self) -> str:
-        self._load_config()
-        return str(self._config_cache["source_repo_url"])
+        return os.getenv("SOURCE_REPOSITORY_URL", "")
 
     @property
     def target_repo_url(self) -> str:
-        self._load_config()
-        return str(self._config_cache["target_repo_url"])
+        return os.getenv("TARGET_REPOSITORY_URL", "")
 
-    @property
-    def secure_repo_url(self) -> str:
-        self._load_config()
-        return str(self._config_cache["secure_repo_url"])
 
     def process_package_lock(
         self, request_id: int, package_data: Dict[str, Any]
@@ -127,12 +70,7 @@ class PackageService:
             )
 
             # Create database records for new packages
-            self._create_package_records(packages_to_process)
-
-            # Update request metadata
-            self._update_request_metadata(
-                request_id, packages_to_process, existing_packages
-            )
+            self._create_package_records(packages_to_process, request_id)
 
             # Start async processing
             self._process_packages_async(request_id)
@@ -216,14 +154,26 @@ class PackageService:
             package_version = package_data["version"]
             package_info = package_data["info"]
 
-            # Check if package already exists in database
+            # Check if package already exists in database (deduplicated across all requests)
             existing_package = Package.query.filter_by(
                 name=package_name,
                 version=package_version,
-                package_request_id=request_id,
             ).first()
 
             if existing_package:
+                # Check if this package is already linked to this request
+                existing_link = RequestPackage.query.filter_by(
+                    request_id=request_id, package_id=existing_package.id
+                ).first()
+
+                if not existing_link:
+                    # Create link between request and existing package
+                    request_package = RequestPackage(
+                        request_id=request_id, package_id=existing_package.id
+                    )
+                    db.session.add(request_package)
+                    db.session.commit()
+
                 existing_packages.append(existing_package)
                 continue
 
@@ -264,15 +214,13 @@ class PackageService:
         return Package(
             name=package_name,
             version=package_version,
-            package_request_id=request_id,
-            status="requested",
             license_identifier=package_info.get("license"),
-            checksum=package_info.get("integrity"),
+            integrity=package_info.get("integrity"),
             npm_url=package_info.get("resolved"),
         )
 
     def _create_package_records(
-        self, packages_to_process: List[Dict[str, Any]]
+        self, packages_to_process: List[Dict[str, Any]], request_id: int
     ) -> List[Package]:
         """Create database records for new packages"""
         package_objects = []
@@ -280,40 +228,41 @@ class PackageService:
             package = self._create_package_object(
                 package_data["name"],
                 package_data["version"],
-                package_data,
-                package_data["request_id"],
+                package_data["package_info"],
+                request_id,
             )
             db.session.add(package)
+            db.session.flush()  # Get the package ID
+
+            # Create package status record
+            package_status = PackageStatus(
+                package_id=package.id,
+                status="Requested",
+                security_scan_status="pending",
+            )
+            db.session.add(package_status)
+
+            # Create request-package link
+            request_package = RequestPackage(
+                request_id=request_id, package_id=package.id
+            )
+            db.session.add(request_package)
+
             package_objects.append(package)
             logger.info(
                 f"Added package for processing: {package.name}@{package.version}"
             )
-        return package_objects
 
-    def _update_request_metadata(
-        self,
-        request_id: int,
-        packages_to_process: List[Dict[str, Any]],
-        existing_packages: List[Dict[str, Any]],
-    ) -> None:
-        """Update PackageRequest with total package count and status"""
-        package_request = PackageRequest.query.get(request_id)
-        if package_request:
-            package_request.total_packages = len(packages_to_process) + len(
-                existing_packages
-            )
-            package_request.validated_packages = len(
-                existing_packages
-            )  # Start with existing validated packages
-            db.session.commit()
+        db.session.commit()
+        return package_objects
 
     def _process_packages_async(self, request_id: int) -> None:
         """Process packages asynchronously (refactored version)"""
         try:
             # Initialize services
-            status_manager = PackageRequestStatusManager(db.session)
+            status_manager = PackageRequestStatusManager(db)
             package_processor = PackageProcessor(
-                self.license_service, self.trivy_service, db.session
+                self.license_service, self.trivy_service, db
             )
 
             # Process pending packages
@@ -343,16 +292,26 @@ class PackageService:
     def _handle_processing_error(self, request_id: int, error: Exception) -> None:
         """Handle errors during package processing"""
         try:
-            package_request = PackageRequest.query.get(request_id)
-            if package_request:
-                package_request.status = "validation_failed"
-                db.session.commit()
-                logger.info(
-                    f"Updated request {request_id} status to validation_failed due to error"
-                )
+            # Update package statuses to reflect error
+            packages = (
+                db.session.query(Package)
+                .join(RequestPackage)
+                .filter(RequestPackage.request_id == request_id)
+                .all()
+            )
+
+            for package in packages:
+                if package.package_status:
+                    package.package_status.status = "Rejected"
+                    package.package_status.updated_at = datetime.utcnow()
+
+            db.session.commit()
+            logger.info(
+                f"Updated package statuses for request {request_id} to Rejected due to error"
+            )
         except Exception as commit_error:
             logger.error(
-                f"Failed to update request status after error: {str(commit_error)}"
+                f"Failed to update package statuses after error: {str(commit_error)}"
             )
 
     def _calculate_security_score(self, package: Package) -> int:
@@ -400,12 +359,12 @@ class PackageService:
     def publish_to_secure_repo(self, package: Package) -> bool:
         """Publish package to secure repository using real npm publish"""
         try:
-
             # Get the target repository URL
-            self._load_config()
-            target_url = self.target_repo_url or SECURE_REPO_URL
+            target_url = self.target_repo_url or TARGET_REPOSITORY_URL
             if not target_url:
-                raise ValueError("SECURE_REPO_URL environment variable is required")
+                raise ValueError(
+                    "TARGET_REPOSITORY_URL environment variable is required"
+                )
 
             logger.info(
                 f"Publishing {package.name}@{package.version} to repository at {target_url}"
@@ -455,9 +414,13 @@ class PackageService:
                         "This package has been validated and approved by the Secure Package Manager.\n\n"
                     )
                     f.write("## Security Information\n\n")
-                    f.write(f'- Security Score: {package.security_score or "N/A"}\n')
+                    f.write(
+                        f'- Security Score: {package.package_status.security_score if package.package_status else "N/A"}\n'
+                    )
                     f.write(f'- License: {package.license_identifier or "N/A"}\n')
-                    f.write(f"- Status: {package.status}\n")
+                    f.write(
+                        f"- Status: {package.package_status.status if package.package_status else 'N/A'}\n"
+                    )
 
                 # Set npm registry to our secure repository
                 registry_url = target_url.rstrip("/")

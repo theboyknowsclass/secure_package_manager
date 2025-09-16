@@ -82,8 +82,8 @@ ADFS_SSO_URL=https://your-adfs-server.com/adfs/ls/
 
 #### Optional
 ```bash
-NPM_PROXY_URL=https://registry.npmjs.org
-SECURE_REPO_URL=https://your-secure-registry.com
+SOURCE_REPOSITORY_URL=https://registry.npmjs.org
+TARGET_REPOSITORY_URL=https://your-secure-registry.com
 FRONTEND_API_URL=https://your-api-domain.com
 TRIVY_TIMEOUT=300
 TRIVY_MAX_RETRIES=3

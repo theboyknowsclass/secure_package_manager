@@ -3,13 +3,17 @@
 
 echo "🛑 Stopping development environment..."
 
+# Ensure we're using the correct Docker context
+echo "🔧 Setting Docker context..."
+docker context use default
+
 # Stop and remove all containers
 echo "📦 Stopping containers..."
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml down
+docker compose --env-file .env.development -f docker-compose.base.yml -f docker-compose.dev.yml down
 
 # Remove volumes (optional - uncomment if you want to completely reset)
 # echo "🗑️  Removing volumes..."
-# docker-compose -f docker-compose.yml -f docker-compose.dev.yml down -v
+# docker compose --env-file .env.development -f docker-compose.base.yml -f docker-compose.dev.yml down -v
 
 # Remove any dangling images (optional)
 # echo "🧹 Cleaning up dangling images..."

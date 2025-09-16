@@ -1,10 +1,11 @@
 import json
 import logging
+from datetime import datetime
 from typing import Any, Dict, Union
 
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
-from models import Application, Package, PackageReference, PackageRequest, db
+from models import Package, Request, RequestPackage, db
 from services.auth_service import AuthService
 from services.package_service import PackageService
 
@@ -33,18 +34,15 @@ def upload_package_lock() -> ResponseReturnValue:
         if isinstance(package_data, tuple):  # Error response
             return package_data
 
-        # Get or create application record
-        application = _get_or_create_application(package_data)
-
-        # Create package request
-        package_request = _create_package_request(application, package_data)
+        # Create request record
+        request_record = _create_request(package_data)
 
         # Process packages and handle validation errors
-        result = _process_package_validation(package_request, package_data)
+        result = _process_package_validation(request_record, package_data)
         if isinstance(result, tuple):  # Error response
             return result
 
-        return _create_success_response(package_request, application, package_data)
+        return _create_success_response(request_record, package_data)
 
     except Exception as e:
         logger.error(f"Upload error: {str(e)}")
@@ -91,56 +89,46 @@ def _parse_package_lock_file(file: Any) -> Union[Dict[str, Any], ResponseReturnV
     return package_data
 
 
-def _get_or_create_application(package_data: Dict[str, Any]) -> Application:
-    """Get existing application or create a new one"""
+def _create_request(package_data: Dict[str, Any]) -> Request:
+    """Create a new request record"""
     app_name = package_data.get("name", "Unknown Application")
     app_version = package_data.get("version", "1.0.0")
 
-    # Check if application already exists
-    application: Application | None = Application.query.filter_by(
-        name=app_name, version=app_version
-    ).first()
-
-    if not application:
-        # Create new application record
-        application = Application(
-            name=app_name, version=app_version, created_by=request.user.id
-        )
-        db.session.add(application)
-        db.session.commit()
-    else:
-        logger.info(f"Reusing existing application: {app_name} v{app_version}")
-
-    return application
-
-
-def _create_package_request(
-    application: Application, package_data: Dict[str, Any]
-) -> PackageRequest:
-    """Create a new package request record"""
-    package_request = PackageRequest(
-        application_id=application.id,
+    request_record = Request(
+        application_name=app_name,
+        version=app_version,
         requestor_id=request.user.id,
         package_lock_file=json.dumps(package_data),
-        status="requested",
     )
-    db.session.add(package_request)
+    db.session.add(request_record)
     db.session.commit()
-    return package_request
+    return request_record
 
 
 def _process_package_validation(
-    package_request: PackageRequest, package_data: Dict[str, Any]
+    request_record: Request, package_data: Dict[str, Any]
 ) -> ResponseReturnValue | None:
     """Process package validation and handle errors"""
     try:
-        package_service.process_package_lock(package_request.id, package_data)
+        package_service.process_package_lock(request_record.id, package_data)
         return None  # Success
     except ValueError as ve:
         # Handle validation errors (unsupported lockfile version, wrong file type, etc.)
         logger.warning(f"Package validation error: {str(ve)}")
-        # Update request status to rejected
-        package_request.status = "rejected"
+
+        # Update package statuses to reflect error
+        packages = (
+            db.session.query(Package)
+            .join(RequestPackage)
+            .filter(RequestPackage.request_id == request_record.id)
+            .all()
+        )
+
+        for package in packages:
+            if package.package_status:
+                package.package_status.status = "Rejected"
+                package.package_status.updated_at = datetime.utcnow()
+
         db.session.commit()
 
         return (
@@ -148,7 +136,7 @@ def _process_package_validation(
                 {
                     "error": "Package validation failed",
                     "details": str(ve),
-                    "request_id": package_request.id,
+                    "request_id": request_record.id,
                 }
             ),
             400,
@@ -156,8 +144,7 @@ def _process_package_validation(
 
 
 def _create_success_response(
-    package_request: PackageRequest,
-    application: Application,
+    request_record: Request,
     package_data: Dict[str, Any],
 ) -> ResponseReturnValue:
     """Create success response for package upload"""
@@ -168,9 +155,8 @@ def _create_success_response(
         jsonify(
             {
                 "message": "Package lock file uploaded successfully",
-                "request_id": package_request.id,
+                "request_id": request_record.id,
                 "application": {
-                    "id": application.id,
                     "name": app_name,
                     "version": app_version,
                 },
@@ -185,47 +171,75 @@ def _create_success_response(
 def get_package_request(request_id: int) -> ResponseReturnValue:
     """Get package request details"""
     try:
-        package_request = PackageRequest.query.get_or_404(request_id)
+        request_record = Request.query.get_or_404(request_id)
 
         # Check if user has access to this request
         if (
             not request.user.is_admin()
-            and package_request.requestor_id != request.user.id
+            and request_record.requestor_id != request.user.id
         ):
             return jsonify({"error": "Access denied"}), 403
 
-        packages = Package.query.filter_by(package_request_id=request_id).all()
+        # Get packages for this request
+        packages = (
+            db.session.query(Package)
+            .join(RequestPackage)
+            .filter(RequestPackage.request_id == request_id)
+            .all()
+        )
+
+        # Get request status from status manager
+        from services.package_request_status_manager import PackageRequestStatusManager
+
+        status_manager = PackageRequestStatusManager()
+        status_summary = status_manager.get_request_status_summary(request_id)
 
         return (
             jsonify(
                 {
                     "request": {
-                        "id": package_request.id,
-                        "status": package_request.status,
-                        "total_packages": package_request.total_packages,
-                        "validated_packages": package_request.validated_packages,
-                        "created_at": package_request.created_at.isoformat(),
-                        "application": {
-                            "id": package_request.application.id,
-                            "name": package_request.application.name,
-                            "version": package_request.application.version,
+                        "id": request_record.id,
+                        "application_name": request_record.application_name,
+                        "version": request_record.version,
+                        "status": status_summary["current_status"],
+                        "total_packages": status_summary["total_packages"],
+                        "completion_percentage": status_summary[
+                            "completion_percentage"
+                        ],
+                        "created_at": request_record.created_at.isoformat(),
+                        "requestor": {
+                            "id": request_record.requestor.id,
+                            "username": request_record.requestor.username,
+                            "full_name": request_record.requestor.full_name,
                         },
+                        "package_counts": status_summary["package_counts"],
                     },
                     "packages": [
                         {
                             "id": pkg.id,
                             "name": pkg.name,
                             "version": pkg.version,
-                            "status": pkg.status,
-                            "security_score": pkg.security_score,
-                            "license_score": pkg.license_score,
-                            "security_scan_status": pkg.security_scan_status,
-                            "vulnerability_count": pkg.vulnerability_count,
-                            "critical_vulnerabilities": pkg.critical_vulnerabilities,
-                            "high_vulnerabilities": pkg.high_vulnerabilities,
-                            "medium_vulnerabilities": pkg.medium_vulnerabilities,
-                            "low_vulnerabilities": pkg.low_vulnerabilities,
-                            "validation_errors": pkg.validation_errors or [],
+                            "status": (
+                                pkg.package_status.status
+                                if pkg.package_status
+                                else "Requested"
+                            ),
+                            "security_score": (
+                                pkg.package_status.security_score
+                                if pkg.package_status
+                                else None
+                            ),
+                            "license_score": (
+                                pkg.package_status.license_score
+                                if pkg.package_status
+                                else None
+                            ),
+                            "security_scan_status": (
+                                pkg.package_status.security_scan_status
+                                if pkg.package_status
+                                else "pending"
+                            ),
+                            "license_identifier": pkg.license_identifier,
                         }
                         for pkg in packages
                     ],
@@ -245,89 +259,35 @@ def list_package_requests() -> ResponseReturnValue:
     """List package requests for the user"""
     try:
         if request.user.is_admin():
-            requests = PackageRequest.query.all()
+            requests = Request.query.all()
         else:
-            requests = PackageRequest.query.filter_by(
-                requestor_id=request.user.id
-            ).all()
+            requests = Request.query.filter_by(requestor_id=request.user.id).all()
 
         result_requests = []
         for req in requests:
-            # Get packages for this request (newly created packages)
-            packages = Package.query.filter_by(package_request_id=req.id).all()
+            # Get request status from status manager (this already includes package counts)
+            from services.package_request_status_manager import (
+                PackageRequestStatusManager,
+            )
 
-            # Get package references (all packages mentioned in package-lock.json)
-            package_references = PackageReference.query.filter_by(
-                package_request_id=req.id
-            ).all()
-
-            # Combine both for display
-            all_packages = []
-
-            # Add newly created packages
-            for pkg in packages:
-                all_packages.append(
-                    {
-                        "id": pkg.id,
-                        "name": pkg.name,
-                        "version": pkg.version,
-                        "status": pkg.status,
-                        "security_score": pkg.security_score,
-                        "license_score": pkg.license_score,
-                        "license_identifier": pkg.license_identifier,
-                        "security_scan_status": pkg.security_scan_status,
-                        "vulnerability_count": pkg.vulnerability_count,
-                        "critical_vulnerabilities": pkg.critical_vulnerabilities,
-                        "high_vulnerabilities": pkg.high_vulnerabilities,
-                        "medium_vulnerabilities": pkg.medium_vulnerabilities,
-                        "low_vulnerabilities": pkg.low_vulnerabilities,
-                        "validation_errors": pkg.validation_errors or [],
-                        "type": "new",
-                    }
-                )
-
-            # Add existing validated packages that were referenced
-            for ref in package_references:
-                if ref.status == "already_validated" and ref.existing_package_id:
-                    existing_pkg = Package.query.get(ref.existing_package_id)
-                    if existing_pkg:
-                        all_packages.append(
-                            {
-                                "id": existing_pkg.id,
-                                "name": ref.name,
-                                "version": ref.version,
-                                "status": "already_validated",
-                                "security_score": existing_pkg.security_score,
-                                "license_identifier": existing_pkg.license_identifier,
-                                "security_scan_status": existing_pkg.security_scan_status,
-                                "vulnerability_count": existing_pkg.vulnerability_count,
-                                "critical_vulnerabilities": existing_pkg.critical_vulnerabilities,
-                                "high_vulnerabilities": existing_pkg.high_vulnerabilities,
-                                "medium_vulnerabilities": existing_pkg.medium_vulnerabilities,
-                                "low_vulnerabilities": existing_pkg.low_vulnerabilities,
-                                "validation_errors": [],
-                                "type": "existing",
-                            }
-                        )
+            status_manager = PackageRequestStatusManager()
+            status_summary = status_manager.get_request_status_summary(req.id)
 
             result_requests.append(
                 {
                     "id": req.id,
-                    "status": req.status,
-                    "total_packages": req.total_packages,
-                    "validated_packages": req.validated_packages,
+                    "application_name": req.application_name,
+                    "version": req.version,
+                    "status": status_summary["current_status"],
+                    "total_packages": status_summary["total_packages"],
+                    "completion_percentage": status_summary["completion_percentage"],
                     "created_at": req.created_at.isoformat(),
-                    "updated_at": req.updated_at.isoformat(),
                     "requestor": {
                         "id": req.requestor.id,
                         "username": req.requestor.username,
                         "full_name": req.requestor.full_name,
                     },
-                    "application": {
-                        "name": req.application.name,
-                        "version": req.application.version,
-                    },
-                    "packages": all_packages,
+                    "package_counts": status_summary["package_counts"],
                 }
             )
 
@@ -346,11 +306,20 @@ def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
         package = Package.query.get_or_404(package_id)
 
         # Check if user has access to this package
-        if (
-            not request.user.is_admin()
-            and package.package_request.requestor_id != request.user.id
-        ):
-            return jsonify({"error": "Access denied"}), 403
+        if not request.user.is_admin():
+            # Check if user has access through any request
+            has_access = (
+                db.session.query(RequestPackage)
+                .join(Request)
+                .filter(
+                    RequestPackage.package_id == package_id,
+                    Request.requestor_id == request.user.id,
+                )
+                .first()
+            )
+
+            if not has_access:
+                return jsonify({"error": "Access denied"}), 403
 
         scan_status = package_service.get_package_security_scan_status(package_id)
 
@@ -382,11 +351,20 @@ def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
         package = Package.query.get_or_404(package_id)
 
         # Check if user has access to this package
-        if (
-            not request.user.is_admin()
-            and package.package_request.requestor_id != request.user.id
-        ):
-            return jsonify({"error": "Access denied"}), 403
+        if not request.user.is_admin():
+            # Check if user has access through any request
+            has_access = (
+                db.session.query(RequestPackage)
+                .join(Request)
+                .filter(
+                    RequestPackage.package_id == package_id,
+                    Request.requestor_id == request.user.id,
+                )
+                .first()
+            )
+
+            if not has_access:
+                return jsonify({"error": "Access denied"}), 403
 
         scan_report = package_service.get_package_security_scan_report(package_id)
 
@@ -421,11 +399,20 @@ def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
         package = Package.query.get_or_404(package_id)
 
         # Check if user has access to this package
-        if (
-            not request.user.is_admin()
-            and package.package_request.requestor_id != request.user.id
-        ):
-            return jsonify({"error": "Access denied"}), 403
+        if not request.user.is_admin():
+            # Check if user has access through any request
+            has_access = (
+                db.session.query(RequestPackage)
+                .join(Request)
+                .filter(
+                    RequestPackage.package_id == package_id,
+                    Request.requestor_id == request.user.id,
+                )
+                .first()
+            )
+
+            if not has_access:
+                return jsonify({"error": "Access denied"}), 403
 
         # Trigger new scan
         scan_result = package_service.trivy_service.scan_package(package)

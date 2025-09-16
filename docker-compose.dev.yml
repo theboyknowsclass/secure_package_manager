@@ -1,101 +1,46 @@
-# Development Docker Compose Configuration
-# Extends base config with dev-specific services and settings
-
-version: '3.8'
+# Development-specific overrides and additions
+# Use with: docker compose -f docker-compose.base.yml -f docker-compose.dev.yml up
 
 services:
-  # Override database for development
+  # Development database overrides
   db:
     volumes:
-      # Use dev-specific init script (in addition to base init.sql)
+      # Add dev-specific init script
       - ./database/init-dev.sql:/docker-entrypoint-initdb.d/01-init-dev.sql:ro
     ports:
       # Expose database port for direct access
       - "5432:5432"
 
-  # Override API for development
+  # Development API overrides
   api:
-    environment:
-      - FLASK_ENV=development
-      - FLASK_DEBUG=1
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/secure_package_manager
-      - LOG_LEVEL=DEBUG
-      # Application configuration
-      - APP_NAME=secure-package-manager
-      - FRONTEND_APP_NAME=secure-package-manager-frontend
-      # Network configuration
-      - FRONTEND_PORT=3000
-      - API_PORT=5000
-      - DATABASE_PORT=5432
-      - IDP_PORT=8081
-      - NPM_REGISTRY_PORT=8080
-      - TRIVY_PORT=4954
-      - LOCALHOST=localhost
-      - DOCKER_HOST=localhost
-      # Required environment variables
-      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-dev-secret-key-change-in-production}
-      - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
-      - IDP_SECRET_KEY=${IDP_SECRET_KEY:-idp-secret-key}
-      - OAUTH_AUDIENCE=${OAUTH_AUDIENCE:-secure-package-manager}
-      - OAUTH_ISSUER=${OAUTH_ISSUER:-http://localhost:8081}
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
-      - SECURE_REPO_URL=http://mock-npm-registry:8080
-      - TRIVY_URL=${TRIVY_URL:-http://trivy:4954}
-      - NPM_PROXY_URL=${NPM_PROXY_URL:-https://registry.npmjs.org}
-      - TRIVY_TIMEOUT=${TRIVY_TIMEOUT:-300}
-      - TRIVY_MAX_RETRIES=${TRIVY_MAX_RETRIES:-3}
-      # Database configuration
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=secure_package_manager
-      # Default admin users (development only)
-      - DEFAULT_ADMIN_USERNAME=admin
-      - DEFAULT_ADMIN_PASSWORD=admin
-      - DEFAULT_ADMIN_EMAIL=admin@company.com
-      # Use mock services for development
-      - ADFS_ENTITY_ID=${ADFS_ENTITY_ID:-http://localhost:3000}
-      - ADFS_SSO_URL=${ADFS_SSO_URL:-http://localhost:8081/sso}
-    volumes:
-      # Mount source code for hot reloading
-      - ./backend:/app
     ports:
-      # Expose API port
+      # Expose API port for direct access
       - "5000:5000"
 
-  # Override frontend for development
+  # Development frontend overrides
   frontend:
-    environment:
-      - NODE_ENV=development
-      - VITE_API_URL=${FRONTEND_API_URL:-http://localhost:5000}
-      - VITE_ADFS_ENTITY_ID=${ADFS_ENTITY_ID:-http://localhost:3000}
-      - VITE_ADFS_SSO_URL=${ADFS_SSO_URL:-http://localhost:8081/sso}
-    volumes:
-      # Mount source code for hot reloading
-      - ./frontend:/app
-      - /app/node_modules
     ports:
       # Expose frontend port
       - "3000:3000"
 
-  # Mock IDP for Development (DEV ONLY)
+  # Development Trivy overrides
+  trivy:
+    ports:
+      # Expose trivy port for direct access
+      - "${TRIVY_PORT}:${TRIVY_PORT}"
+
+  # Development-only services
   mock-idp:
     build:
       context: ./mock-idp
       dockerfile: Dockerfile
-    environment:
-      - IDP_ENTITY_ID=${ADFS_ENTITY_ID:-http://localhost:3000}
-      - IDP_SSO_URL=${ADFS_SSO_URL:-http://localhost:8081/sso}
-      - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
-      - IDP_SECRET_KEY=${IDP_SECRET_KEY:-idp-secret-key}
-      - OAUTH_AUDIENCE=${OAUTH_AUDIENCE:-secure-package-manager}
-      - OAUTH_ISSUER=${OAUTH_ISSUER:-http://localhost:8081}
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+    env_file:
+      - .env.development
     ports:
       - "8081:8081"
     networks:
       - app-network
 
-  # Mock Secure NPM Registry (DEV ONLY)
   mock-npm-registry:
     build:
       context: ./mock-npm-registry
@@ -108,12 +53,6 @@ services:
       - npm_storage:/app/storage
     networks:
       - app-network
-
-  # Override Trivy for development
-  trivy:
-    ports:
-      # Expose trivy port for direct access (different from mock registry)
-      - "4954:4954"
 
 volumes:
   # Add dev-specific volumes

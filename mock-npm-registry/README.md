@@ -148,7 +148,7 @@ See `package.json` for complete dependency list.
 
 The mock registry is configured as the package source in the development environment:
 
-- **Environment Variable**: `SECURE_REPO_URL=http://mock-npm-registry:8080`
+- **Environment Variable**: `TARGET_REPOSITORY_URL=http://mock-npm-registry:8080`
 - **Package Service**: Uses this URL for downloading packages
 - **Trivy Integration**: Downloaded packages are scanned for vulnerabilities
 
