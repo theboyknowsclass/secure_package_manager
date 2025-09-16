@@ -25,6 +25,7 @@ import {
 import { MaterialReactTable, type MRT_ColumnDef } from "material-react-table";
 import { Visibility, Download, Close } from "@mui/icons-material";
 import { api, endpoints } from "../services/api";
+import { PACKAGE_STATUS, type PackageStatus } from "../types/status";
 
 interface Package {
   id: number;
@@ -592,7 +593,7 @@ export default function RequestStatus() {
 }
 
 function getRequestStatusColor(
-  status: string
+  status: PackageStatus
 ):
   | "default"
   | "primary"
@@ -602,44 +603,44 @@ function getRequestStatusColor(
   | "success"
   | "warning" {
   switch (status) {
-    case "requested":
+    case PACKAGE_STATUS.REQUESTED:
       return "default";
-    case "performing_licence_check":
+    case PACKAGE_STATUS.PERFORMING_LICENCE_CHECK:
       return "warning";
-    case "licence_check_complete":
+    case PACKAGE_STATUS.LICENCE_CHECK_COMPLETE:
       return "info";
-    case "performing_security_scan":
+    case PACKAGE_STATUS.PERFORMING_SECURITY_SCAN:
       return "warning";
-    case "security_scan_complete":
+    case PACKAGE_STATUS.SECURITY_SCAN_COMPLETE:
       return "info";
-    case "pending_approval":
+    case PACKAGE_STATUS.PENDING_APPROVAL:
       return "warning";
-    case "approved":
+    case PACKAGE_STATUS.APPROVED:
       return "success";
-    case "rejected":
+    case PACKAGE_STATUS.REJECTED:
       return "error";
     default:
       return "default";
   }
 }
 
-function getRequestStatusLabel(status: string): string {
+function getRequestStatusLabel(status: PackageStatus): string {
   switch (status) {
-    case "requested":
+    case PACKAGE_STATUS.REQUESTED:
       return "Requested";
-    case "performing_licence_check":
+    case PACKAGE_STATUS.PERFORMING_LICENCE_CHECK:
       return "Checking Licenses";
-    case "licence_check_complete":
+    case PACKAGE_STATUS.LICENCE_CHECK_COMPLETE:
       return "License Check Complete";
-    case "performing_security_scan":
+    case PACKAGE_STATUS.PERFORMING_SECURITY_SCAN:
       return "Scanning Security";
-    case "security_scan_complete":
+    case PACKAGE_STATUS.SECURITY_SCAN_COMPLETE:
       return "Security Scan Complete";
-    case "pending_approval":
+    case PACKAGE_STATUS.PENDING_APPROVAL:
       return "Pending Approval";
-    case "approved":
+    case PACKAGE_STATUS.APPROVED:
       return "Approved";
-    case "rejected":
+    case PACKAGE_STATUS.REJECTED:
       return "Rejected";
     default:
       return status;
@@ -647,7 +648,7 @@ function getRequestStatusLabel(status: string): string {
 }
 
 function getPackageStatusColor(
-  status: string
+  status: PackageStatus
 ):
   | "default"
   | "primary"
@@ -657,44 +658,44 @@ function getPackageStatusColor(
   | "success"
   | "warning" {
   switch (status) {
-    case "requested":
+    case PACKAGE_STATUS.REQUESTED:
       return "default";
-    case "performing_licence_check":
+    case PACKAGE_STATUS.PERFORMING_LICENCE_CHECK:
       return "warning";
-    case "licence_check_complete":
+    case PACKAGE_STATUS.LICENCE_CHECK_COMPLETE:
       return "info";
-    case "performing_security_scan":
+    case PACKAGE_STATUS.PERFORMING_SECURITY_SCAN:
       return "warning";
-    case "security_scan_complete":
+    case PACKAGE_STATUS.SECURITY_SCAN_COMPLETE:
       return "info";
-    case "pending_approval":
+    case PACKAGE_STATUS.PENDING_APPROVAL:
       return "warning";
-    case "approved":
+    case PACKAGE_STATUS.APPROVED:
       return "success";
-    case "rejected":
+    case PACKAGE_STATUS.REJECTED:
       return "error";
     default:
       return "default";
   }
 }
 
-function getPackageStatusLabel(status: string): string {
+function getPackageStatusLabel(status: PackageStatus): string {
   switch (status) {
-    case "requested":
+    case PACKAGE_STATUS.REQUESTED:
       return "Requested";
-    case "performing_licence_check":
+    case PACKAGE_STATUS.PERFORMING_LICENCE_CHECK:
       return "Checking License";
-    case "licence_check_complete":
+    case PACKAGE_STATUS.LICENCE_CHECK_COMPLETE:
       return "License OK";
-    case "performing_security_scan":
+    case PACKAGE_STATUS.PERFORMING_SECURITY_SCAN:
       return "Scanning";
-    case "security_scan_complete":
+    case PACKAGE_STATUS.SECURITY_SCAN_COMPLETE:
       return "Scan Complete";
-    case "pending_approval":
+    case PACKAGE_STATUS.PENDING_APPROVAL:
       return "Pending Approval";
-    case "approved":
+    case PACKAGE_STATUS.APPROVED:
       return "Approved";
-    case "rejected":
+    case PACKAGE_STATUS.REJECTED:
       return "Rejected";
     default:
       return status;

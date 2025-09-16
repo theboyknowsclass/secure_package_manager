@@ -30,6 +30,12 @@ class LicenseService:
             if not license_identifier:
                 return self._create_no_license_result()
 
+            # Check if this is a complex license expression
+            if self._is_complex_license_expression(license_identifier):
+                return self._validate_complex_license_expression(
+                    license_identifier, package_name
+                )
+
             # Look up license in database
             license = self._lookup_license_in_db(license_identifier)
             if not license:
@@ -233,3 +239,155 @@ class LicenseService:
         except Exception as e:
             self.logger.error(f"Error checking license support: {str(e)}")
             return False
+
+    def _is_complex_license_expression(self, license_identifier):
+        """Check if the license identifier is a complex expression with OR/AND operators"""
+        if not license_identifier:
+            return False
+
+        # Check for common complex expression patterns
+        complex_patterns = [" OR ", " AND ", "(", ")", "|", "&"]
+
+        return any(
+            pattern in license_identifier.upper() for pattern in complex_patterns
+        )
+
+    def _validate_complex_license_expression(self, license_expression, package_name):
+        """Validate complex license expressions like (MIT OR CC0-1.0)"""
+        try:
+            # Parse the license expression to extract individual licenses
+            individual_licenses = self._parse_license_expression(license_expression)
+
+            if not individual_licenses:
+                return self._create_unknown_license_result(license_expression)
+
+            # For OR expressions, use the best (highest scoring) license
+            # For AND expressions, use the worst (lowest scoring) license
+            if " OR " in license_expression.upper() or "|" in license_expression:
+                return self._validate_or_expression(
+                    individual_licenses, license_expression, package_name
+                )
+            elif " AND " in license_expression.upper() or "&" in license_expression:
+                return self._validate_and_expression(
+                    individual_licenses, license_expression, package_name
+                )
+            else:
+                # Default to OR behavior for complex expressions
+                return self._validate_or_expression(
+                    individual_licenses, license_expression, package_name
+                )
+
+        except Exception as e:
+            self.logger.error(
+                f"Error validating complex license expression '{license_expression}': {str(e)}"
+            )
+            return {
+                "score": 0,
+                "errors": [f"Failed to parse license expression: {license_expression}"],
+                "warnings": [],
+            }
+
+    def _parse_license_expression(self, license_expression):
+        """Parse a license expression to extract individual license identifiers"""
+        # Remove parentheses and normalize
+        cleaned = license_expression.replace("(", "").replace(")", "").strip()
+
+        # Split by OR/AND operators
+        licenses = []
+        for separator in [" OR ", " AND ", "|", "&"]:
+            if separator in cleaned.upper():
+                licenses = [
+                    license.strip() for license in cleaned.upper().split(separator)
+                ]
+                break
+
+        # If no separators found, treat as single license
+        if not licenses:
+            licenses = [cleaned]
+
+        # Clean up each license identifier
+        cleaned_licenses = []
+        for license in licenses:
+            cleaned_license = license.strip()
+            if cleaned_license:
+                cleaned_licenses.append(cleaned_license)
+
+        return cleaned_licenses
+
+    def _validate_or_expression(
+        self, individual_licenses, original_expression, package_name
+    ):
+        """Validate OR expression - use the best (highest scoring) license"""
+        best_score = 0
+        best_result = None
+        all_errors = []
+        all_warnings = []
+
+        for license_id in individual_licenses:
+            # Look up each license
+            license = self._lookup_license_in_db(license_id)
+            if license:
+                result = self._validate_license_status(
+                    license, license_id, package_name
+                )
+                if result["score"] > best_score:
+                    best_score = result["score"]
+                    best_result = result
+            else:
+                all_errors.append(f'License "{license_id}" is not recognized')
+                all_warnings.append(
+                    f'License "{license_id}" is not in the license database'
+                )
+
+        if best_result:
+            # Add information about the OR expression
+            best_result["warnings"].append(
+                f"Using best license from OR expression: {original_expression}"
+            )
+            return best_result
+        else:
+            return {
+                "score": 0,
+                "errors": all_errors,
+                "warnings": all_warnings,
+            }
+
+    def _validate_and_expression(
+        self, individual_licenses, original_expression, package_name
+    ):
+        """Validate AND expression - use the worst (lowest scoring) license"""
+        worst_score = 100
+        worst_result = None
+        all_errors = []
+        all_warnings = []
+        valid_licenses = []
+
+        for license_id in individual_licenses:
+            # Look up each license
+            license = self._lookup_license_in_db(license_id)
+            if license:
+                result = self._validate_license_status(
+                    license, license_id, package_name
+                )
+                valid_licenses.append(result)
+                if result["score"] < worst_score:
+                    worst_score = result["score"]
+                    worst_result = result
+            else:
+                all_errors.append(f'License "{license_id}" is not recognized')
+                all_warnings.append(
+                    f'License "{license_id}" is not in the license database'
+                )
+
+        if worst_result:
+            # Add information about the AND expression
+            worst_result["warnings"].append(
+                f"Using worst license from AND expression: {original_expression}"
+            )
+            return worst_result
+        else:
+            return {
+                "score": 0,
+                "errors": all_errors,
+                "warnings": all_warnings,
+            }

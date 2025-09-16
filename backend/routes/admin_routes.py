@@ -24,7 +24,14 @@ def approve_package(package_id):
         package = Package.query.get_or_404(package_id)
 
         if package.status != "pending_approval":
-            return jsonify({"error": "Package must be pending approval before it can be approved"}), 400
+            return (
+                jsonify(
+                    {
+                        "error": "Package must be pending approval before it can be approved"
+                    }
+                ),
+                400,
+            )
 
         # Approve the package
         package.status = "approved"
@@ -69,7 +76,12 @@ def reject_package(package_id):
         package = Package.query.get_or_404(package_id)
 
         if package.status in ["approved", "published"]:
-            return jsonify({"error": "Cannot reject an already approved or published package"}), 400
+            return (
+                jsonify(
+                    {"error": "Cannot reject an already approved or published package"}
+                ),
+                400,
+            )
 
         # Get rejection reason from request body
         data = request.get_json() or {}
@@ -178,6 +190,7 @@ def get_validated_packages():
                         "name": pkg.name,
                         "version": pkg.version,
                         "security_score": pkg.security_score or 0,
+                        "license_score": pkg.license_score,
                         "license_identifier": pkg.license_identifier or "Unknown",
                         "validation_errors": pkg.validation_errors or [],
                         "request": request_data,

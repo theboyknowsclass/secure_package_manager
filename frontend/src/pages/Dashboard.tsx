@@ -12,10 +12,16 @@ import {
 } from "@mui/material";
 import { useAuth } from "../hooks/useAuth";
 import { api, endpoints } from "../services/api";
+import { 
+  PACKAGE_STATUS, 
+  type PackageStatus,
+  isPendingStatus,
+  isCompletedStatus 
+} from "../types/status";
 
 interface PackageRequest {
   id: number;
-  status: string;
+  status: PackageStatus;
   total_packages: number;
   validated_packages: number;
   created_at: string;
@@ -61,14 +67,11 @@ export default function Dashboard() {
   const totalRequests = requests?.length || 0;
   const pendingRequests =
     requests?.filter(
-      (r) => r.status === "requested" || r.status === "validating"
+      (r) => !isCompletedStatus(r.status)
     ).length || 0;
   const completedRequests =
     requests?.filter(
-      (r) =>
-        r.status === "validated" ||
-        r.status === "approved" ||
-        r.status === "published"
+      (r) => isCompletedStatus(r.status)
     ).length || 0;
 
   return (
@@ -189,21 +192,22 @@ export default function Dashboard() {
   );
 }
 
-function getStatusColor(status: string): string {
+function getStatusColor(status: PackageStatus): string {
   switch (status) {
-    case "requested":
-      return "#1976d2";
-    case "validating":
-      return "#ed6c02";
-    case "validated":
-      return "#2e7d32";
-    case "approved":
-      return "#9c27b0";
-    case "published":
-      return "#388e3c";
-    case "rejected":
-      return "#d32f2f";
+    case PACKAGE_STATUS.REQUESTED:
+      return "#757575"; // Grey
+    case PACKAGE_STATUS.PERFORMING_LICENCE_CHECK:
+    case PACKAGE_STATUS.PERFORMING_SECURITY_SCAN:
+    case PACKAGE_STATUS.PENDING_APPROVAL:
+      return "#ed6c02"; // Orange/Warning
+    case PACKAGE_STATUS.LICENCE_CHECK_COMPLETE:
+    case PACKAGE_STATUS.SECURITY_SCAN_COMPLETE:
+      return "#1976d2"; // Blue/Info
+    case PACKAGE_STATUS.APPROVED:
+      return "#2e7d32"; // Green/Success
+    case PACKAGE_STATUS.REJECTED:
+      return "#d32f2f"; // Red/Error
     default:
-      return "#757575";
+      return "#757575"; // Grey
   }
 }

@@ -34,15 +34,22 @@ import {
   Warning
 } from "@mui/icons-material";
 import { api, endpoints } from "../services/api";
+import { 
+  PACKAGE_STATUS, 
+  LICENSE_STATUS,
+  type PackageStatus,
+  type LicenseStatus,
+  isPendingApprovalStatus
+} from "../types/status";
 
 interface Package {
   id: number;
   name: string;
   version: string;
-  status: string;
+  status: PackageStatus;
   security_score: number | null;
   license_identifier: string | null;
-  license_status?: string; // "always_allowed", "allowed", "avoid", "blocked"
+  license_status?: LicenseStatus;
   license_score?: number;
   validation_errors: string[];
   type?: "new" | "existing";
@@ -54,7 +61,7 @@ interface Package {
 
 interface PackageRequest {
   id: number;
-  status: string;
+  status: PackageStatus;
   total_packages: number;
   validated_packages: number;
   created_at: string;
@@ -398,7 +405,7 @@ export default function ApprovalDashboard() {
     
     return requests.filter(request => 
       request.packages.some(pkg => 
-        pkg.status === "pending_approval"
+        isPendingApprovalStatus(pkg.status)
       )
     );
   }, [requests]);
@@ -406,11 +413,11 @@ export default function ApprovalDashboard() {
   // Transform data for the table
   const tableData = useMemo(() => {
     return approvalRequests.map((request) => {
-      const pendingPackages = request.packages.filter(pkg => pkg.status === "pending_approval");
-      const approvedPackages = request.packages.filter(pkg => pkg.status === "approved");
-      const rejectedPackages = request.packages.filter(pkg => pkg.status === "rejected");
+      const pendingPackages = request.packages.filter(pkg => pkg.status === PACKAGE_STATUS.PENDING_APPROVAL);
+      const approvedPackages = request.packages.filter(pkg => pkg.status === PACKAGE_STATUS.APPROVED);
+      const rejectedPackages = request.packages.filter(pkg => pkg.status === PACKAGE_STATUS.REJECTED);
       const processingPackages = request.packages.filter(pkg => 
-        !["pending_approval", "approved", "rejected"].includes(pkg.status)
+        ![PACKAGE_STATUS.PENDING_APPROVAL, PACKAGE_STATUS.APPROVED, PACKAGE_STATUS.REJECTED].includes(pkg.status)
       );
       
       return {
@@ -990,16 +997,16 @@ function getPackageStatusLabel(status: string): string {
   }
 }
 
-function getLicenseStatusColor(licenseIdentifier: string, licenseStatus?: string) {
+function getLicenseStatusColor(licenseIdentifier: string, licenseStatus?: LicenseStatus) {
   // Use database license status if available
   if (licenseStatus) {
     switch (licenseStatus) {
-      case "always_allowed":
-      case "allowed":
+      case LICENSE_STATUS.ALWAYS_ALLOWED:
+      case LICENSE_STATUS.ALLOWED:
         return "success";
-      case "avoid":
+      case LICENSE_STATUS.AVOID:
         return "warning";
-      case "blocked":
+      case LICENSE_STATUS.BLOCKED:
         return "error";
       default:
         return "default";
@@ -1034,16 +1041,16 @@ function getLicenseStatusColor(licenseIdentifier: string, licenseStatus?: string
   }
 }
 
-function getLicenseCategory(licenseIdentifier: string, licenseStatus?: string): string {
+function getLicenseCategory(licenseIdentifier: string, licenseStatus?: LicenseStatus): string {
   // Use database license status if available
   if (licenseStatus) {
     switch (licenseStatus) {
-      case "always_allowed":
-      case "allowed":
+      case LICENSE_STATUS.ALWAYS_ALLOWED:
+      case LICENSE_STATUS.ALLOWED:
         return "Allowed";
-      case "avoid":
+      case LICENSE_STATUS.AVOID:
         return "Avoid";
-      case "blocked":
+      case LICENSE_STATUS.BLOCKED:
         return "Blocked";
       default:
         return "Review";

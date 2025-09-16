@@ -8,12 +8,13 @@ from config.constants import SECURE_REPO_URL
 from models import (
     Package,
     PackageRequest,
-    PackageValidation,
     RepositoryConfig,
     db,
 )
 
 from .license_service import LicenseService
+from .package_processor import PackageProcessor
+from .package_request_status_manager import PackageRequestStatusManager
 from .trivy_service import TrivyService
 
 logger = logging.getLogger(__name__)
@@ -170,10 +171,10 @@ class PackageService:
         """Filter packages to find new ones that need processing"""
         packages_to_process = []
         existing_packages = []
-        
+
         # First, deduplicate packages by name+version within the same lock file
         unique_packages = {}
-        
+
         for package_path, package_info in packages.items():
             if package_path == "":  # Skip root package
                 continue
@@ -189,22 +190,24 @@ class PackageService:
 
             # Use name+version as the key to deduplicate
             package_key = f"{package_name}@{package_version}"
-            
+
             # Keep the first occurrence of each unique package
             if package_key not in unique_packages:
                 unique_packages[package_key] = {
-                    'name': package_name,
-                    'version': package_version,
-                    'info': package_info
+                    "name": package_name,
+                    "version": package_version,
+                    "info": package_info,
                 }
 
-        logger.info(f"Deduplicated {len(packages)} package entries to {len(unique_packages)} unique packages")
+        logger.info(
+            f"Deduplicated {len(packages)} package entries to {len(unique_packages)} unique packages"
+        )
 
         # Now process the deduplicated packages
         for package_key, package_data in unique_packages.items():
-            package_name = package_data['name']
-            package_version = package_data['version']
-            package_info = package_data['info']
+            package_name = package_data["name"]
+            package_version = package_data["version"]
+            package_info = package_data["info"]
 
             # Check if package already exists in database
             existing_package = Package.query.filter_by(
@@ -275,260 +278,52 @@ class PackageService:
             db.session.commit()
 
     def _process_packages_async(self, request_id):
-        """Process packages asynchronously (simplified version)"""
+        """Process packages asynchronously (refactored version)"""
         try:
-            packages = Package.query.filter_by(package_request_id=request_id).all()
+            # Initialize services
+            status_manager = PackageRequestStatusManager(db.session)
+            package_processor = PackageProcessor(
+                self.license_service, self.trivy_service, db.session
+            )
 
-            for package in packages:
-                if package.status == "requested":
-                    self._download_and_validate_package(package)
+            # Process pending packages
+            processing_results = package_processor.process_pending_packages(request_id)
 
-            # Update request status
-            package_request = PackageRequest.query.get(request_id)
-            if package_request:
-                # Check if all packages are processed
-                pending_packages = Package.query.filter_by(
-                    package_request_id=request_id, status="requested"
-                ).count()
+            # Update request status based on results
+            new_status = status_manager.update_request_status(request_id)
 
-                if pending_packages == 0:
-                    # Check if any packages failed validation
-                    failed_packages = Package.query.filter_by(
-                        package_request_id=request_id, status="rejected"
-                    ).count()
+            # Log results
+            logger.info(
+                f"Processed {processing_results['processed']} packages for request {request_id}, "
+                f"new status: {new_status}"
+            )
 
-                    if failed_packages > 0:
-                        package_request.status = "rejected"
-                    else:
-                        # Check if all packages are pending approval
-                        pending_approval_packages = Package.query.filter_by(
-                            package_request_id=request_id, status="pending_approval"
-                        ).count()
-                        
-                        if pending_approval_packages == package_request.total_packages:
-                            package_request.status = "pending_approval"
-                        else:
-                            # Check if all packages have completed security scan
-                            completed_packages = Package.query.filter_by(
-                                package_request_id=request_id, status="security_scan_complete"
-                            ).count()
-                            
-                            if completed_packages == package_request.total_packages:
-                                package_request.status = "security_scan_complete"
-                            else:
-                                # Some packages are still processing
-                                processing_packages = Package.query.filter(
-                                    Package.package_request_id == request_id,
-                                    Package.status.in_(["performing_licence_check", "licence_check_complete", "performing_security_scan"])
-                                ).count()
-                                
-                                if processing_packages > 0:
-                                    package_request.status = "performing_security_scan"
-                                else:
-                                    package_request.status = "performing_licence_check"
-
-                    db.session.commit()
+            if processing_results["failed"] > 0:
+                logger.warning(
+                    f"Failed to process {processing_results['failed']} packages: "
+                    f"{processing_results['errors']}"
+                )
 
         except Exception as e:
             logger.error(
                 f"Error processing packages for request {request_id}: {str(e)}"
             )
+            self._handle_processing_error(request_id, e)
+
+    def _handle_processing_error(self, request_id: int, error: Exception):
+        """Handle errors during package processing"""
+        try:
             package_request = PackageRequest.query.get(request_id)
             if package_request:
                 package_request.status = "validation_failed"
                 db.session.commit()
-
-    def _download_and_validate_package(self, package):
-        """Validate package information from package-lock.json"""
-        try:
-            # Step 1: Perform license check
-            package.status = "performing_licence_check"
-            db.session.commit()
-
-            # Validate package information (license check)
-            if not self._validate_package_info(package):
-                package.status = "rejected"
-                package.validation_errors = ["Package validation failed"]
-                db.session.commit()
-                return False
-
-            # Create validation records
-            if not self._create_validation_records(package):
-                package.status = "rejected"
-                package.validation_errors = ["Failed to create validation records"]
-                db.session.commit()
-                return False
-
-            # Step 2: License check complete
-            package.status = "licence_check_complete"
-            db.session.commit()
-
-            # Step 3: Perform security scan
-            package.status = "performing_security_scan"
-            db.session.commit()
-
-            logger.info(
-                f"Starting security scan for package {package.name}@{package.version}"
-            )
-            scan_result = self.trivy_service.scan_package(package)
-
-            if scan_result["status"] == "failed":
-                logger.warning(
-                    f"Security scan failed for {package.name}@{package.version}: {scan_result.get('error', 'Unknown error')}"
-                )
-                # Don't fail the package validation if security scan fails, just log it
-                package.validation_errors = package.validation_errors or []
-                package.validation_errors.append(
-                    f"Security scan failed: {scan_result.get('error', 'Unknown error')}"
-                )
-            else:
                 logger.info(
-                    f"Security scan completed for {package.name}@{package.version}: {scan_result.get('vulnerability_count', 0)} vulnerabilities found"
+                    f"Updated request {request_id} status to validation_failed due to error"
                 )
-
-            # Step 4: Security scan complete - ready for manual approval
-            package.status = "pending_approval"
-            package.security_score = self._calculate_security_score(package)
-
-            # Update PackageRequest validated_packages count
-            package_request = PackageRequest.query.get(package.package_request_id)
-            if package_request:
-                # Count packages with status 'pending_approval' for this request
-                completed_count = Package.query.filter_by(
-                    package_request_id=package.package_request_id, status="pending_approval"
-                ).count()
-                package_request.validated_packages = completed_count
-
-                # Update request status based on processing progress
-                if completed_count == package_request.total_packages:
-                    package_request.status = "pending_approval"
-                elif completed_count > 0:
-                    package_request.status = "performing_security_scan"
-
-            db.session.commit()
-
-            return True
-
-        except Exception as e:
+        except Exception as commit_error:
             logger.error(
-                f"Error processing package {package.name}@{package.version}: {str(e)}"
+                f"Failed to update request status after error: {str(commit_error)}"
             )
-            package.status = "rejected"
-            package.validation_errors = [str(e)]
-            db.session.commit()
-            return False
-
-    def _validate_package_info(self, package):
-        """Validate package information from package-lock.json"""
-        try:
-            # Basic validation - check if we have the required information
-            if not package.name or not package.version:
-                logger.warning(
-                    f"Package {package.name}@{package.version} missing required information"
-                )
-                return False
-
-            # Log validation using configured repository
-            logger.info(
-                f"Validating package {package.name}@{package.version} from {self.source_repo_url}"
-            )
-
-            # In production, you would download and analyze the package from the source repository
-            # For now, we'll simulate this process
-            if not self._simulate_package_download(package):
-                logger.warning(
-                    f"Failed to download package {package.name}@{package.version} from {self.source_repo_url}"
-                )
-                package.validation_errors = [
-                    f"Failed to download package from {self.source_repo_url}"
-                ]
-                return False
-
-            # Validate license information (permissive for testing)
-            license_validation = self._validate_package_license(package)
-            if license_validation["score"] == 0:
-                # For testing, allow packages with missing licenses to proceed
-                logger.warning(
-                    f"Package {package.name}@{package.version} has license issues but allowing for testing: {license_validation['errors']}"
-                )
-                # Don't return False, just log the warning
-
-            logger.info(
-                f"Package {package.name}@{package.version} validated successfully (License: {package.license_identifier})"
-            )
-            return True
-
-        except Exception as e:
-            logger.error(
-                f"Error validating package info for {package.name}@{package.version}: {str(e)}"
-            )
-            return False
-
-    def _simulate_package_download(self, package):
-        """Simulate downloading package from source repository"""
-        try:
-            import random
-            import time
-
-            # Simulate download delay based on package size and network conditions
-            base_delay = 0.1  # Base delay in seconds
-            size_factor = 0.001  # Additional delay per MB
-            network_factor = random.uniform(0.5, 2.0)  # Simulate network variability
-
-            # Calculate simulated download time
-            estimated_size = random.uniform(1, 50)  # Simulate package size in MB
-            download_time = (base_delay + estimated_size * size_factor) * network_factor
-
-            # Simulate download
-            logger.info(
-                f"Downloading {package.name}@{package.version} from {self.source_repo_url} (simulated {download_time:.2f}s)"
-            )
-            time.sleep(min(download_time, 0.5))  # Cap actual sleep time for testing
-
-            # Simulate occasional download failures (disabled for testing)
-            if random.random() < 0.00:  # 0% failure rate for testing
-                logger.warning(
-                    f"Simulated download failure for {package.name}@{package.version}"
-                )
-                return False
-
-            logger.info(
-                f"Successfully downloaded {package.name}@{package.version} from {self.source_repo_url}"
-            )
-            return True
-
-        except Exception as e:
-            logger.error(
-                f"Error simulating package download for {package.name}@{package.version}: {str(e)}"
-            )
-            return False
-
-    def _validate_package_license(self, package):
-        """Validate package license information"""
-        try:
-            # Get package data from npm registry or package-lock.json
-            package_data = {
-                "name": package.name,
-                "version": package.version,
-                "license": package.license_identifier,  # This should be populated from package-lock.json
-            }
-
-            # Use license service to validate
-            validation_result = self.license_service.validate_package_license(
-                package_data
-            )
-
-            return validation_result
-
-        except Exception as e:
-            logger.error(
-                f"Error validating package license for {package.name}@{package.version}: {str(e)}"
-            )
-            return {
-                "score": 0,
-                "errors": [f"License validation failed: {str(e)}"],
-                "warnings": [],
-            }
 
     def _calculate_security_score(self, package):
         """Calculate security score for package based on Trivy scan results"""
@@ -669,30 +464,4 @@ class PackageService:
             logger.error(
                 f"Error publishing package {package.name}@{package.version}: {str(e)}"
             )
-            return False
-
-    def _create_validation_records(self, package):
-        """Create validation records for package"""
-        try:
-            # Create validation records based on actual validation results
-            validations = [
-                ("package_info", "passed", "Package information validated"),
-                ("license_check", "passed", "License validation passed"),
-                ("integrity_check", "passed", "Integrity hash verified"),
-            ]
-
-            for validation_type, status, details in validations:
-                validation = PackageValidation(
-                    package_id=package.id,
-                    validation_type=validation_type,
-                    status=status,
-                    details=details,
-                )
-                db.session.add(validation)
-
-            db.session.commit()
-            return True
-
-        except Exception as e:
-            logger.error(f"Error creating validation records: {str(e)}")
             return False

@@ -10,8 +10,8 @@ import sys
 
 
 def run_tests():
-    """Run the admin API tests"""
-    print("🚀 Starting Admin API Tests...")
+    """Run all tests (admin API and backend license tests)"""
+    print("🚀 Starting All Tests...")
     print("=" * 50)
 
     # Check if tests directory exists
@@ -19,20 +19,39 @@ def run_tests():
         print("❌ Tests directory not found. Creating it...")
         os.makedirs("tests")
 
-    # Run the test
+    all_passed = True
+
+    # Run admin API tests
+    print("\n📋 Running Admin API Tests...")
     try:
         result = subprocess.run(
             [sys.executable, "tests/test_admin_api.py"], capture_output=False, text=True
         )
-
-        if result.returncode == 0:
-            print("\n🎉 All tests passed!")
-            return True
-        else:
-            print("\n❌ Some tests failed!")
-            return False
+        if result.returncode != 0:
+            all_passed = False
     except Exception as e:
-        print(f"❌ Error running tests: {e}")
+        print(f"❌ Error running admin API tests: {e}")
+        all_passed = False
+
+    # Run backend license tests
+    print("\n🔍 Running Backend License Tests...")
+    try:
+        result = subprocess.run(
+            [sys.executable, "backend/tests/run_backend_tests.py"],
+            capture_output=False,
+            text=True,
+        )
+        if result.returncode != 0:
+            all_passed = False
+    except Exception as e:
+        print(f"❌ Error running backend license tests: {e}")
+        all_passed = False
+
+    if all_passed:
+        print("\n🎉 All tests passed!")
+        return True
+    else:
+        print("\n❌ Some tests failed!")
         return False
 
 
