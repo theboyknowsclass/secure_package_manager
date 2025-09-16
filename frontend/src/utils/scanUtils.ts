@@ -1,6 +1,7 @@
 /**
  * Utility functions for formatting scan-related data
  */
+import { ScanResult } from "../types/package";
 
 /**
  * Format scan duration from milliseconds to human-readable format
@@ -17,21 +18,23 @@ export const formatScanDuration = (durationMs: number | null): string => {
   }
 
   const seconds = durationMs / 1000;
-  
+
   if (seconds < 60) {
     return `${seconds.toFixed(1)}s`;
   }
 
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = Math.floor(seconds % 60);
-  
+
   if (minutes < 60) {
-    return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+    return remainingSeconds > 0
+      ? `${minutes}m ${remainingSeconds}s`
+      : `${minutes}m`;
   }
 
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
-  
+
   return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 };
 
@@ -40,9 +43,11 @@ export const formatScanDuration = (durationMs: number | null): string => {
  * @param scanResult - Scan result object
  * @returns Total number of vulnerabilities
  */
-export const getTotalVulnerabilities = (scanResult: any): number => {
+export const getTotalVulnerabilities = (
+  scanResult: ScanResult | null
+): number => {
   if (!scanResult) return 0;
-  
+
   return (
     (scanResult.critical_count || 0) +
     (scanResult.high_count || 0) +
@@ -57,11 +62,13 @@ export const getTotalVulnerabilities = (scanResult: any): number => {
  * @param scanResult - Scan result object
  * @returns Formatted string with severity breakdown
  */
-export const getVulnerabilityBreakdown = (scanResult: any): string => {
+export const getVulnerabilityBreakdown = (
+  scanResult: ScanResult | null
+): string => {
   if (!scanResult) return "No scan data available";
-  
+
   const parts = [];
-  
+
   if (scanResult.critical_count > 0) {
     parts.push(`${scanResult.critical_count} critical`);
   }
@@ -77,10 +84,10 @@ export const getVulnerabilityBreakdown = (scanResult: any): string => {
   if (scanResult.info_count > 0) {
     parts.push(`${scanResult.info_count} info`);
   }
-  
+
   if (parts.length === 0) {
     return "No vulnerabilities found";
   }
-  
+
   return parts.join(", ");
 };

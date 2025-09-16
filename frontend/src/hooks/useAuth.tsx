@@ -1,9 +1,10 @@
 import React, { createContext, useContext } from "react";
 import { useAuthStore } from "../stores/authStore";
 import { oauthService } from "../services/oauth";
+import { AuthUser } from "../types/auth";
 
 interface AuthContextType {
-  user: any;
+  user: AuthUser | null;
   loading: boolean;
   login: () => void;
   logout: () => void;

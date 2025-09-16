@@ -5,7 +5,10 @@ import {
   type SecurityScanStatus,
 } from "../../types/securityStatus";
 import { ScanResult } from "../../types/package";
-import { getVulnerabilityBreakdown, formatScanDuration } from "../../utils/scanUtils";
+import {
+  getVulnerabilityBreakdown,
+  formatScanDuration,
+} from "../../utils/scanUtils";
 
 export interface SecurityScoreChipProps {
   score: number | null;
@@ -45,13 +48,21 @@ export const SecurityScoreChip: React.FC<SecurityScoreChipProps> = ({
     if (showTooltip) {
       const tooltipContent = (
         <div>
-          <div><strong>Security Score:</strong> {score}/100</div>
+          <div>
+            <strong>Security Score:</strong> {score}/100
+          </div>
           {scanResult && (
             <>
-              <div><strong>Vulnerabilities:</strong> {getVulnerabilityBreakdown(scanResult)}</div>
-              <div><strong>Scan Duration:</strong> {formatScanDuration(scanResult.scan_duration_ms)}</div>
+              <div>
+                <strong>Vulnerabilities:</strong>{" "}
+                {getVulnerabilityBreakdown(scanResult)}
+              </div>
+              <div>
+                <strong>Scan Duration:</strong>{" "}
+                {formatScanDuration(scanResult.scan_duration_ms)}
+              </div>
               {score === 0 && scanResult.critical_count > 0 && (
-                <div style={{ color: '#f44336', fontWeight: 'bold' }}>
+                <div style={{ color: "#f44336", fontWeight: "bold" }}>
                   ⚠️ Critical vulnerabilities block approval
                 </div>
               )}
@@ -59,7 +70,11 @@ export const SecurityScoreChip: React.FC<SecurityScoreChipProps> = ({
           )}
         </div>
       );
-      return <Tooltip title={tooltipContent} arrow>{chip}</Tooltip>;
+      return (
+        <Tooltip title={tooltipContent} arrow>
+          {chip}
+        </Tooltip>
+      );
     }
     return chip;
   }

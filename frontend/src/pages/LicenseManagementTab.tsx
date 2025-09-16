@@ -33,6 +33,7 @@ import {
   Error,
 } from "@mui/icons-material";
 import { api, endpoints } from "../services/api";
+import { CreateLicenseData, UpdateLicenseData } from "../types/license";
 
 interface SupportedLicense {
   id: number;
@@ -83,7 +84,7 @@ export default function LicenseManagementTab() {
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
-    severity: "success" as any,
+    severity: "success" as "success" | "error" | "warning" | "info",
   });
 
   // Form state
@@ -112,7 +113,7 @@ export default function LicenseManagementTab() {
   );
 
   const createMutation = useMutation(
-    async (licenseData: any) => {
+    async (licenseData: CreateLicenseData) => {
       const response = await api.post(endpoints.admin.licenses(), licenseData);
       return response.data;
     },
@@ -127,10 +128,12 @@ export default function LicenseManagementTab() {
         setCreateDialogOpen(false);
         resetForm();
       },
-      onError: (error: any) => {
+      onError: (error: unknown) => {
         setSnackbar({
           open: true,
-          message: error.response?.data?.error || "Failed to create license",
+          message:
+            (error as { response?: { data?: { error?: string } } })?.response
+              ?.data?.error || "Failed to create license",
           severity: "error",
         });
       },
@@ -138,7 +141,7 @@ export default function LicenseManagementTab() {
   );
 
   const updateMutation = useMutation(
-    async ({ id, data }: { id: number; data: any }) => {
+    async ({ id, data }: { id: number; data: UpdateLicenseData }) => {
       const response = await api.put(endpoints.admin.license(id), data);
       return response.data;
     },
@@ -154,10 +157,12 @@ export default function LicenseManagementTab() {
         setEditingLicense(null);
         resetForm();
       },
-      onError: (error: any) => {
+      onError: (error: unknown) => {
         setSnackbar({
           open: true,
-          message: error.response?.data?.error || "Failed to update license",
+          message:
+            (error as { response?: { data?: { error?: string } } })?.response
+              ?.data?.error || "Failed to update license",
           severity: "error",
         });
       },
@@ -180,10 +185,12 @@ export default function LicenseManagementTab() {
         setDeleteDialogOpen(false);
         setEditingLicense(null);
       },
-      onError: (error: any) => {
+      onError: (error: unknown) => {
         setSnackbar({
           open: true,
-          message: error.response?.data?.error || "Failed to delete license",
+          message:
+            (error as { response?: { data?: { error?: string } } })?.response
+              ?.data?.error || "Failed to delete license",
           severity: "error",
         });
       },
@@ -226,7 +233,16 @@ export default function LicenseManagementTab() {
             <Chip
               icon={statusDisplay.icon}
               label={statusDisplay.label}
-              color={statusDisplay.color as any}
+              color={
+                statusDisplay.color as
+                  | "default"
+                  | "primary"
+                  | "secondary"
+                  | "error"
+                  | "info"
+                  | "success"
+                  | "warning"
+              }
               size="small"
             />
           );
@@ -306,7 +322,7 @@ export default function LicenseManagementTab() {
     }
   };
 
-  const handleFormChange = (field: string, value: any) => {
+  const handleFormChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 

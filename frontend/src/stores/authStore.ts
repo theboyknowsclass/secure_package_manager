@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { api } from "../services/api";
 import { clearAuthStorage } from "../utils/auth";
+import { AuthUser } from "../types/auth";
 
 export interface User {
   sub: string;
@@ -13,7 +14,7 @@ export interface User {
 }
 
 interface AuthState {
-  user: User | null;
+  user: AuthUser | null;
   token: string | null;
   loading: boolean;
   isAuthenticated: boolean;
@@ -37,7 +38,17 @@ export const useAuthStore = create<AuthState>()(
 
       setUser: user => {
         console.log("AuthStore: Setting user:", user);
-        set({ user, isAuthenticated: !!user });
+        // Convert User to AuthUser if user is not null
+        const authUser = user
+          ? {
+              id: parseInt(user.sub) || 0,
+              username: user.username,
+              full_name: user.full_name,
+              role: user.role,
+              email: user.email,
+            }
+          : null;
+        set({ user: authUser, isAuthenticated: !!authUser });
       },
 
       setToken: token => {
@@ -64,8 +75,16 @@ export const useAuthStore = create<AuthState>()(
           "token:",
           token ? "present" : "null"
         );
+        // Convert User to AuthUser
+        const authUser: AuthUser = {
+          id: parseInt(user.sub) || 0,
+          username: user.username,
+          full_name: user.full_name,
+          role: user.role,
+          email: user.email,
+        };
         set({
-          user,
+          user: authUser,
           token,
           isAuthenticated: true,
           loading: false,

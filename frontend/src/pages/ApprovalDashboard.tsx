@@ -19,6 +19,25 @@ import {
   type Package,
 } from "../types/status";
 import ApprovalDetailDialog from "../components/ApprovalDetailDialog";
+import { getTotalVulnerabilities } from "../utils/scanUtils";
+
+interface ApprovalRequestRowData {
+  id: number;
+  requestId: number;
+  applicationName: string;
+  applicationVersion: string;
+  requestorName: string;
+  requestorUsername: string;
+  status: string;
+  processingCount: number;
+  pendingCount: number;
+  approvedCount: number;
+  rejectedCount: number;
+  createdAt: string;
+  updatedAt: string;
+  totalPackages: number;
+  packages: Package[];
+}
 
 // Define columns for package details table
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -150,8 +169,8 @@ const packageColumns: MRT_ColumnDef<
     size: 120,
     Cell: ({ row }) => {
       const pkg = row.original;
-      const total = pkg.vulnerability_count || 0;
-      const critical = pkg.critical_vulnerabilities || 0;
+      const total = getTotalVulnerabilities(pkg.scan_result);
+      const critical = pkg.scan_result?.critical_count || 0;
 
       if (total === 0) {
         return (
@@ -274,7 +293,7 @@ export default function ApprovalDashboard() {
   }, [approvalRequests]);
 
   // Define columns for approval request rows
-  const columns = useMemo<MRT_ColumnDef<any>[]>(
+  const columns = useMemo<MRT_ColumnDef<ApprovalRequestRowData>[]>(
     () => [
       {
         accessorKey: "requestId",

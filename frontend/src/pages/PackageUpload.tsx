@@ -14,62 +14,75 @@ import {
 import { CloudUpload, CheckCircle, Visibility } from "@mui/icons-material";
 import { api, endpoints } from "../services/api";
 
+interface UploadResult {
+  request_id: number;
+  message: string;
+  packages_processed: number;
+  application_name: string;
+  version: string;
+}
+
 export default function PackageUpload() {
   const navigate = useNavigate();
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadResult, setUploadResult] = useState<any>(null);
+  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [error, setError] = useState("");
   const [errorDetails, setErrorDetails] = useState("");
 
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    if (acceptedFiles.length === 0) return;
+  const onDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      if (acceptedFiles.length === 0) return;
 
-    const file = acceptedFiles[0];
-    if (!file.name.endsWith(".json")) {
-      setError("Please upload a JSON file (package-lock.json)");
-      return;
-    }
+      const file = acceptedFiles[0];
+      if (!file.name.endsWith(".json")) {
+        setError("Please upload a JSON file (package-lock.json)");
+        return;
+      }
 
-    setUploading(true);
-    setUploadProgress(0);
-    setError("");
-    setUploadResult(null);
+      setUploading(true);
+      setUploadProgress(0);
+      setError("");
+      setUploadResult(null);
 
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
 
-      const response = await api.post(endpoints.packages.upload, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-        onUploadProgress: progressEvent => {
-          if (progressEvent.total) {
-            const progress = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            );
-            setUploadProgress(progress);
-          }
-        },
-      });
+        const response = await api.post(endpoints.packages.upload, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+          onUploadProgress: progressEvent => {
+            if (progressEvent.total) {
+              const progress = Math.round(
+                (progressEvent.loaded * 100) / progressEvent.total
+              );
+              setUploadProgress(progress);
+            }
+          },
+        });
 
-      // Set progress to 100% when upload completes
-      setUploadProgress(100);
-      setUploadResult(response.data);
+        // Set progress to 100% when upload completes
+        setUploadProgress(100);
+        setUploadResult(response.data);
 
-      // Auto-redirect to status page after successful upload
-      setTimeout(() => {
-        navigate("/status");
-      }, 2000); // 2 second delay to show success message
-    } catch (err: any) {
-      const errorData = err.response?.data;
-      setError(errorData?.error || "Upload failed. Please try again.");
-      setErrorDetails(errorData?.details || "");
-    } finally {
-      setUploading(false);
-    }
-  }, []);
+        // Auto-redirect to status page after successful upload
+        setTimeout(() => {
+          navigate("/status");
+        }, 2000); // 2 second delay to show success message
+      } catch (err: unknown) {
+        const errorData = (
+          err as { response?: { data?: { error?: string; details?: string } } }
+        )?.response?.data;
+        setError(errorData?.error || "Upload failed. Please try again.");
+        setErrorDetails(errorData?.details || "");
+      } finally {
+        setUploading(false);
+      }
+    },
+    [navigate]
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

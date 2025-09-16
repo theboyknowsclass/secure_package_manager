@@ -1,4 +1,5 @@
 import { useAuthStore } from "../stores/authStore";
+import { AuthUser } from "../types/auth";
 
 // OAuth2/OpenID Connect configuration
 const OAUTH_CONFIG = {
@@ -153,7 +154,7 @@ export class OAuthService {
   }
 
   // Get current user
-  getCurrentUser(): any {
+  getCurrentUser(): AuthUser | null {
     return useAuthStore.getState().user;
   }
 

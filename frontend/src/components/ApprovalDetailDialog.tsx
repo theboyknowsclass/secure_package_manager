@@ -25,6 +25,7 @@ import {
   type Package,
   type DetailedRequestResponse,
 } from "../types/status";
+import { getTotalVulnerabilities } from "../utils/scanUtils";
 
 interface ApprovalDetailDialogProps {
   open: boolean;
@@ -175,8 +176,8 @@ const packageColumns: MRT_ColumnDef<
     size: 120,
     Cell: ({ row }) => {
       const pkg = row.original;
-      const total = pkg.vulnerability_count || 0;
-      const critical = pkg.critical_vulnerabilities || 0;
+      const total = getTotalVulnerabilities(pkg.scan_result);
+      const critical = pkg.scan_result?.critical_count || 0;
 
       if (total === 0) {
         return (
@@ -441,7 +442,10 @@ export default function ApprovalDetailDialog({
                           <Chip
                             key={status}
                             label={`${count} ${status.replace("_", " ").toUpperCase()}`}
-                            color={getLicenseStatusColor("", status as LicenseStatus)}
+                            color={getLicenseStatusColor(
+                              "",
+                              status as LicenseStatus
+                            )}
                             size="small"
                           />
                         ))}
@@ -791,4 +795,3 @@ function getLicenseStatusColor(
     }
   }
 }
-

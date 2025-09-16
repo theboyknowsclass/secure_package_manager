@@ -65,19 +65,21 @@ export const isPendingApprovalStatus = (status: PackageStatus): boolean => {
 
 // Additional helper functions for granular statuses
 export const isActiveProcessingStatus = (status: PackageStatus): boolean => {
-  return [
+  const activeStatuses: PackageStatus[] = [
     PACKAGE_STATUS.CHECKING_LICENCE,
     PACKAGE_STATUS.DOWNLOADING,
     PACKAGE_STATUS.SECURITY_SCANNING,
-  ].includes(status as any);
+  ];
+  return activeStatuses.includes(status);
 };
 
 export const isCompletedProcessingStatus = (status: PackageStatus): boolean => {
-  return [
+  const completedStatuses: PackageStatus[] = [
     PACKAGE_STATUS.LICENCE_CHECKED,
     PACKAGE_STATUS.DOWNLOADED,
     PACKAGE_STATUS.SECURITY_SCANNED,
-  ].includes(status as any);
+  ];
+  return completedStatuses.includes(status);
 };
 
 export const getStatusDisplayName = (status: PackageStatus): string => {

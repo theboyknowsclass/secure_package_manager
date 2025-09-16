@@ -3,9 +3,29 @@ import { Box, Typography, Alert, IconButton } from "@mui/material";
 import { MaterialReactTable, type MRT_ColumnDef } from "material-react-table";
 import { Visibility, Download } from "@mui/icons-material";
 import { usePackageRequests } from "../../services/api/packageService";
-import { type PackageRequest } from "../../types";
+import {
+  type PackageRequest,
+  type PackageStatus,
+  type Package,
+} from "../../types";
 import { LoadingSpinner, PackageStatusChip } from "../atoms";
 import { RequestDetailDialog } from "../organisms";
+
+interface RequestRowData {
+  id: number;
+  requestId: number;
+  applicationName: string;
+  applicationVersion: string;
+  requestorName: string;
+  requestorUsername: string;
+  status: PackageStatus;
+  progress: string;
+  createdAt: string;
+  updatedAt: string;
+  totalPackages: number;
+  validatedPackages: number;
+  packages: Package[];
+}
 
 export default function RequestStatusDashboard() {
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -58,7 +78,7 @@ export default function RequestStatusDashboard() {
   }, [requests]);
 
   // Define columns for package request rows
-  const columns = useMemo<MRT_ColumnDef<any>[]>(
+  const columns = useMemo<MRT_ColumnDef<RequestRowData>[]>(
     () => [
       {
         accessorKey: "requestId",

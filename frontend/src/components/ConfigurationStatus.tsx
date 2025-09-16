@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Alert,
@@ -28,11 +28,7 @@ export default function ConfigurationStatus() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  useEffect(() => {
-    checkConfigurationStatus();
-  }, []);
-
-  const checkConfigurationStatus = async () => {
+  const checkConfigurationStatus = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -44,7 +40,7 @@ export default function ConfigurationStatus() {
         navigate("/settings");
         return;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // If we can't check config status, assume it's incomplete for admin users
       if (user?.role === "admin") {
         setConfigStatus({
@@ -56,13 +52,17 @@ export default function ConfigurationStatus() {
         navigate("/settings");
         return;
       }
-      setError(
-        err.response?.data?.error || "Failed to check configuration status"
-      );
+      const errorData = (err as { response?: { data?: { error?: string } } })
+        ?.response?.data;
+      setError(errorData?.error || "Failed to check configuration status");
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, navigate]);
+
+  useEffect(() => {
+    checkConfigurationStatus();
+  }, [checkConfigurationStatus]);
 
   const handleConfigureClick = () => {
     navigate("/settings");
@@ -140,7 +140,11 @@ export default function ConfigurationStatus() {
   }
 
   // If user is not admin and configuration is incomplete, redirect to configuration required page
-  if (user?.role !== "admin" && !configStatus.is_complete) {
+  if (
+    user &&
+    (user.role === "user" || user.role === "approver") &&
+    !configStatus.is_complete
+  ) {
     navigate("/configuration-required");
     return null;
   }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -16,21 +16,7 @@ export default function OAuthCallback() {
   const navigate = useNavigate();
   const isProcessingRef = useRef(false);
 
-  useEffect(() => {
-    console.log("OAuthCallback page mounted, URL:", window.location.href);
-    console.log("URL params:", new URLSearchParams(window.location.search));
-
-    // Prevent duplicate processing
-    if (isProcessingRef.current) {
-      console.log("OAuthCallback: Already processing, skipping...");
-      return;
-    }
-
-    isProcessingRef.current = true;
-    handleOAuthCallback();
-  }, []);
-
-  const handleOAuthCallback = async () => {
+  const handleOAuthCallback = useCallback(async () => {
     try {
       console.log("OAuthCallback page: Processing OAuth callback...");
 
@@ -75,7 +61,21 @@ export default function OAuthCallback() {
       // Reset processing state
       isProcessingRef.current = false;
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    console.log("OAuthCallback page mounted, URL:", window.location.href);
+    console.log("URL params:", new URLSearchParams(window.location.search));
+
+    // Prevent duplicate processing
+    if (isProcessingRef.current) {
+      console.log("OAuthCallback: Already processing, skipping...");
+      return;
+    }
+
+    isProcessingRef.current = true;
+    handleOAuthCallback();
+  }, [handleOAuthCallback]);
 
   return (
     <Container component="main" maxWidth="sm">

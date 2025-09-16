@@ -8,16 +8,11 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Chip,
 } from "@mui/material";
 import { MaterialReactTable, type MRT_ColumnDef } from "material-react-table";
 import { Close } from "@mui/icons-material";
 import { usePackageRequest } from "../../services/api/packageService";
-import {
-  PACKAGE_STATUS,
-  type Package,
-  type DetailedRequestResponse,
-} from "../../types/status";
+import { type Package } from "../../types/status";
 import {
   PackageStatusChip,
   LicenseChip,
@@ -28,7 +23,7 @@ import {
   LoadingSpinner,
 } from "../atoms";
 import { RequestSummary } from "../molecules";
-import { SECURITY_SCAN_STATUS, type SecurityScanStatus } from "../../types/securityStatus";
+import { type SecurityScanStatus } from "../../types/securityStatus";
 
 interface RequestDetailDialogProps {
   open: boolean;
@@ -53,9 +48,7 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     accessorKey: "status",
     header: "Status",
     size: 120,
-    Cell: ({ row }) => (
-      <PackageStatusChip status={row.original.status} />
-    ),
+    Cell: ({ row }) => <PackageStatusChip status={row.original.status} />,
   },
   {
     accessorKey: "license_identifier",
@@ -75,9 +68,7 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     accessorKey: "license_score",
     header: "License Score",
     size: 120,
-    Cell: ({ row }) => (
-      <LicenseScoreChip score={row.original.license_score} />
-    ),
+    Cell: ({ row }) => <LicenseScoreChip score={row.original.license_score} />,
   },
   {
     accessorKey: "security_score",
@@ -107,11 +98,7 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     size: 120,
     Cell: ({ row }) => {
       const pkg = row.original;
-      return (
-        <VulnerabilityChip
-          scanResult={pkg.scan_result}
-        />
-      );
+      return <VulnerabilityChip scanResult={pkg.scan_result} />;
     },
   },
   {
@@ -121,9 +108,7 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     Cell: ({ row }) => {
       const type = row.original.type;
       return (
-        <PackageTypeChip
-          type={type === "existing" ? "existing" : "new"}
-        />
+        <PackageTypeChip type={type === "existing" ? "existing" : "new"} />
       );
     },
   },
@@ -139,8 +124,8 @@ export default function RequestDetailDialog({
     data: selectedRequest,
     isLoading,
     error,
-  } = usePackageRequest(requestId || 0, { 
-    refetchInterval: open ? refetchInterval : undefined 
+  } = usePackageRequest(requestId || 0, {
+    refetchInterval: open ? refetchInterval : undefined,
   });
 
   const handleClose = () => {
@@ -191,15 +176,18 @@ export default function RequestDetailDialog({
                 sx: {
                   tableLayout: "fixed",
                   // Override cursor for tooltip columns to prevent interference
-                  "& .MuiTableHead-root th[data-columnid='security_score']:hover": {
-                    cursor: "default !important",
-                  },
-                  "& .MuiTableHead-root th[data-columnid='license_score']:hover": {
-                    cursor: "default !important",
-                  },
-                  "& .MuiTableHead-root th[data-columnid='scan_result']:hover": {
-                    cursor: "default !important",
-                  },
+                  "& .MuiTableHead-root th[data-columnid='security_score']:hover":
+                    {
+                      cursor: "default !important",
+                    },
+                  "& .MuiTableHead-root th[data-columnid='license_score']:hover":
+                    {
+                      cursor: "default !important",
+                    },
+                  "& .MuiTableHead-root th[data-columnid='scan_result']:hover":
+                    {
+                      cursor: "default !important",
+                    },
                 },
               }}
               muiTableContainerProps={{
@@ -226,7 +214,10 @@ export default function RequestDetailDialog({
             />
           </Box>
         ) : isLoading ? (
-          <LoadingSpinner message="Loading package details..." minHeight="200px" />
+          <LoadingSpinner
+            message="Loading package details..."
+            minHeight="200px"
+          />
         ) : error ? (
           <Box
             sx={{
@@ -262,4 +253,3 @@ export default function RequestDetailDialog({
     </Dialog>
   );
 }
-

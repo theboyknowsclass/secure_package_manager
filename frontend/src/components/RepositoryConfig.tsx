@@ -78,8 +78,10 @@ export default function RepositoryConfig() {
         setConfig(response.data.config);
         setConfigStatus(response.data.status);
         setError(null);
-      } catch (err: any) {
-        setError(err.response?.data?.error || "Failed to load configuration");
+      } catch (err: unknown) {
+        const errorData = (err as { response?: { data?: { error?: string } } })
+          ?.response?.data;
+        setError(errorData?.error || "Failed to load configuration");
       } finally {
         setLoading(false);
       }

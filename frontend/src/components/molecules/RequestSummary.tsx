@@ -14,9 +14,10 @@ export const RequestSummary: React.FC<RequestSummaryProps> = ({
   showTitle = true,
   variant = "default",
 }) => {
-  const containerSx = variant === "compact" 
-    ? { mb: 2, p: 1.5, bgcolor: "grey.50", borderRadius: 1 }
-    : { mb: 3, p: 2, bgcolor: "grey.50", borderRadius: 1 };
+  const containerSx =
+    variant === "compact"
+      ? { mb: 2, p: 1.5, bgcolor: "grey.50", borderRadius: 1 }
+      : { mb: 3, p: 2, bgcolor: "grey.50", borderRadius: 1 };
 
   return (
     <Box sx={containerSx}>
@@ -39,7 +40,8 @@ export const RequestSummary: React.FC<RequestSummaryProps> = ({
             Requestor
           </Typography>
           <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-            {request.request.requestor.full_name} (@{request.request.requestor.username})
+            {request.request.requestor.full_name} (@
+            {request.request.requestor.username})
           </Typography>
         </Box>
         <Box>
@@ -47,10 +49,7 @@ export const RequestSummary: React.FC<RequestSummaryProps> = ({
             Status
           </Typography>
           <Box sx={{ mt: 0.5 }}>
-            <RequestStatusChip
-              status={request.request.status}
-              size="small"
-            />
+            <RequestStatusChip status={request.request.status} size="small" />
           </Box>
         </Box>
         <Box>
@@ -66,7 +65,11 @@ export const RequestSummary: React.FC<RequestSummaryProps> = ({
             Progress
           </Typography>
           <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-            {Math.round((request.request.completion_percentage / 100) * request.request.total_packages)} of {request.request.total_packages} packages processed
+            {Math.round(
+              (request.request.completion_percentage / 100) *
+                request.request.total_packages
+            )}{" "}
+            of {request.request.total_packages} packages processed
           </Typography>
         </Box>
       </Box>

@@ -17,7 +17,10 @@ export const usePackageRequests = (options?: { refetchInterval?: number }) => {
   );
 };
 
-export const usePackageRequest = (requestId: number, options?: { refetchInterval?: number }) => {
+export const usePackageRequest = (
+  requestId: number,
+  options?: { refetchInterval?: number }
+) => {
   return useQuery<DetailedRequestResponse>(
     ["packageRequest", requestId],
     async () => {
