@@ -20,10 +20,10 @@ import {
   type Package,
   type DetailedRequestResponse,
 } from "../types/status";
-import { 
-  getLicenseColorFromScore, 
+import {
+  getLicenseColorFromScore,
   getLicenseCategoryFromScore,
-  getScoreColor 
+  getScoreColor,
 } from "../utils/licenseUtils";
 
 interface RequestDetailDialogProps {
@@ -475,4 +475,3 @@ function getPackageStatusLabel(status: string): string {
       return status;
   }
 }
-

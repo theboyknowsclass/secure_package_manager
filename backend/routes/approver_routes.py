@@ -98,6 +98,7 @@ def batch_approve_packages() -> ResponseReturnValue:
                 
                 # Approve the package
                 package.package_status.status = "Approved"
+                package.package_status.approver_id = request.user.id
                 approved_count += 1
                 
                 # Log the approval (publishing will be done in batch later)
@@ -188,6 +189,7 @@ def batch_reject_packages() -> ResponseReturnValue:
                 
                 # Reject the package
                 package.package_status.status = "Rejected"
+                package.package_status.rejector_id = request.user.id
                 rejected_count += 1
                 
                 # Log the rejection
@@ -281,6 +283,7 @@ def get_validated_packages() -> ResponseReturnValue:
                         "security_score": pkg.package_status.security_score or 0,
                         "license_score": pkg.package_status.license_score,
                         "license_identifier": pkg.license_identifier or "Unknown",
+                        "license_status": pkg.package_status.license_status,
                         "security_scan_status": pkg.package_status.security_scan_status,
                         "type": package_type,
                         "request": request_data

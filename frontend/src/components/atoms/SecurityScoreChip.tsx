@@ -47,12 +47,7 @@ export const SecurityScoreChip: React.FC<SecurityScoreChipProps> = ({
   // Handle scan status when score is not available
   if (scanStatus === SECURITY_SCAN_STATUS.FAILED) {
     const chip = (
-      <Chip
-        label="Scan Failed"
-        color="error"
-        size={size}
-        variant={variant}
-      />
+      <Chip label="Scan Failed" color="error" size={size} variant={variant} />
     );
 
     if (showTooltip) {
@@ -63,12 +58,7 @@ export const SecurityScoreChip: React.FC<SecurityScoreChipProps> = ({
 
   if (scanStatus === SECURITY_SCAN_STATUS.RUNNING) {
     const chip = (
-      <Chip
-        label="Scanning..."
-        color="info"
-        size={size}
-        variant={variant}
-      />
+      <Chip label="Scanning..." color="info" size={size} variant={variant} />
     );
 
     if (showTooltip) {

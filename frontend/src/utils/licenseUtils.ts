@@ -2,21 +2,28 @@
  * License utility functions for consistent color coding and categorization
  */
 
-export type LicenseColor = 
+export type LicenseColor =
   | "default"
-  | "primary" 
+  | "primary"
   | "secondary"
   | "error"
   | "info"
   | "success"
   | "warning";
 
-export type LicenseCategory = "Pending" | "Blocked" | "Allowed" | "Unknown" | "Avoid";
+export type LicenseCategory =
+  | "Pending"
+  | "Blocked"
+  | "Allowed"
+  | "Unknown"
+  | "Avoid";
 
 /**
  * Get MUI color for license based on score
  */
-export const getLicenseColorFromScore = (licenseScore: number | null): LicenseColor => {
+export const getLicenseColorFromScore = (
+  licenseScore: number | null
+): LicenseColor => {
   if (licenseScore === null) {
     return "info"; // Pending - blue
   }
@@ -37,7 +44,9 @@ export const getLicenseColorFromScore = (licenseScore: number | null): LicenseCo
 /**
  * Get human-readable category for license based on score
  */
-export const getLicenseCategoryFromScore = (licenseScore: number | null): LicenseCategory => {
+export const getLicenseCategoryFromScore = (
+  licenseScore: number | null
+): LicenseCategory => {
   if (licenseScore === null) {
     return "Pending";
   }
@@ -67,17 +76,19 @@ export const getScoreColor = (score: number): LicenseColor => {
 /**
  * Get MUI color for license identifier string (for direct license matching)
  */
-export const getLicenseColorFromIdentifier = (licenseIdentifier: string): LicenseColor => {
+export const getLicenseColorFromIdentifier = (
+  licenseIdentifier: string
+): LicenseColor => {
   const allowedLicenses = [
     "MIT",
-    "Apache-2.0", 
+    "Apache-2.0",
     "BSD",
     "CC0-1.0",
     "Unlicense",
     "ISC",
     "0BSD",
   ];
-  
+
   const avoidLicenses = ["GPL-3.0", "LGPL-3.0"];
   const blockedLicenses = ["GPL", "GPL-2.0", "AGPL"];
 

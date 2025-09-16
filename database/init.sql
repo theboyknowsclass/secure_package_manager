@@ -68,6 +68,10 @@ CREATE TABLE IF NOT EXISTS package_status (
     license_score INTEGER CHECK (license_score >= 0 AND license_score <= 100),
     security_score INTEGER CHECK (security_score >= 0 AND security_score <= 100),
     security_scan_status VARCHAR(50) DEFAULT 'pending',
+    license_status VARCHAR(20), -- Primary license status calculated from supported_licenses table
+    approver_id INTEGER REFERENCES users(id) ON DELETE SET NULL, -- User who approved the package
+    rejector_id INTEGER REFERENCES users(id) ON DELETE SET NULL, -- User who rejected the package
+    published_at TIMESTAMP, -- Timestamp when package was successfully published
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(package_id), -- Only one status record per package
@@ -83,7 +87,8 @@ CREATE TABLE IF NOT EXISTS package_status (
         'Approved', 
         'Rejected'
     )),
-    CONSTRAINT package_status_security_scan_status_check CHECK (security_scan_status IN ('pending', 'running', 'completed', 'failed', 'skipped'))
+    CONSTRAINT package_status_security_scan_status_check CHECK (security_scan_status IN ('pending', 'running', 'completed', 'failed', 'skipped')),
+    CONSTRAINT package_status_license_status_check CHECK (license_status IN ('always_allowed', 'allowed', 'avoid', 'blocked'))
 );
 
 -- Create security_scans table (stores Trivy scan results)
@@ -122,6 +127,8 @@ CREATE INDEX IF NOT EXISTS idx_requests_requestor_id ON requests(requestor_id);
 CREATE INDEX IF NOT EXISTS idx_request_packages_request_id ON request_packages(request_id);
 CREATE INDEX IF NOT EXISTS idx_request_packages_package_id ON request_packages(package_id);
 CREATE INDEX IF NOT EXISTS idx_package_status_package_id ON package_status(package_id);
+CREATE INDEX IF NOT EXISTS idx_package_status_approver_id ON package_status(approver_id);
+CREATE INDEX IF NOT EXISTS idx_package_status_rejector_id ON package_status(rejector_id);
 CREATE INDEX IF NOT EXISTS idx_security_scans_package_id ON security_scans(package_id);
 
 -- Common query patterns

@@ -1,8 +1,8 @@
 import React from "react";
 import { Tooltip, Chip } from "@mui/material";
-import { 
-  getLicenseColorFromScore, 
-  getLicenseCategoryFromScore 
+import {
+  getLicenseColorFromScore,
+  getLicenseCategoryFromScore,
 } from "../../utils/licenseUtils";
 
 export interface LicenseChipProps {
@@ -22,12 +22,7 @@ export const LicenseChip: React.FC<LicenseChipProps> = ({
 }) => {
   if (!identifier) {
     const chip = (
-      <Chip
-        label="Unknown"
-        color="default"
-        size={size}
-        variant={variant}
-      />
+      <Chip label="Unknown" color="default" size={size} variant={variant} />
     );
 
     if (showTooltip) {
@@ -44,12 +39,7 @@ export const LicenseChip: React.FC<LicenseChipProps> = ({
   const category = getLicenseCategoryFromScore(score);
 
   const chip = (
-    <Chip
-      label={identifier}
-      color={color}
-      size={size}
-      variant={variant}
-    />
+    <Chip label={identifier} color={color} size={size} variant={variant} />
   );
 
   if (showTooltip) {

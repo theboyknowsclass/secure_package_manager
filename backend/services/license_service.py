@@ -130,6 +130,7 @@ class LicenseService:
         """Create result for packages with no license information"""
         return {
             "score": 0,
+            "license_status": None,
             "errors": ["No license information found"],
             "warnings": ["Package has no license specified"],
         }
@@ -153,6 +154,7 @@ class LicenseService:
         """Create result for unknown licenses"""
         return {
             "score": 50,
+            "license_status": None,
             "errors": [f'License "{license_identifier}" is not recognized'],
             "warnings": [
                 f'License "{license_identifier}" is not in the license database'
@@ -182,6 +184,7 @@ class LicenseService:
         """Create result for blocked licenses"""
         return {
             "score": 0,
+            "license_status": "blocked",
             "errors": [f'License "{license_identifier}" is blocked by policy'],
             "warnings": [f'License "{license_identifier}" is explicitly prohibited'],
         }
@@ -190,6 +193,7 @@ class LicenseService:
         """Create result for avoided licenses"""
         return {
             "score": 30,
+            "license_status": "avoid",
             "errors": [],
             "warnings": [
                 f'License "{license_identifier}" is discouraged and may have restrictions'
@@ -201,7 +205,12 @@ class LicenseService:
     ) -> Dict[str, Any]:
         """Create result for allowed licenses"""
         score = self._calculate_license_score(license)
-        result = {"score": score, "errors": [], "warnings": []}
+        result = {
+            "score": score, 
+            "license_status": license.status,
+            "errors": [], 
+            "warnings": []
+        }
 
         self.logger.info(
             f"License validation for {package_name}: {license_identifier} - Score: {score} (Allowed)"
@@ -213,7 +222,12 @@ class LicenseService:
     ) -> Dict[str, Any]:
         """Create result for always allowed licenses"""
         score = self._calculate_license_score(license)
-        result = {"score": score, "errors": [], "warnings": []}
+        result = {
+            "score": score, 
+            "license_status": license.status,
+            "errors": [], 
+            "warnings": []
+        }
 
         self.logger.info(
             f"License validation for {package_name}: {license_identifier} - Score: {score} (Always Allowed)"
@@ -224,6 +238,7 @@ class LicenseService:
         """Create result for licenses with unknown status"""
         return {
             "score": 0,
+            "license_status": None,
             "errors": [f'License "{license_identifier}" has unknown status'],
             "warnings": [],
         }
@@ -412,6 +427,7 @@ class LicenseService:
         else:
             return {
                 "score": 0,
+                "license_status": None,
                 "errors": all_errors,
                 "warnings": all_warnings,
             }
@@ -455,6 +471,7 @@ class LicenseService:
         else:
             return {
                 "score": 0,
+                "license_status": None,
                 "errors": all_errors,
                 "warnings": all_warnings,
             }

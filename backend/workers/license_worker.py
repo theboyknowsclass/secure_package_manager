@@ -119,9 +119,13 @@ class LicenseWorker(BaseWorker):
             # Perform license validation
             license_validation = self._validate_package_license(package)
             
-            # Store the license score
+            # Get the license status from the validation result
+            license_status = license_validation.get("license_status")
+            
+            # Store the license score and status
             if package.package_status:
                 package.package_status.license_score = license_validation["score"]
+                package.package_status.license_status = license_status
                 package.package_status.updated_at = datetime.utcnow()
                 db.session.commit()
             
@@ -136,7 +140,7 @@ class LicenseWorker(BaseWorker):
                 package.package_status.status = "Licence Checked"
                 package.package_status.updated_at = datetime.utcnow()
             
-            logger.info(f"Successfully checked license for package {package.name}@{package.version} (Score: {license_validation['score']})")
+            logger.info(f"Successfully checked license for package {package.name}@{package.version} (Score: {license_validation['score']}, Status: {license_status})")
             
         except Exception as e:
             logger.error(f"Error checking license for package {package.name}@{package.version}: {str(e)}")

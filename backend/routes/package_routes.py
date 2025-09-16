@@ -242,6 +242,11 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                                 else "pending"
                             ),
                             "license_identifier": pkg.license_identifier,
+                            "license_status": (
+                                pkg.package_status.license_status
+                                if pkg.package_status
+                                else None
+                            ),
                             "type": rp.package_type,
                         }
                         for pkg, rp in packages_with_context
@@ -570,6 +575,7 @@ def get_request_processing_status(request_id: int) -> ResponseReturnValue:
                 "package_version": package.version,
                 "status": pkg_status.status,
                 "license_score": pkg_status.license_score,
+                "license_status": pkg_status.license_status,
                 "security_score": pkg_status.security_score,
                 "security_scan_status": pkg_status.security_scan_status,
                 "updated_at": pkg_status.updated_at.isoformat() if pkg_status.updated_at else None,

@@ -121,9 +121,9 @@ class PublishWorker(BaseWorker):
             success = self.package_service.publish_to_secure_repo(package)
             
             if success:
-                # Mark as published successfully
+                # Mark as published successfully (keep status as Approved, just set published_at)
                 if package.package_status:
-                    package.package_status.status = "Published"
+                    package.package_status.published_at = datetime.utcnow()
                     package.package_status.updated_at = datetime.utcnow()
                 logger.info(f"Successfully published package {package.name}@{package.version}")
             else:

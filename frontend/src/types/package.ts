@@ -8,8 +8,12 @@ export interface Package {
   status: PackageStatus;
   security_score: number | null;
   license_score: number | null;
+  license_status: string | null;
   security_scan_status: string;
   license_identifier: string | null;
+  approver_id: number | null;
+  rejector_id: number | null;
+  published_at: string | null;
   type?: "new" | "existing";
   vulnerability_count?: number;
   critical_vulnerabilities?: number;

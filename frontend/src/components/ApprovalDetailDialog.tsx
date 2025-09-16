@@ -121,7 +121,10 @@ const packageColumns: MRT_ColumnDef<
         return (
           <Chip
             label={licenses[0]}
-            color={getLicenseStatusColor(licenses[0])}
+            color={getLicenseStatusColor(
+              licenses[0],
+              pkg.license_status || undefined
+            )}
             size="small"
           />
         );
@@ -133,7 +136,10 @@ const packageColumns: MRT_ColumnDef<
             <Chip
               key={index}
               label={license}
-              color={getLicenseStatusColor(license)}
+              color={getLicenseStatusColor(
+                license,
+                pkg.license_status || undefined
+              )}
               size="small"
             />
           ))}
@@ -338,13 +344,17 @@ export default function ApprovalDetailDialog({
 
   const getLicenseSummary = (packages: Package[]) => {
     const licenseCounts: { [key: string]: number } = {};
+    const statusCounts: { [key: string]: number } = {};
 
     packages.forEach(pkg => {
       const license = pkg.license_identifier || "Unknown";
+      const status = pkg.license_status || "unknown";
+
       licenseCounts[license] = (licenseCounts[license] || 0) + 1;
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
     });
 
-    return { licenseCounts };
+    return { licenseCounts, statusCounts };
   };
 
   return (
@@ -415,49 +425,51 @@ export default function ApprovalDetailDialog({
                 License Summary
               </Typography>
               {(() => {
-                const { licenseCounts } = getLicenseSummary(
+                const { licenseCounts, statusCounts } = getLicenseSummary(
                   selectedRequest.packages
-                );
-
-                const individualLicenseCounts: { [key: string]: number } = {};
-
-                Object.entries(licenseCounts).forEach(
-                  ([licenseExpression, count]) => {
-                    const individualLicenses = licenseExpression
-                      .replace(/[()]/g, "")
-                      .split(/\s+(?:OR|AND)\s+/i)
-                      .map(license => license.trim())
-                      .filter(license => license.length > 0);
-
-                    individualLicenses.forEach(license => {
-                      individualLicenseCounts[license] =
-                        (individualLicenseCounts[license] || 0) + count;
-                    });
-                  }
                 );
 
                 return (
                   <Grid container spacing={2}>
-                    {Object.entries(individualLicenseCounts).map(
-                      ([license, count]) => (
-                        <Grid item xs={3} key={license}>
-                          <Box sx={{ textAlign: "center" }}>
+                    {/* License Status Summary */}
+                    <Grid item xs={12}>
+                      <Typography variant="subtitle2" gutterBottom>
+                        License Status Summary
+                      </Typography>
+                      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                        {Object.entries(statusCounts).map(([status, count]) => (
+                          <Chip
+                            key={status}
+                            label={`${count} ${status.replace("_", " ").toUpperCase()}`}
+                            color={getLicenseStatusColor("", status as LicenseStatus)}
+                            size="small"
+                          />
+                        ))}
+                      </Box>
+                    </Grid>
+
+                    {/* Individual License Summary */}
+                    <Grid item xs={12}>
+                      <Typography
+                        variant="subtitle2"
+                        gutterBottom
+                        sx={{ mt: 2 }}
+                      >
+                        Individual Licenses
+                      </Typography>
+                      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                        {Object.entries(licenseCounts).map(
+                          ([license, count]) => (
                             <Chip
+                              key={license}
                               label={`${count} ${license}`}
-                              color={getLicenseStatusColor(license)}
+                              color="default"
                               size="small"
                             />
-                            <Typography
-                              variant="caption"
-                              color="textSecondary"
-                              sx={{ display: "block", mt: 0.5 }}
-                            >
-                              {getLicenseCategory(license)}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      )
-                    )}
+                          )
+                        )}
+                      </Box>
+                    </Grid>
                   </Grid>
                 );
               })()}
@@ -713,15 +725,20 @@ function getPackageStatusLabel(status: string): string {
 
 function getLicenseStatusColor(
   licenseIdentifier: string,
-  licenseStatus?: LicenseStatus
+  licenseStatus?: LicenseStatus | string
 ) {
   if (licenseStatus) {
     switch (licenseStatus) {
+      case "always_allowed":
       case LICENSE_STATUS.ALWAYS_ALLOWED:
+        return "success";
+      case "allowed":
       case LICENSE_STATUS.ALLOWED:
         return "success";
+      case "avoid":
       case LICENSE_STATUS.AVOID:
         return "warning";
+      case "blocked":
       case LICENSE_STATUS.BLOCKED:
         return "error";
       default:
@@ -775,66 +792,3 @@ function getLicenseStatusColor(
   }
 }
 
-function getLicenseCategory(
-  licenseIdentifier: string,
-  licenseStatus?: LicenseStatus
-): string {
-  if (licenseStatus) {
-    switch (licenseStatus) {
-      case LICENSE_STATUS.ALWAYS_ALLOWED:
-      case LICENSE_STATUS.ALLOWED:
-        return "Allowed";
-      case LICENSE_STATUS.AVOID:
-        return "Avoid";
-      case LICENSE_STATUS.BLOCKED:
-        return "Blocked";
-      default:
-        return "Review";
-    }
-  }
-
-  const allowedLicenses = [
-    "MIT",
-    "Apache-2.0",
-    "BSD",
-    "CC0-1.0",
-    "Unlicense",
-    "ISC",
-    "0BSD",
-  ];
-  const avoidLicenses = ["GPL-3.0", "LGPL-3.0"];
-  const blockedLicenses = ["GPL", "GPL-2.0", "AGPL"];
-
-  if (allowedLicenses.includes(licenseIdentifier)) {
-    return "Allowed";
-  } else if (avoidLicenses.includes(licenseIdentifier)) {
-    return "Avoid";
-  } else if (blockedLicenses.includes(licenseIdentifier)) {
-    return "Blocked";
-  } else {
-    if (
-      licenseIdentifier.includes("GPL-2.0") ||
-      licenseIdentifier.includes("LGPL-2.0")
-    ) {
-      return "Avoid";
-    } else if (
-      licenseIdentifier.includes("GPL-3.0") ||
-      licenseIdentifier.includes("LGPL-3.0") ||
-      licenseIdentifier.includes("AGPL")
-    ) {
-      return "Blocked";
-    } else if (
-      licenseIdentifier.includes("MIT") ||
-      licenseIdentifier.includes("Apache-2.0") ||
-      licenseIdentifier.includes("BSD") ||
-      licenseIdentifier.includes("CC0-1.0") ||
-      licenseIdentifier.includes("Unlicense") ||
-      licenseIdentifier.includes("ISC") ||
-      licenseIdentifier.includes("0BSD")
-    ) {
-      return "Allowed";
-    } else {
-      return "Review";
-    }
-  }
-}

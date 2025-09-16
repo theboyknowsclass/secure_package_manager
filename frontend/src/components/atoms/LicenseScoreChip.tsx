@@ -25,12 +25,7 @@ export const LicenseScoreChip: React.FC<LicenseScoreChipProps> = ({
 
   const color = getLicenseColorFromScore(score);
   const chip = (
-    <Chip
-      label={`${score}/100`}
-      color={color}
-      size={size}
-      variant={variant}
-    />
+    <Chip label={`${score}/100`} color={color} size={size} variant={variant} />
   );
 
   if (showTooltip) {
