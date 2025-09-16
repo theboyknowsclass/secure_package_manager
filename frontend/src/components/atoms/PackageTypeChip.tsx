@@ -1,5 +1,5 @@
 import React from "react";
-import { StatusChip } from "./StatusChip";
+import { Chip } from "@mui/material";
 
 export interface PackageTypeChipProps {
   type: "new" | "existing";
@@ -11,21 +11,13 @@ export const PackageTypeChip: React.FC<PackageTypeChipProps> = ({
   type,
   size = "small",
   variant = "outlined",
-}) => {
-  if (type === "existing") {
-    return (
-      <StatusChip
-        status="Already Processed"
-        color="success"
-        size={size}
-        variant={variant}
-      />
-    );
-  }
-
-  return (
-    <StatusChip status="New" color="primary" size={size} variant={variant} />
-  );
-};
+}) => (
+  <Chip
+    label={type === "existing" ? "Existing" : "New"}
+    color={type === "existing" ? "success" : "primary"}
+    size={size}
+    variant={variant}
+  />
+);
 
 export default PackageTypeChip;

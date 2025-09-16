@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 # Create blueprint
 approver_bp = Blueprint("approver", __name__, url_prefix="/api/approver")
 
+
+
 # Initialize services
 auth_service = AuthService()
 package_service = PackageService()
@@ -268,6 +270,9 @@ def get_validated_packages() -> ResponseReturnValue:
                             "version": request_record.version,
                         }
 
+                # Get package type from RequestPackage
+                package_type = request_package.package_type if request_package else "new"
+                
                 package_list.append(
                     {
                         "id": pkg.id,
@@ -277,6 +282,7 @@ def get_validated_packages() -> ResponseReturnValue:
                         "license_score": pkg.package_status.license_score,
                         "license_identifier": pkg.license_identifier or "Unknown",
                         "security_scan_status": pkg.package_status.security_scan_status,
+                        "type": package_type,
                         "request": request_data
                         or {
                             "id": 0,

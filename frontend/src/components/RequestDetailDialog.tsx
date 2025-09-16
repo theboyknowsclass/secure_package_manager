@@ -20,6 +20,11 @@ import {
   type Package,
   type DetailedRequestResponse,
 } from "../types/status";
+import { 
+  getLicenseColorFromScore, 
+  getLicenseCategoryFromScore,
+  getScoreColor 
+} from "../utils/licenseUtils";
 
 interface RequestDetailDialogProps {
   open: boolean;
@@ -85,6 +90,25 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     },
   },
   {
+    accessorKey: "license_score",
+    header: "License Score",
+    size: 120,
+    Cell: ({ row }) => {
+      const score = row.original.license_score;
+      return score !== null ? (
+        <Chip
+          label={`${score}/100`}
+          color={getScoreColor(score)}
+          size="small"
+        />
+      ) : (
+        <Typography variant="body2" color="textSecondary">
+          -
+        </Typography>
+      );
+    },
+  },
+  {
     accessorKey: "security_score",
     header: "Security Score",
     size: 120,
@@ -119,25 +143,6 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
           </Typography>
         );
       }
-    },
-  },
-  {
-    accessorKey: "license_score",
-    header: "License Score",
-    size: 120,
-    Cell: ({ row }) => {
-      const score = row.original.license_score;
-      return score !== null ? (
-        <Chip
-          label={`${score}/100`}
-          color={getScoreColor(score)}
-          size="small"
-        />
-      ) : (
-        <Typography variant="body2" color="textSecondary">
-          -
-        </Typography>
-      );
     },
   },
   {
@@ -471,62 +476,3 @@ function getPackageStatusLabel(status: string): string {
   }
 }
 
-function getLicenseColorFromScore(
-  licenseScore: number | null
-):
-  | "default"
-  | "primary"
-  | "secondary"
-  | "error"
-  | "info"
-  | "success"
-  | "warning" {
-  if (licenseScore === null) {
-    return "info"; // Pending - blue
-  }
-
-  if (licenseScore === 0) {
-    return "error"; // Blocked - red
-  } else if (licenseScore >= 80) {
-    return "success"; // Allowed - green
-  } else if (licenseScore >= 50) {
-    return "info"; // Unknown - blue
-  } else if (licenseScore >= 30) {
-    return "warning"; // Avoid - orange
-  } else {
-    return "error"; // Blocked - red
-  }
-}
-
-function getLicenseCategoryFromScore(licenseScore: number | null): string {
-  if (licenseScore === null) {
-    return "Pending";
-  }
-
-  if (licenseScore === 0) {
-    return "Blocked";
-  } else if (licenseScore >= 80) {
-    return "Allowed";
-  } else if (licenseScore >= 50) {
-    return "Unknown";
-  } else if (licenseScore >= 30) {
-    return "Avoid";
-  } else {
-    return "Blocked";
-  }
-}
-
-function getScoreColor(
-  score: number
-):
-  | "default"
-  | "primary"
-  | "secondary"
-  | "error"
-  | "info"
-  | "success"
-  | "warning" {
-  if (score >= 80) return "success";
-  if (score >= 60) return "warning";
-  return "error";
-}

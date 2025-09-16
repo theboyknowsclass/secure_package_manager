@@ -135,11 +135,13 @@ class RequestPackage(db.Model):  # type: ignore[misc]
 
     request_id = db.Column(db.Integer, db.ForeignKey("requests.id"), primary_key=True)
     package_id = db.Column(db.Integer, db.ForeignKey("packages.id"), primary_key=True)
+    package_type = db.Column(db.String(20), default="new", nullable=False)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "request_id": self.request_id,
             "package_id": self.package_id,
+            "package_type": self.package_type,
         }
 
 

@@ -53,7 +53,9 @@ CREATE TABLE IF NOT EXISTS packages (
 CREATE TABLE IF NOT EXISTS request_packages (
     request_id INTEGER REFERENCES requests(id) ON DELETE CASCADE,
     package_id INTEGER REFERENCES packages(id) ON DELETE CASCADE,
-    PRIMARY KEY (request_id, package_id)
+    package_type VARCHAR(20) NOT NULL DEFAULT 'new',
+    PRIMARY KEY (request_id, package_id),
+    CONSTRAINT request_packages_package_type_check CHECK (package_type IN ('new', 'existing'))
 );
 
 -- Create package_status table (replaces package_validations and status tracking)
@@ -126,6 +128,7 @@ CREATE INDEX IF NOT EXISTS idx_security_scans_package_id ON security_scans(packa
 CREATE INDEX IF NOT EXISTS idx_packages_name_version ON packages(name, version);
 CREATE INDEX IF NOT EXISTS idx_package_status_status ON package_status(status);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_request_packages_package_type ON request_packages(package_type);
 
 
 -- Create function to update updated_at timestamp

@@ -169,8 +169,11 @@ class PackageService:
 
                 if not existing_link:
                     # Create link between request and existing package
+                    # Since package exists in DB, it's "existing" for this request
                     request_package = RequestPackage(
-                        request_id=request_id, package_id=existing_package.id
+                        request_id=request_id, 
+                        package_id=existing_package.id,
+                        package_type="existing"
                     )
                     db.session.add(request_package)
                     db.session.commit()
@@ -254,14 +257,17 @@ class PackageService:
             db.session.add(package_status)
 
             # Create request-package link
+            # Since this is a newly created package, it's "new" for this request
             request_package = RequestPackage(
-                request_id=request_id, package_id=package.id
+                request_id=request_id, 
+                package_id=package.id,
+                package_type="new"
             )
             db.session.add(request_package)
 
             package_objects.append(package)
             logger.info(
-                f"Added package for processing: {package.name}@{package.version}"
+                f"Added package for processing: {package.name}@{package.version} (type: new)"
             )
 
         db.session.commit()

@@ -49,6 +49,8 @@ def upload_package_lock() -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
+
+
 def _validate_uploaded_file() -> Union[Any, ResponseReturnValue]:
     """Validate the uploaded file"""
     if "file" not in request.files:
@@ -180,9 +182,9 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
         ):
             return jsonify({"error": "Access denied"}), 403
 
-        # Get packages for this request
-        packages = (
-            db.session.query(Package)
+        # Get packages for this request with their creation context
+        packages_with_context = (
+            db.session.query(Package, RequestPackage)
             .join(RequestPackage)
             .filter(RequestPackage.request_id == request_id)
             .all()
@@ -240,8 +242,9 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                                 else "pending"
                             ),
                             "license_identifier": pkg.license_identifier,
+                            "type": rp.package_type,
                         }
-                        for pkg in packages
+                        for pkg, rp in packages_with_context
                     ],
                 }
             ),
@@ -538,11 +541,11 @@ def get_request_processing_status(request_id: int) -> ResponseReturnValue:
         if not request.user.is_admin() and request_obj.requestor_id != request.user.id:
             return jsonify({"error": "Access denied"}), 403
         
-        # Get packages for this request
+        # Get packages for this request with package_type
         packages = (
-            db.session.query(Package, PackageStatus)
+            db.session.query(Package, PackageStatus, RequestPackage)
             .join(PackageStatus)
-            .join(RequestPackage)
+            .join(RequestPackage, Package.id == RequestPackage.package_id)
             .filter(RequestPackage.request_id == request_id)
             .all()
         )
@@ -550,17 +553,17 @@ def get_request_processing_status(request_id: int) -> ResponseReturnValue:
         # Count packages by status
         status_counts = {}
         for status in ["Requested", "Checking Licence", "Downloading", "Security Scanning", "Pending Approval", "Rejected"]:
-            count = sum(1 for _, pkg_status in packages if pkg_status.status == status)
+            count = sum(1 for _, pkg_status, _ in packages if pkg_status.status == status)
             status_counts[status] = count
         
         # Calculate progress
         total_packages = len(packages)
-        completed_packages = sum(1 for _, pkg_status in packages if pkg_status.status in ["Pending Approval", "Rejected"])
+        completed_packages = sum(1 for _, pkg_status, _ in packages if pkg_status.status in ["Pending Approval", "Rejected"])
         progress_percentage = (completed_packages / total_packages * 100) if total_packages > 0 else 0
         
         # Get package details
         package_details = []
-        for package, pkg_status in packages:
+        for package, pkg_status, rp in packages:
             package_details.append({
                 "package_id": package.id,
                 "package_name": package.name,
@@ -570,6 +573,7 @@ def get_request_processing_status(request_id: int) -> ResponseReturnValue:
                 "security_score": pkg_status.security_score,
                 "security_scan_status": pkg_status.security_scan_status,
                 "updated_at": pkg_status.updated_at.isoformat() if pkg_status.updated_at else None,
+                "type": rp.package_type,
             })
         
         return jsonify({

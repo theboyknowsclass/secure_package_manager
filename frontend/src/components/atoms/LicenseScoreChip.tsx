@@ -1,6 +1,6 @@
 import React from "react";
-import { Tooltip, Typography } from "@mui/material";
-import { StatusChip } from "./StatusChip";
+import { Tooltip, Typography, Chip } from "@mui/material";
+import { getLicenseColorFromScore } from "../../utils/licenseUtils";
 
 export interface LicenseScoreChipProps {
   score: number | null;
@@ -8,12 +8,6 @@ export interface LicenseScoreChipProps {
   size?: "small" | "medium";
   variant?: "filled" | "outlined";
 }
-
-const getScoreColor = (score: number) => {
-  if (score >= 80) return "success";
-  if (score >= 60) return "warning";
-  return "error";
-};
 
 export const LicenseScoreChip: React.FC<LicenseScoreChipProps> = ({
   score,
@@ -29,10 +23,10 @@ export const LicenseScoreChip: React.FC<LicenseScoreChipProps> = ({
     );
   }
 
-  const color = getScoreColor(score);
+  const color = getLicenseColorFromScore(score);
   const chip = (
-    <StatusChip
-      status={`${score}/100`}
+    <Chip
+      label={`${score}/100`}
       color={color}
       size={size}
       variant={variant}

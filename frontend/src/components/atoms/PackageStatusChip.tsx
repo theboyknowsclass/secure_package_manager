@@ -1,6 +1,5 @@
 import React from "react";
-import { Tooltip } from "@mui/material";
-import { StatusChip } from "./StatusChip";
+import { Tooltip, Chip } from "@mui/material";
 import { PACKAGE_STATUS, type PackageStatus } from "../../types/packageStatus";
 
 export interface PackageStatusChipProps {
@@ -60,7 +59,7 @@ export const PackageStatusChip: React.FC<PackageStatusChipProps> = ({
   const label = getPackageStatusLabel(status);
 
   const chip = (
-    <StatusChip status={label} color={color} size={size} variant={variant} />
+    <Chip label={label} color={color} size={size} variant={variant} />
   );
 
   if (showTooltip) {

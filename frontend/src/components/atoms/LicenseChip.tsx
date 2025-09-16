@@ -1,6 +1,9 @@
 import React from "react";
-import { Tooltip } from "@mui/material";
-import { StatusChip } from "./StatusChip";
+import { Tooltip, Chip } from "@mui/material";
+import { 
+  getLicenseColorFromScore, 
+  getLicenseCategoryFromScore 
+} from "../../utils/licenseUtils";
 
 export interface LicenseChipProps {
   identifier: string | null;
@@ -9,42 +12,6 @@ export interface LicenseChipProps {
   size?: "small" | "medium";
   variant?: "filled" | "outlined";
 }
-
-const getLicenseColorFromScore = (licenseScore: number | null) => {
-  if (licenseScore === null) {
-    return "info"; // Pending - blue
-  }
-
-  if (licenseScore === 0) {
-    return "error"; // Blocked - red
-  } else if (licenseScore >= 80) {
-    return "success"; // Allowed - green
-  } else if (licenseScore >= 50) {
-    return "info"; // Unknown - blue
-  } else if (licenseScore >= 30) {
-    return "warning"; // Avoid - orange
-  } else {
-    return "error"; // Blocked - red
-  }
-};
-
-const getLicenseCategoryFromScore = (licenseScore: number | null): string => {
-  if (licenseScore === null) {
-    return "Pending";
-  }
-
-  if (licenseScore === 0) {
-    return "Blocked";
-  } else if (licenseScore >= 80) {
-    return "Allowed";
-  } else if (licenseScore >= 50) {
-    return "Unknown";
-  } else if (licenseScore >= 30) {
-    return "Avoid";
-  } else {
-    return "Blocked";
-  }
-};
 
 export const LicenseChip: React.FC<LicenseChipProps> = ({
   identifier,
@@ -55,8 +22,8 @@ export const LicenseChip: React.FC<LicenseChipProps> = ({
 }) => {
   if (!identifier) {
     const chip = (
-      <StatusChip
-        status="Unknown"
+      <Chip
+        label="Unknown"
         color="default"
         size={size}
         variant={variant}
@@ -77,8 +44,8 @@ export const LicenseChip: React.FC<LicenseChipProps> = ({
   const category = getLicenseCategoryFromScore(score);
 
   const chip = (
-    <StatusChip
-      status={identifier}
+    <Chip
+      label={identifier}
       color={color}
       size={size}
       variant={variant}

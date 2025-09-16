@@ -1,6 +1,5 @@
 import React from "react";
-import { Tooltip, Typography } from "@mui/material";
-import { StatusChip } from "./StatusChip";
+import { Tooltip, Typography, Chip } from "@mui/material";
 import {
   SECURITY_SCAN_STATUS,
   type SecurityScanStatus,
@@ -31,8 +30,8 @@ export const SecurityScoreChip: React.FC<SecurityScoreChipProps> = ({
   if (score !== null) {
     const color = getScoreColor(score);
     const chip = (
-      <StatusChip
-        status={`${score}/100`}
+      <Chip
+        label={`${score}/100`}
         color={color}
         size={size}
         variant={variant}
@@ -48,8 +47,8 @@ export const SecurityScoreChip: React.FC<SecurityScoreChipProps> = ({
   // Handle scan status when score is not available
   if (scanStatus === SECURITY_SCAN_STATUS.FAILED) {
     const chip = (
-      <StatusChip
-        status="Scan Failed"
+      <Chip
+        label="Scan Failed"
         color="error"
         size={size}
         variant={variant}
@@ -64,8 +63,8 @@ export const SecurityScoreChip: React.FC<SecurityScoreChipProps> = ({
 
   if (scanStatus === SECURITY_SCAN_STATUS.RUNNING) {
     const chip = (
-      <StatusChip
-        status="Scanning..."
+      <Chip
+        label="Scanning..."
         color="info"
         size={size}
         variant={variant}
