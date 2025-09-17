@@ -47,26 +47,26 @@ class PublishWorker(BaseWorker):
         """Handle packages that have been stuck in publishing state too long"""
         try:
             stuck_threshold = datetime.utcnow() - self.stuck_package_timeout
-            stuck_statuses = ["Publishing", "Publish Failed"]
+            stuck_publish_statuses = ["publishing", "failed"]
             
             stuck_packages = (
                 db.session.query(Package)
                 .join(PackageStatus)
                 .filter(
-                    PackageStatus.status.in_(stuck_statuses),
+                    PackageStatus.publish_status.in_(stuck_publish_statuses),
                     PackageStatus.updated_at < stuck_threshold
                 )
                 .all()
             )
             
             if stuck_packages:
-                logger.warning(f"Found {len(stuck_packages)} stuck packages in publishing, resetting to Approved")
+                logger.warning(f"Found {len(stuck_packages)} stuck packages in publishing, resetting publish status")
                 
                 for package in stuck_packages:
                     if package.package_status:
-                        package.package_status.status = "Approved"
+                        package.package_status.publish_status = "pending"
                         package.package_status.updated_at = datetime.utcnow()
-                        logger.info(f"Reset stuck package {package.name}@{package.version} to Approved")
+                        logger.info(f"Reset stuck package {package.name}@{package.version} publish status to pending")
                 
                 db.session.commit()
                 
@@ -77,13 +77,14 @@ class PublishWorker(BaseWorker):
     def _process_pending_publishing(self) -> None:
         """Process packages that are approved and ready for publishing"""
         try:
-            # Get packages that need publishing
-            # For now, we'll look for packages that are "Approved" and don't have a publishing status
-            # In the future, we could add a separate "publishing_status" field
+            # Get packages that need publishing - approved packages with pending publish status
             pending_packages = (
                 db.session.query(Package)
                 .join(PackageStatus)
-                .filter(PackageStatus.status == "Approved")
+                .filter(
+                    PackageStatus.status == "Approved",
+                    PackageStatus.publish_status == "pending"
+                )
                 .limit(self.max_packages_per_cycle)
                 .all()
             )
@@ -111,9 +112,9 @@ class PublishWorker(BaseWorker):
         logger.info(f"Publishing package {package.name}@{package.version}")
         
         try:
-            # Update status to publishing
+            # Update publish status to publishing (keep main status as Approved)
             if package.package_status:
-                package.package_status.status = "Publishing"
+                package.package_status.publish_status = "publishing"
                 package.package_status.updated_at = datetime.utcnow()
                 db.session.commit()
             
@@ -121,9 +122,10 @@ class PublishWorker(BaseWorker):
             success = self.package_service.publish_to_secure_repo(package)
             
             if success:
-                # Mark as published successfully (keep status as Approved, just set published_at)
+                # Mark as published successfully (keep status as Approved, set published_at and publish_status)
                 if package.package_status:
                     package.package_status.published_at = datetime.utcnow()
+                    package.package_status.publish_status = "published"
                     package.package_status.updated_at = datetime.utcnow()
                 logger.info(f"Successfully published package {package.name}@{package.version}")
             else:
@@ -138,7 +140,7 @@ class PublishWorker(BaseWorker):
         """Mark a package as publish failed with error message"""
         try:
             if package.package_status:
-                package.package_status.status = "Publish Failed"
+                package.package_status.publish_status = "failed"
                 package.package_status.updated_at = datetime.utcnow()
             logger.error(f"Package {package.name}@{package.version} publish failed: {error_message}")
         except Exception as e:
@@ -148,15 +150,19 @@ class PublishWorker(BaseWorker):
         """Get current publishing statistics"""
         try:
             with self.app.app_context():
-                # Count packages by status
-                status_counts = {}
-                for status in ["Approved", "Publishing", "Published", "Publish Failed"]:
-                    count = db.session.query(Package).join(PackageStatus).filter(PackageStatus.status == status).count()
-                    status_counts[status] = count
+                # Count packages by publish status
+                publish_status_counts = {}
+                for status in ["pending", "publishing", "published", "failed"]:
+                    count = db.session.query(Package).join(PackageStatus).filter(PackageStatus.publish_status == status).count()
+                    publish_status_counts[status] = count
+                
+                # Count approved packages (main status)
+                approved_count = db.session.query(Package).join(PackageStatus).filter(PackageStatus.status == "Approved").count()
                 
                 return {
                     "worker_status": self.get_worker_status(),
-                    "package_status_counts": status_counts,
+                    "approved_packages": approved_count,
+                    "publish_status_counts": publish_status_counts,
                     "timestamp": datetime.utcnow().isoformat(),
                 }
         except Exception as e:
@@ -169,7 +175,7 @@ class PublishWorker(BaseWorker):
             failed_packages = (
                 db.session.query(Package)
                 .join(PackageStatus)
-                .filter(PackageStatus.status == "Publish Failed")
+                .filter(PackageStatus.publish_status == "failed")
                 .all()
             )
             
@@ -179,7 +185,7 @@ class PublishWorker(BaseWorker):
             retried_count = 0
             for package in failed_packages:
                 if package.package_status:
-                    package.package_status.status = "Approved"
+                    package.package_status.publish_status = "pending"
                     package.package_status.updated_at = datetime.utcnow()
                     retried_count += 1
             

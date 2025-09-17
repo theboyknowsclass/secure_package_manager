@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 import os
@@ -411,34 +412,72 @@ class PackageService:
                 if not registry_url.startswith("http"):
                     registry_url = f"http://{registry_url}"
 
-                # Run npm publish
+                # Create a tarball of the package
+                import tarfile
+                # Sanitize package name for filesystem (replace @ and / with -)
+                safe_name = package.name.replace("@", "").replace("/", "-")
+                tarball_path = os.path.join(temp_dir, f"{safe_name}-{package.version}.tgz")
+                with tarfile.open(tarball_path, "w:gz") as tar:
+                    tar.add(temp_dir, arcname="package", filter=lambda tarinfo: None if tarinfo.name == os.path.basename(tarball_path) else tarinfo)
+
+                # Use curl to directly publish to the registry
                 try:
-                    # First, set the registry
-                    subprocess.run(
-                        ["npm", "config", "set", "registry", registry_url],
-                        check=True,
-                        capture_output=True,
-                        text=True,
-                        cwd=temp_dir,
-                    )
+                    # Read the tarball as base64
+                    with open(tarball_path, 'rb') as f:
+                        tarball_data = f.read()
+                    tarball_b64 = base64.b64encode(tarball_data).decode('ascii')
 
-                    # Publish the package
-                    result = subprocess.run(
-                        ["npm", "publish", "--access", "public"],
-                        check=True,
-                        capture_output=True,
-                        text=True,
-                        cwd=temp_dir,
-                    )
+                    # Create the npm publish payload
+                    publish_payload = {
+                        "_id": package.name,
+                        "name": package.name,
+                        "description": f"Secure package {package.name}",
+                        "dist-tags": {"latest": package.version},
+                        "versions": {
+                            package.version: {
+                                "name": package.name,
+                                "version": package.version,
+                                "description": f"Secure package {package.name}",
+                                "main": "index.js",
+                                "scripts": {"test": 'echo "No tests specified"'},
+                                "keywords": ["secure", "validated"],
+                                "author": "Secure Package Manager",
+                                "license": package.license_identifier or "MIT",
+                                "dist": {
+                                    "shasum": "mock-shasum",
+                                    "tarball": f"{registry_url}/{package.name}/-/{package.name}-{package.version}.tgz"
+                                }
+                            }
+                        },
+                        "_attachments": {
+                            f"{safe_name}-{package.version}.tgz": {
+                                "content_type": "application/octet-stream",
+                                "data": tarball_b64,
+                                "length": len(tarball_data)
+                            }
+                        }
+                    }
 
-                    logger.info(f"npm publish output: {result.stdout}")
-                    logger.info(
-                        f"Successfully published {package.name}@{package.version} to secure repository"
+                    # Use curl to publish directly to the registry
+                    import requests
+                    from urllib.parse import quote
+                    # URL encode the package name for scoped packages like @babel/core
+                    encoded_package_name = quote(package.name, safe='')
+                    response = requests.put(
+                        f"{registry_url}/{encoded_package_name}",
+                        json=publish_payload,
+                        headers={"Content-Type": "application/json"}
                     )
-                    return True
+                    
+                    if response.status_code in [200, 201]:
+                        logger.info(f"Successfully published {package.name}@{package.version} to secure repository")
+                        return True
+                    else:
+                        logger.error(f"Failed to publish package: {response.status_code} - {response.text}")
+                        return False
 
-                except subprocess.CalledProcessError as e:
-                    logger.error(f"npm publish failed: {e.stderr}")
+                except Exception as e:
+                    logger.error(f"Failed to publish package via direct HTTP: {str(e)}")
                     return False
 
         except Exception as e:

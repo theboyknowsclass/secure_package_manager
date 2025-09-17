@@ -172,6 +172,7 @@ app.put('/:package', upload.single('package'), (req, res) => {
   
   // Mock authentication - accept any request for testing
   // In production, this would validate JWT tokens or other auth mechanisms
+  // For development, we'll skip authentication checks entirely
   
   // Extract version from the npm publish format
   let version;

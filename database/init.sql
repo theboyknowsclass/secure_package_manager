@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS package_status (
     approver_id INTEGER REFERENCES users(id) ON DELETE SET NULL, -- User who approved the package
     rejector_id INTEGER REFERENCES users(id) ON DELETE SET NULL, -- User who rejected the package
     published_at TIMESTAMP, -- Timestamp when package was successfully published
+    publish_status VARCHAR(20) DEFAULT 'pending', -- Publishing status: pending, publishing, published, failed
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(package_id), -- Only one status record per package
@@ -88,7 +89,8 @@ CREATE TABLE IF NOT EXISTS package_status (
         'Rejected'
     )),
     CONSTRAINT package_status_security_scan_status_check CHECK (security_scan_status IN ('pending', 'running', 'completed', 'failed', 'skipped')),
-    CONSTRAINT package_status_license_status_check CHECK (license_status IN ('always_allowed', 'allowed', 'avoid', 'blocked'))
+    CONSTRAINT package_status_license_status_check CHECK (license_status IN ('always_allowed', 'allowed', 'avoid', 'blocked')),
+    CONSTRAINT package_status_publish_status_check CHECK (publish_status IN ('pending', 'publishing', 'published', 'failed'))
 );
 
 -- Create security_scans table (stores Trivy scan results)
