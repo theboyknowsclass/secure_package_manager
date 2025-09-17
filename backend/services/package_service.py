@@ -427,6 +427,10 @@ class PackageService:
                         tarball_data = f.read()
                     tarball_b64 = base64.b64encode(tarball_data).decode('ascii')
 
+                    # URL encode the package name for scoped packages like @babel/core
+                    from urllib.parse import quote
+                    encoded_package_name = quote(package.name, safe='')
+                    
                     # Create the npm publish payload
                     publish_payload = {
                         "_id": package.name,
@@ -445,7 +449,7 @@ class PackageService:
                                 "license": package.license_identifier or "MIT",
                                 "dist": {
                                     "shasum": "mock-shasum",
-                                    "tarball": f"{registry_url}/{package.name}/-/{package.name}-{package.version}.tgz"
+                                    "tarball": f"{registry_url}/{encoded_package_name}/-/{safe_name}-{package.version}.tgz"
                                 }
                             }
                         },
@@ -460,9 +464,6 @@ class PackageService:
 
                     # Use curl to publish directly to the registry
                     import requests
-                    from urllib.parse import quote
-                    # URL encode the package name for scoped packages like @babel/core
-                    encoded_package_name = quote(package.name, safe='')
                     response = requests.put(
                         f"{registry_url}/{encoded_package_name}",
                         json=publish_payload,
