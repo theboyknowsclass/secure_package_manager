@@ -111,6 +111,7 @@ class LicenseWorker(BaseWorker):
             pending_packages = self.ops.get_packages_by_status("Parsed", Package, PackageStatus)
 
             if not pending_packages:
+                logger.info("LicenseWorker heartbeat: No packages found for license checking")
                 return {}
 
             # Group packages by license string

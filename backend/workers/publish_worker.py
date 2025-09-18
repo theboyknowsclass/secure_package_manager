@@ -102,6 +102,7 @@ class PublishWorker(BaseWorker):
             )
 
             if not pending_packages:
+                logger.info("PublishWorker heartbeat: No packages found for publishing")
                 return
 
             logger.info(f"Processing {len(pending_packages)} packages for publishing")

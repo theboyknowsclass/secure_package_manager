@@ -78,6 +78,7 @@ class DownloadWorker(BaseWorker):
         packages = packages[:self.max_packages_per_cycle]
         
         if not packages:
+            logger.info("DownloadWorker heartbeat: No packages found for downloading")
             return
 
         logger.info(f"Downloading {len(packages)} packages")

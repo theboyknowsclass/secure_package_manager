@@ -78,6 +78,7 @@ class ApprovalWorker(BaseWorker):
             )
             
             if not security_scanned_packages:
+                logger.info("ApprovalWorker heartbeat: No packages found for approval transition")
                 return
                 
             logger.info(f"Transitioning {len(security_scanned_packages)} packages from Security Scanned to Pending Approval")

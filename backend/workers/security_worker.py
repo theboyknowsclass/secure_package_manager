@@ -77,6 +77,7 @@ class SecurityWorker(BaseWorker):
         packages = self.ops.get_packages_by_status("Downloaded", Package, PackageStatus)
         packages = packages[:self.max_packages_per_cycle]
         if not packages:
+            logger.info("SecurityWorker heartbeat: No packages found for security scanning")
             return
 
         logger.info(f"Security scanning {len(packages)} packages")
