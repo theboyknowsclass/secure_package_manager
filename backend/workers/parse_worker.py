@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 class ParseWorker(BaseWorker):
     """Background worker for parsing package-lock.json blobs and extracting packages"""
 
+    WORKER_TYPE = "parse_worker"
+
     def __init__(self, sleep_interval: int = 10):
         super().__init__("ParseWorker", sleep_interval)
         self.max_requests_per_cycle = 5  # Process max 5 requests per cycle

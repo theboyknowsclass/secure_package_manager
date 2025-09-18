@@ -19,10 +19,12 @@ logger = logging.getLogger(__name__)
 class BaseWorker(ABC):
     """Base class for all background workers"""
 
+    # Worker type identifier - must be overridden in subclasses
+    WORKER_TYPE: str = "base_worker"
+
     # Default required environment variables for workers (can be overridden in subclasses)
     required_env_vars: List[str] = [
         "DATABASE_URL",
-        "DATABASE_PORT", 
         "POSTGRES_USER",
         "POSTGRES_PASSWORD",
         "POSTGRES_DB"

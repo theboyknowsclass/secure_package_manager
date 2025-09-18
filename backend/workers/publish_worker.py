@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 class PublishWorker(BaseWorker):
     """Background worker for publishing approved packages"""
+
+    WORKER_TYPE = "package_publisher"
     
     # Extend base environment variables with publish-specific ones
     required_env_vars = BaseWorker.required_env_vars + [

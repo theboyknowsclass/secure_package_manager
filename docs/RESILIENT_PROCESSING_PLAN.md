@@ -34,7 +34,7 @@ worker:
     context: ./backend
     dockerfile: Dockerfile.worker
   environment:
-    - WORKER_TYPE=package_processor
+    - WORKER_TYPE=package_publisher
     - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${DATABASE_PORT}/${POSTGRES_DB}
     - REDIS_URL=redis://redis:6379/0
   depends_on:

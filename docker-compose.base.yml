@@ -35,7 +35,6 @@ services:
       - APP_NAME=${APP_NAME}
       - FLASK_ENV=${FLASK_ENV}
       - FLASK_DEBUG=${FLASK_DEBUG}
-      - DATABASE_PORT=${DATABASE_PORT}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
@@ -109,12 +108,10 @@ services:
     environment:
       # Base database environment variables (required by all workers)
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${DATABASE_PORT}/${POSTGRES_DB}
-      - DATABASE_PORT=${DATABASE_PORT}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
       # Worker-specific configuration
-      - WORKER_TYPE=license_checker
       - WORKER_SLEEP_INTERVAL=15
       - WORKER_MAX_LICENSE_GROUPS_PER_CYCLE=20
     volumes:
@@ -141,12 +138,10 @@ services:
     environment:
       # Base database environment variables (required by all workers)
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${DATABASE_PORT}/${POSTGRES_DB}
-      - DATABASE_PORT=${DATABASE_PORT}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
       # Worker-specific configuration
-      - WORKER_TYPE=parse_worker
       - WORKER_SLEEP_INTERVAL=10
     volumes:
       - package_cache:/app/package_cache
@@ -172,14 +167,12 @@ services:
     environment:
       # Base database environment variables (required by all workers)
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${DATABASE_PORT}/${POSTGRES_DB}
-      - DATABASE_PORT=${DATABASE_PORT}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
       # Download-specific environment variables
       - SOURCE_REPOSITORY_URL=${SOURCE_REPOSITORY_URL}
       # Worker-specific configuration
-      - WORKER_TYPE=download_worker
       - WORKER_SLEEP_INTERVAL=10
       - WORKER_MAX_PACKAGES_PER_CYCLE=10
     volumes:
@@ -208,7 +201,6 @@ services:
     environment:
       # Base database environment variables (required by all workers)
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${DATABASE_PORT}/${POSTGRES_DB}
-      - DATABASE_PORT=${DATABASE_PORT}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
@@ -217,7 +209,6 @@ services:
       - TRIVY_TIMEOUT=${TRIVY_TIMEOUT}
       - TRIVY_MAX_RETRIES=${TRIVY_MAX_RETRIES}
       # Worker-specific configuration
-      - WORKER_TYPE=security_worker
       - WORKER_SLEEP_INTERVAL=15
       - WORKER_MAX_PACKAGES_PER_CYCLE=10
     volumes:
@@ -244,14 +235,12 @@ services:
     environment:
       # Base database environment variables (required by all workers)
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${DATABASE_PORT}/${POSTGRES_DB}
-      - DATABASE_PORT=${DATABASE_PORT}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
       # Publish-specific environment variables
       - TARGET_REPOSITORY_URL=${TARGET_REPOSITORY_URL}
       # Worker-specific configuration
-      - WORKER_TYPE=package_publisher
       - WORKER_SLEEP_INTERVAL=30
       - WORKER_MAX_PACKAGES_PER_CYCLE=3
     volumes:

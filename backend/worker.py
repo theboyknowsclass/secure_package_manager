@@ -41,47 +41,39 @@ def main():
     logger.info(f"  - Max license groups per cycle: {max_license_groups_per_cycle}")
 
     try:
-        # Import and create the appropriate worker based on type
-        if worker_type == "license_checker":
-            from workers.license_worker import LicenseWorker
+        # Import all worker classes
+        from workers.license_worker import LicenseWorker
+        from workers.publish_worker import PublishWorker
+        from workers.parse_worker import ParseWorker
+        from workers.download_worker import DownloadWorker
+        from workers.security_worker import SecurityWorker
+        from workers.approval_worker import ApprovalWorker
 
-            worker = LicenseWorker(sleep_interval=sleep_interval)
-            worker.max_license_groups_per_cycle = max_license_groups_per_cycle
+        # Create a registry of worker classes by their WORKER_TYPE
+        worker_registry = {
+            LicenseWorker.WORKER_TYPE: LicenseWorker,
+            PublishWorker.WORKER_TYPE: PublishWorker,
+            ParseWorker.WORKER_TYPE: ParseWorker,
+            DownloadWorker.WORKER_TYPE: DownloadWorker,
+            SecurityWorker.WORKER_TYPE: SecurityWorker,
+            ApprovalWorker.WORKER_TYPE: ApprovalWorker,
+        }
 
-        elif worker_type == "package_publisher":
-            from workers.publish_worker import PublishWorker
-
-            worker = PublishWorker(sleep_interval=sleep_interval)
-            worker.max_packages_per_cycle = max_packages_per_cycle
-
-        elif worker_type == "parse_worker":
-            from workers.parse_worker import ParseWorker
-
-            worker = ParseWorker(sleep_interval=sleep_interval)
-
-        elif worker_type == "download_worker":
-            from workers.download_worker import DownloadWorker
-
-            worker = DownloadWorker(sleep_interval=sleep_interval)
-            worker.max_packages_per_cycle = max_packages_per_cycle
-
-        elif worker_type == "security_worker":
-            from workers.security_worker import SecurityWorker
-
-            worker = SecurityWorker(sleep_interval=sleep_interval)
-            worker.max_packages_per_cycle = max_packages_per_cycle
-
-        elif worker_type == "approval_worker":
-            from workers.approval_worker import ApprovalWorker
-
-            worker = ApprovalWorker(sleep_interval=sleep_interval)
-
-        else:
+        # Get the worker class from the registry
+        worker_class = worker_registry.get(worker_type)
+        if not worker_class:
             logger.error(f"Unknown worker type: {worker_type}")
-            logger.error(
-                "Supported worker types: license_checker, package_publisher, parse_worker, download_worker, security_worker, approval_worker"
-            )
+            logger.error(f"Supported worker types: {', '.join(worker_registry.keys())}")
             sys.exit(1)
+
+        # Create the worker instance
+        worker = worker_class(sleep_interval=sleep_interval)
+        
+        # Set worker-specific configuration
+        if hasattr(worker, 'max_license_groups_per_cycle'):
+            worker.max_license_groups_per_cycle = max_license_groups_per_cycle
+        if hasattr(worker, 'max_packages_per_cycle'):
+            worker.max_packages_per_cycle = max_packages_per_cycle
 
         # Start the worker (this will run until interrupted)
         worker.start()

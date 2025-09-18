@@ -132,7 +132,6 @@ ADFS_CERT_PATH = get_required_env("ADFS_CERT_PATH", "ADFS certificate path")
 # =============================================================================
 
 # Database Port & Connection
-DATABASE_PORT = get_required_env_int("DATABASE_PORT", "PostgreSQL database port")
 DATABASE_URL = get_required_env("DATABASE_URL", "Database connection URL")
 
 # Database Credentials
@@ -207,14 +206,3 @@ def is_development() -> bool:
 def is_production() -> bool:
     """Check if running in production mode"""
     return os.getenv("FLASK_ENV", "development") == "production"
-
-
-# =============================================================================
-# CONFIGURATION VALIDATION
-# =============================================================================
-
-
-# Validate all required environment variables at module load time
-# Only validate if not running as a worker (workers may not need all variables)
-if not os.getenv("WORKER_TYPE"):
-    validate_all_required_env()

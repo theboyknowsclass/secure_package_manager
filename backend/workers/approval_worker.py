@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 class ApprovalWorker(BaseWorker):
     """Background worker for transitioning packages to pending approval"""
 
+    WORKER_TYPE = "approval_worker"
+
     def __init__(self, sleep_interval: int = 30):
         super().__init__("ApprovalWorker", sleep_interval)
         self.max_packages_per_cycle = 50  # Can handle many packages since it's just status updates

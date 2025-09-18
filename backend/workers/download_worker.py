@@ -19,6 +19,10 @@ logger = logging.getLogger(__name__)
 
 
 class DownloadWorker(BaseWorker):
+    """Background worker for downloading packages"""
+
+    WORKER_TYPE = "download_worker"
+
     # Extend base environment variables with download-specific ones
     required_env_vars = BaseWorker.required_env_vars + [
         "SOURCE_REPOSITORY_URL"

@@ -19,6 +19,10 @@ logger = logging.getLogger(__name__)
 
 
 class SecurityWorker(BaseWorker):
+    """Background worker for security scanning packages"""
+
+    WORKER_TYPE = "security_worker"
+
     # Extend base environment variables with Trivy-specific ones
     required_env_vars = BaseWorker.required_env_vars + [
         "TRIVY_URL",

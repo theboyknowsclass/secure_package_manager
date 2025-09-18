@@ -34,7 +34,6 @@ RUN mkdir -p /app/package_cache
 
 # Set environment variables
 ENV PYTHONPATH=/app
-ENV WORKER_TYPE=package_processor
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

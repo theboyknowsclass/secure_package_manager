@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 class LicenseWorker(BaseWorker):
     """Background worker for license validation"""
 
+    WORKER_TYPE = "license_checker"
+
     def __init__(self, sleep_interval: int = 15):
         super().__init__("LicenseChecker", sleep_interval)
         self.license_service = None
