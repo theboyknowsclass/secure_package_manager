@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch
 # Add the parent directory to the path so we can import modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from models import Package, SupportedLicense
+from database.models import Package, SupportedLicense
 from services.license_service import LicenseService
 from services.package_service import PackageService
 

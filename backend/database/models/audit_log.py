@@ -5,7 +5,7 @@ AuditLog model for tracking user actions
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 
 from .base import Base
 

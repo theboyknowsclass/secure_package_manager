@@ -8,7 +8,9 @@ based on the states of individual packages within the request.
 import logging
 from typing import Any, Dict, List, Optional
 
-from models import Package, PackageStatus, Request, RequestPackage, db
+from database.models import Package, PackageStatus, Request, RequestPackage
+
+from database import db
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +64,6 @@ class PackageRequestStatusManager:
         # Rule 1: If there are still early-stage packages, keep processing
         if counts["Submitted"] > 0 or counts["Parsed"] > 0:
             return "processing"
-
 
         # Rule 3: If all packages are pending approval, request is ready for approval
         if counts["Pending Approval"] == total_packages:

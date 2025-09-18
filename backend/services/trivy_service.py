@@ -10,7 +10,9 @@ from config.constants import (
     TRIVY_TIMEOUT,
     TRIVY_URL,
 )
-from models import Package, SecurityScan, db
+from database.models import Package, SecurityScan
+
+from database import db
 
 logger = logging.getLogger(__name__)
 
@@ -255,9 +257,9 @@ class TrivyService:
                             "installed_version": vuln.get("InstalledVersion", package.version),
                             "fixed_version": vuln.get("FixedVersion"),
                             "references": vuln.get("References", []),
-                            "cvss_score": vuln.get("CVSS", {}).get("nvd", {}).get("V3Score")
-                            if vuln.get("CVSS")
-                            else None,
+                            "cvss_score": (
+                                vuln.get("CVSS", {}).get("nvd", {}).get("V3Score") if vuln.get("CVSS") else None
+                            ),
                             "published_date": vuln.get("PublishedDate"),
                             "last_modified_date": vuln.get("LastModifiedDate"),
                         }

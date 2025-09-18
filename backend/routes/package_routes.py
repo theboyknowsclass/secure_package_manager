@@ -3,11 +3,13 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, Union
 
+from database.models import Package, PackageStatus, Request, RequestPackage, SecurityScan
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
-from models import Package, PackageStatus, Request, RequestPackage, SecurityScan, db
 from services.auth_service import AuthService
 from services.package_service import PackageService
+
+from database import db
 
 logger = logging.getLogger(__name__)
 

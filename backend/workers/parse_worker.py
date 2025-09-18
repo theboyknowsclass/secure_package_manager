@@ -11,9 +11,9 @@ import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from database.service import DatabaseService
-from database.operations import DatabaseOperations
 from database.models import Package, PackageStatus, Request, RequestPackage
+from database.operations import DatabaseOperations
+from database.service import DatabaseService
 from workers.base_worker import BaseWorker
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ class ParseWorker(BaseWorker):
         database_url = os.getenv("DATABASE_URL")
         if not database_url:
             raise ValueError("DATABASE_URL environment variable is required")
-        
+
         self.db_service = DatabaseService(database_url)
         logger.info("ParseWorker database service initialized")
 
@@ -54,16 +54,16 @@ class ParseWorker(BaseWorker):
         """Handle requests that have been stuck in processing too long"""
         try:
             stuck_threshold = datetime.utcnow() - self.stuck_request_timeout
-            
+
             # Find requests that have been processing too long
             # Note: This is a simplified version - in practice, you might want to add a status field to Request
             stuck_requests = self.ops.get_pending_requests(Request)
             stuck_requests = [r for r in stuck_requests if r.created_at < stuck_threshold]
-            
+
             if stuck_requests:
                 logger.warning(f"Found {len(stuck_requests)} potentially stuck requests")
                 # In a real implementation, you might want to add retry logic or error handling
-                    
+
         except Exception as e:
             logger.error(f"Error handling stuck requests: {str(e)}", exc_info=True)
 
@@ -74,21 +74,22 @@ class ParseWorker(BaseWorker):
             # This is a simplified version - in practice, you might want to add a status field to Request
             all_requests = self.ops.get_pending_requests(Request)
             logger.debug(f"Found {len(all_requests)} total requests in database")
-            
-            requests_to_process = [
-                r for r in all_requests 
-                if r.raw_request_blob and not r.request_packages
-            ][:self.max_requests_per_cycle]
-            
+
+            requests_to_process = [r for r in all_requests if r.raw_request_blob and not r.request_packages][
+                : self.max_requests_per_cycle
+            ]
+
             if not requests_to_process:
                 if not all_requests:
                     logger.info("ParseWorker heartbeat: No requests found in database to parse")
                 else:
-                    logger.info(f"ParseWorker heartbeat: No requests found to parse - {len(all_requests)} requests exist but all are either processed or have no raw_request_blob")
+                    logger.info(
+                        f"ParseWorker heartbeat: No requests found to parse - {len(all_requests)} requests exist but all are either processed or have no raw_request_blob"
+                    )
                 return
-                
+
             logger.info(f"Processing {len(requests_to_process)} requests for package extraction")
-            
+
             for request in requests_to_process:
                 try:
                     self._parse_request_blob(request)
@@ -98,7 +99,7 @@ class ParseWorker(BaseWorker):
                         exc_info=True,
                     )
                     # Mark request as failed (could add a status field to Request model)
-                    
+
         except Exception as e:
             logger.error(f"Error processing submitted requests: {str(e)}", exc_info=True)
 
@@ -107,24 +108,24 @@ class ParseWorker(BaseWorker):
         try:
             # Parse the JSON blob
             package_data = json.loads(request.raw_request_blob)
-            
+
             # Validate the package-lock.json file
             self._validate_package_lock_file(package_data)
-            
+
             # Extract packages from the JSON data
             packages = self._extract_packages_from_json(package_data)
-            
+
             # Filter and process packages
             packages_to_process, existing_packages = self._filter_new_packages(packages, request.id)
-            
+
             # Create database records for new packages
             self._create_package_records(packages_to_process, request.id)
-            
+
             logger.info(
                 f"Request {request.id}: Created {len(packages_to_process)} new packages, "
                 f"linked {len(existing_packages)} existing packages"
             )
-            
+
         except Exception as e:
             logger.error(f"Error parsing request {request.id} blob: {str(e)}")
             raise e
@@ -245,16 +246,12 @@ class ParseWorker(BaseWorker):
         """Create database records for new packages"""
         # Use the shared operations to create package records
         package_objects = self.ops.create_package_records(
-            packages_to_process, 
-            request_id, 
-            Package, 
-            PackageStatus, 
-            RequestPackage
+            packages_to_process, request_id, Package, PackageStatus, RequestPackage
         )
-        
+
         for package in package_objects:
             logger.info(f"Added package for processing: {package.name}@{package.version} (type: new)")
-        
+
         return package_objects
 
     def _create_package_object(

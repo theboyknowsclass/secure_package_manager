@@ -16,9 +16,11 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler("/app/logs/worker.log", mode="a")
-        if os.path.exists("/app/logs")
-        else logging.StreamHandler(sys.stdout),
+        (
+            logging.FileHandler("/app/logs/worker.log", mode="a")
+            if os.path.exists("/app/logs")
+            else logging.StreamHandler(sys.stdout)
+        ),
     ],
 )
 
@@ -28,12 +30,12 @@ logger = logging.getLogger(__name__)
 def _get_worker_registry():
     """Get the worker registry using class attributes - DRY implementation"""
     # Import all worker classes
-    from workers.license_worker import LicenseWorker
-    from workers.publish_worker import PublishWorker
-    from workers.parse_worker import ParseWorker
-    from workers.download_worker import DownloadWorker
-    from workers.security_worker import SecurityWorker
     from workers.approval_worker import ApprovalWorker
+    from workers.download_worker import DownloadWorker
+    from workers.license_worker import LicenseWorker
+    from workers.parse_worker import ParseWorker
+    from workers.publish_worker import PublishWorker
+    from workers.security_worker import SecurityWorker
 
     # Create a registry using the WORKER_TYPE class attribute
     return {
@@ -78,18 +80,18 @@ def main():
         worker_class = get_worker_class_by_type(worker_type)
         if not worker_class:
             available_types = get_available_worker_types()
-            
+
             logger.error(f"Unknown worker type: {worker_type}")
             logger.error(f"Supported worker types: {', '.join(available_types)}")
             sys.exit(1)
 
         # Create the worker instance
         worker = worker_class(sleep_interval=sleep_interval)
-        
+
         # Set worker-specific configuration
-        if hasattr(worker, 'max_license_groups_per_cycle'):
+        if hasattr(worker, "max_license_groups_per_cycle"):
             worker.max_license_groups_per_cycle = max_license_groups_per_cycle
-        if hasattr(worker, 'max_packages_per_cycle'):
+        if hasattr(worker, "max_packages_per_cycle"):
             worker.max_packages_per_cycle = max_packages_per_cycle
 
         # Start the worker (this will run until interrupted)

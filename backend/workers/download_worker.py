@@ -8,9 +8,9 @@ import logging
 import os
 from datetime import datetime, timedelta
 
-from database.service import DatabaseService
-from database.operations import DatabaseOperations
 from database.models import Package, PackageStatus
+from database.operations import DatabaseOperations
+from database.service import DatabaseService
 from services.download_service import DownloadService
 from services.queue_interface import QueueInterface
 from workers.base_worker import BaseWorker
@@ -24,9 +24,7 @@ class DownloadWorker(BaseWorker):
     WORKER_TYPE = "download_worker"
 
     # Extend base environment variables with download-specific ones
-    required_env_vars = BaseWorker.required_env_vars + [
-        "SOURCE_REPOSITORY_URL"
-    ]
+    required_env_vars = BaseWorker.required_env_vars + ["SOURCE_REPOSITORY_URL"]
 
     def __init__(self, sleep_interval: int = 10):
         super().__init__("DownloadWorker", sleep_interval)
@@ -40,12 +38,12 @@ class DownloadWorker(BaseWorker):
     def initialize(self) -> None:
         logger.info("Initializing DownloadWorker...")
         self.download_service = DownloadService()
-        
+
         # Initialize database service
         database_url = os.getenv("DATABASE_URL")
         if not database_url:
             raise ValueError("DATABASE_URL environment variable is required")
-        
+
         self.db_service = DatabaseService(database_url)
 
     def process_cycle(self) -> None:
@@ -62,8 +60,10 @@ class DownloadWorker(BaseWorker):
             stuck_threshold = datetime.utcnow() - self.stuck_package_timeout
             stuck_statuses = ["Downloading"]
             stuck_packages = self.ops.get_packages_by_statuses(stuck_statuses, Package, PackageStatus)
-            stuck_packages = [p for p in stuck_packages if p.package_status and p.package_status.updated_at < stuck_threshold]
-            
+            stuck_packages = [
+                p for p in stuck_packages if p.package_status and p.package_status.updated_at < stuck_threshold
+            ]
+
             if not stuck_packages:
                 return
             logger.warning(f"Found {len(stuck_packages)} stuck downloads; resetting to Licence Checked")
@@ -75,8 +75,8 @@ class DownloadWorker(BaseWorker):
 
     def _process_ready_packages(self) -> None:
         packages = self.ops.get_packages_by_status("Licence Checked", Package, PackageStatus)
-        packages = packages[:self.max_packages_per_cycle]
-        
+        packages = packages[: self.max_packages_per_cycle]
+
         if not packages:
             logger.info("DownloadWorker heartbeat: No packages found for downloading")
             return
@@ -115,5 +115,3 @@ class DownloadWorker(BaseWorker):
                 self.ops.update_package_status(package.id, "Rejected", PackageStatus)
         except Exception:
             logger.exception("Error marking package as rejected in DownloadWorker")
-
-

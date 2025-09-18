@@ -7,7 +7,9 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 from config.constants import TARGET_REPOSITORY_URL
-from models import Package, PackageStatus, RequestPackage, db
+from database.models import Package, PackageStatus, RequestPackage
+
+from database import db
 
 from .license_service import LicenseService
 from .trivy_service import TrivyService

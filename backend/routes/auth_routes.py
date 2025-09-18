@@ -1,9 +1,11 @@
 import logging
 
+from database.models import User
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
-from models import User, db
 from services.auth_service import AuthService
+
+from database import db
 
 logger = logging.getLogger(__name__)
 

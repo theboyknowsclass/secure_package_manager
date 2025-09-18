@@ -10,9 +10,9 @@ import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
-from database.service import DatabaseService
-from database.operations import DatabaseOperations
 from database.models import Package, PackageStatus
+from database.operations import DatabaseOperations
+from database.service import DatabaseService
 from services.license_service import LicenseService
 from workers.base_worker import BaseWorker
 
@@ -36,12 +36,12 @@ class LicenseWorker(BaseWorker):
         """Initialize services"""
         logger.info("Initializing LicenseWorker services...")
         self.license_service = LicenseService()
-        
+
         # Initialize database service
         database_url = os.getenv("DATABASE_URL")
         if not database_url:
             raise ValueError("DATABASE_URL environment variable is required")
-        
+
         self.db_service = DatabaseService(database_url)
         logger.info("LicenseWorker services initialized")
 
@@ -67,7 +67,9 @@ class LicenseWorker(BaseWorker):
 
             # Get packages with stuck statuses
             stuck_packages = self.ops.get_packages_by_statuses(stuck_statuses, Package, PackageStatus)
-            stuck_packages = [p for p in stuck_packages if p.package_status and p.package_status.updated_at < stuck_threshold]
+            stuck_packages = [
+                p for p in stuck_packages if p.package_status and p.package_status.updated_at < stuck_threshold
+            ]
 
             if stuck_packages:
                 logger.warning(
@@ -76,11 +78,7 @@ class LicenseWorker(BaseWorker):
 
                 for package in stuck_packages:
                     if package.package_status:
-                        self.ops.update_package_status(
-                            package.id, 
-                            "Submitted", 
-                            PackageStatus
-                        )
+                        self.ops.update_package_status(package.id, "Submitted", PackageStatus)
                         logger.info(f"Reset stuck package {package.name}@{package.version} to Submitted")
 
         except Exception as e:

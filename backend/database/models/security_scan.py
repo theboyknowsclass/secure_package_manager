@@ -5,7 +5,7 @@ SecurityScan model for storing security scan results
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String
 
 from .base import Base
 

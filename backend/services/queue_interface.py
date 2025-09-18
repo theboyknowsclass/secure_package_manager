@@ -9,7 +9,9 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from models import PackageStatus, db
+from database.models import PackageStatus
+
+from database import db
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +21,7 @@ class QueueInterface:
 
     def advance_status(self, package_id: int, next_status: str) -> bool:
         try:
-            status: Optional[PackageStatus] = (
-                db.session.query(PackageStatus).filter_by(package_id=package_id).first()
-            )
+            status: Optional[PackageStatus] = db.session.query(PackageStatus).filter_by(package_id=package_id).first()
             if not status:
                 logger.warning(f"advance_status: no PackageStatus for package_id={package_id}")
                 return False
@@ -31,13 +31,9 @@ class QueueInterface:
             status.updated_at = datetime.utcnow()
             db.session.commit()
 
-            logger.info(
-                f"Status advanced: package_id={package_id} {prev_status} -> {next_status}"
-            )
+            logger.info(f"Status advanced: package_id={package_id} {prev_status} -> {next_status}")
             return True
         except Exception as e:
             logger.error(f"advance_status failed for package_id={package_id}: {str(e)}", exc_info=True)
             db.session.rollback()
             return False
-
-

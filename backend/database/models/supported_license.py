@@ -5,7 +5,7 @@ SupportedLicense model for managing license policies
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 
 from .base import Base
 

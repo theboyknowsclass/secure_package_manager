@@ -41,10 +41,8 @@ def create_app() -> Flask:
     logging.basicConfig(level=logging.INFO)
     logging.getLogger(__name__)
 
-    # Import models first (they create the db instance)
-    from models import (
-        db,
-    )
+    # Import database instance
+    from database import db
 
     # Now initialize the database with the app
     db.init_app(app)
@@ -82,7 +80,7 @@ def wait_for_db(max_retries: int = 30, delay: int = 2) -> bool:
         try:
             with app.app_context():
                 # Import db inside the app context
-                from models import db
+                from database import db
 
                 with db.engine.connect() as connection:
                     connection.execute(db.text("SELECT 1"))
@@ -104,7 +102,7 @@ if __name__ == "__main__":
 
     with app.app_context():
         # Import db inside the app context
-        from models import db
+        from database import db
 
         db.create_all()
         logging.getLogger(__name__).info("Database tables created/verified")

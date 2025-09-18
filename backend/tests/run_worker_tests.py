@@ -16,15 +16,15 @@ def run_worker_tests():
     """Run all worker unit tests"""
     print("🚀 Starting Worker Unit Tests...")
     print("=" * 50)
-    
+
     # Discover and run all tests in the workers test package
     loader = unittest.TestLoader()
     workers_dir = os.path.join(os.path.dirname(__file__), "workers")
-    suite = loader.discover(workers_dir, pattern='test_*.py')
-    
+    suite = loader.discover(workers_dir, pattern="test_*.py")
+
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
-    
+
     # Print summary
     print("\n" + "=" * 50)
     if result.wasSuccessful():

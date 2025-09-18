@@ -5,7 +5,7 @@ Request model for managing package requests
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from .base import Base

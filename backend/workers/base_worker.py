@@ -23,12 +23,7 @@ class BaseWorker(ABC):
     WORKER_TYPE: str = "base_worker"
 
     # Default required environment variables for workers (can be overridden in subclasses)
-    required_env_vars: List[str] = [
-        "DATABASE_URL",
-        "POSTGRES_USER",
-        "POSTGRES_PASSWORD",
-        "POSTGRES_DB"
-    ]
+    required_env_vars: List[str] = ["DATABASE_URL", "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"]
 
     def __init__(self, worker_name: str, sleep_interval: int = 5):
         """
@@ -42,7 +37,7 @@ class BaseWorker(ABC):
         self.sleep_interval = sleep_interval
         self.running = False
         self._setup_signal_handlers()
-        
+
         # Validate required environment variables for this worker
         self._validate_required_env_vars()
 
@@ -52,7 +47,7 @@ class BaseWorker(ABC):
         for var in self.required_env_vars:
             if not os.getenv(var):
                 missing_vars.append(f"  - {var}")
-        
+
         if missing_vars:
             error_msg = f"Missing required environment variables for {self.worker_name}:\n" + "\n".join(missing_vars)
             error_msg += "\n\nPlease set these environment variables before starting this worker."

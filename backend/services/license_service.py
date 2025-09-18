@@ -2,7 +2,9 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from models import PackageStatus, SupportedLicense, db
+from database.models import PackageStatus, SupportedLicense
+
+from database import db
 
 logger = logging.getLogger(__name__)
 

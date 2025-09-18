@@ -10,9 +10,9 @@ import os
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
-from database.service import DatabaseService
-from database.operations import DatabaseOperations
 from database.models import Package, PackageStatus
+from database.operations import DatabaseOperations
+from database.service import DatabaseService
 from services.package_service import PackageService
 from workers.base_worker import BaseWorker
 
@@ -23,11 +23,9 @@ class PublishWorker(BaseWorker):
     """Background worker for publishing approved packages"""
 
     WORKER_TYPE = "package_publisher"
-    
+
     # Extend base environment variables with publish-specific ones
-    required_env_vars = BaseWorker.required_env_vars + [
-        "TARGET_REPOSITORY_URL"
-    ]
+    required_env_vars = BaseWorker.required_env_vars + ["TARGET_REPOSITORY_URL"]
 
     def __init__(self, sleep_interval: int = 30):
         super().__init__("PackagePublisher", sleep_interval)
@@ -41,12 +39,12 @@ class PublishWorker(BaseWorker):
         """Initialize services"""
         logger.info("Initializing PublishWorker services...")
         self.package_service = PackageService()
-        
+
         # Initialize database service
         database_url = os.getenv("DATABASE_URL")
         if not database_url:
             raise ValueError("DATABASE_URL environment variable is required")
-        
+
         self.db_service = DatabaseService(database_url)
         logger.info("PublishWorker services initialized")
 
@@ -72,7 +70,9 @@ class PublishWorker(BaseWorker):
 
             # Get packages with stuck publish status
             stuck_packages = self.ops.get_packages_by_publish_statuses(stuck_publish_statuses, Package, PackageStatus)
-            stuck_packages = [p for p in stuck_packages if p.package_status and p.package_status.updated_at < stuck_threshold]
+            stuck_packages = [
+                p for p in stuck_packages if p.package_status and p.package_status.updated_at < stuck_threshold
+            ]
 
             if stuck_packages:
                 logger.warning(f"Found {len(stuck_packages)} stuck packages in publishing, resetting publish status")

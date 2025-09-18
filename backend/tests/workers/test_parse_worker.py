@@ -12,18 +12,18 @@ import unittest
 
 def load_test_package_lock(filename):
     """Load a test package-lock.json file and return as JSON data"""
-    if not filename.endswith('.json'):
-        filename += '.json'
-    
+    if not filename.endswith(".json"):
+        filename += ".json"
+
     file_path = os.path.join(os.path.dirname(__file__), "..", "test_data", "package_locks", filename)
-    
-    with open(file_path, 'r', encoding='utf-8') as f:
+
+    with open(file_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
 class ParseWorkerValidation:
     """Standalone validation logic extracted from ParseWorker for testing"""
-    
+
     @staticmethod
     def validate_package_lock_file(package_data):
         """Validate that the package data is a valid package-lock.json file"""
@@ -77,10 +77,10 @@ class TestParseWorkerValidation(unittest.TestCase):
     def test_validate_simple_app(self):
         """Test validation of simple app package-lock.json"""
         package_data = load_test_package_lock("simple_app")
-        
+
         # Should not raise any exception
         ParseWorkerValidation.validate_package_lock_file(package_data)
-        
+
         # Verify basic structure
         self.assertEqual(package_data["name"], "simple-app")
         self.assertEqual(package_data["version"], "1.0.0")
@@ -89,10 +89,10 @@ class TestParseWorkerValidation(unittest.TestCase):
     def test_validate_adminportal(self):
         """Test validation of adminportal package-lock.json"""
         package_data = load_test_package_lock("adminportal")
-        
+
         # Should not raise any exception
         ParseWorkerValidation.validate_package_lock_file(package_data)
-        
+
         # Verify basic structure
         self.assertEqual(package_data["name"], "adminportal")
         self.assertEqual(package_data["version"], "0.0.0")
@@ -101,10 +101,10 @@ class TestParseWorkerValidation(unittest.TestCase):
     def test_validate_scoped_packages(self):
         """Test validation of scoped packages app"""
         package_data = load_test_package_lock("scoped_packages")
-        
+
         # Should not raise any exception
         ParseWorkerValidation.validate_package_lock_file(package_data)
-        
+
         # Verify structure
         self.assertEqual(package_data["name"], "scoped-packages-app")
         self.assertEqual(package_data["lockfileVersion"], 3)
@@ -112,19 +112,19 @@ class TestParseWorkerValidation(unittest.TestCase):
     def test_validate_invalid_version_fails(self):
         """Test that invalid lockfile version fails validation"""
         package_data = load_test_package_lock("invalid_version")
-        
+
         with self.assertRaises(ValueError) as context:
             ParseWorkerValidation.validate_package_lock_file(package_data)
-        
+
         self.assertIn("Unsupported lockfile version: 1", str(context.exception))
 
     def test_validate_missing_lockfile_version_fails(self):
         """Test that missing lockfile version fails validation"""
         package_data = load_test_package_lock("missing_lockfile_version")
-        
+
         with self.assertRaises(ValueError) as context:
             ParseWorkerValidation.validate_package_lock_file(package_data)
-        
+
         self.assertIn("Missing 'lockfileVersion' field", str(context.exception))
 
 
@@ -135,12 +135,12 @@ class TestParseWorkerExtraction(unittest.TestCase):
         """Test package extraction from simple app"""
         package_data = load_test_package_lock("simple_app")
         packages = ParseWorkerValidation.extract_packages_from_json(package_data)
-        
+
         # Should have 2 packages: root + lodash
         self.assertEqual(len(packages), 2)
         self.assertIn("", packages)  # Root package
         self.assertIn("node_modules/lodash", packages)
-        
+
         # Check lodash package details
         lodash_pkg = packages["node_modules/lodash"]
         self.assertEqual(lodash_pkg["version"], "4.17.21")
@@ -150,19 +150,19 @@ class TestParseWorkerExtraction(unittest.TestCase):
         """Test package extraction from scoped packages app"""
         package_data = load_test_package_lock("scoped_packages")
         packages = ParseWorkerValidation.extract_packages_from_json(package_data)
-        
+
         # Should have 4 packages: root + 3 dependencies
         self.assertEqual(len(packages), 4)
         self.assertIn("", packages)  # Root package
         self.assertIn("node_modules/@angular/core", packages)
         self.assertIn("node_modules/@types/lodash", packages)
         self.assertIn("node_modules/tslib", packages)
-        
+
         # Check scoped package details
         angular_pkg = packages["node_modules/@angular/core"]
         self.assertEqual(angular_pkg["version"], "15.0.0")
         self.assertEqual(angular_pkg["license"], "MIT")
-        
+
         types_lodash_pkg = packages["node_modules/@types/lodash"]
         self.assertEqual(types_lodash_pkg["version"], "4.14.191")
         self.assertEqual(types_lodash_pkg["license"], "MIT")
@@ -171,14 +171,14 @@ class TestParseWorkerExtraction(unittest.TestCase):
         """Test package extraction with duplicate packages"""
         package_data = load_test_package_lock("duplicate_packages")
         packages = ParseWorkerValidation.extract_packages_from_json(package_data)
-        
+
         # Should have 4 packages: root + 3 unique packages (lodash appears twice)
         self.assertEqual(len(packages), 4)
         self.assertIn("", packages)  # Root package
         self.assertIn("node_modules/lodash", packages)
         self.assertIn("node_modules/some-package", packages)
         self.assertIn("node_modules/some-package/node_modules/lodash", packages)
-        
+
         # Both lodash instances should have the same version
         lodash1 = packages["node_modules/lodash"]
         lodash2 = packages["node_modules/some-package/node_modules/lodash"]
@@ -189,7 +189,7 @@ class TestParseWorkerExtraction(unittest.TestCase):
         """Test package extraction from app with no dependencies"""
         package_data = load_test_package_lock("empty_packages")
         packages = ParseWorkerValidation.extract_packages_from_json(package_data)
-        
+
         # Should have only root package
         self.assertEqual(len(packages), 1)
         self.assertIn("", packages)  # Root package only
@@ -198,16 +198,16 @@ class TestParseWorkerExtraction(unittest.TestCase):
         """Test package extraction from adminportal app"""
         package_data = load_test_package_lock("adminportal")
         packages = ParseWorkerValidation.extract_packages_from_json(package_data)
-        
+
         # Should have many packages (adminportal has lots of dependencies)
         self.assertGreater(len(packages), 100)  # Adminportal has many dependencies
         self.assertIn("", packages)  # Root package
-        
+
         # Check for some expected packages
         self.assertIn("node_modules/@emotion/react", packages)
         self.assertIn("node_modules/@mui/material", packages)
         self.assertIn("node_modules/@mui/icons-material", packages)
-        
+
         # Check package details
         emotion_react = packages["node_modules/@emotion/react"]
         self.assertEqual(emotion_react["version"], "11.14.0")
@@ -218,21 +218,21 @@ class TestParseWorkerExtraction(unittest.TestCase):
         # Test with simple app
         simple_data = load_test_package_lock("simple_app")
         packages = simple_data["packages"]
-        
+
         # Test lodash package
         lodash_info = packages["node_modules/lodash"]
         package_name = ParseWorkerValidation.extract_package_name("node_modules/lodash", lodash_info)
         self.assertEqual(package_name, "lodash")
-        
+
         # Test with scoped packages
         scoped_data = load_test_package_lock("scoped_packages")
         scoped_packages = scoped_data["packages"]
-        
+
         # Test @angular/core package
         angular_info = scoped_packages["node_modules/@angular/core"]
         package_name = ParseWorkerValidation.extract_package_name("node_modules/@angular/core", angular_info)
         self.assertEqual(package_name, "@angular/core")
-        
+
         # Test @types/lodash package
         types_info = scoped_packages["node_modules/@types/lodash"]
         package_name = ParseWorkerValidation.extract_package_name("node_modules/@types/lodash", types_info)
@@ -241,11 +241,15 @@ class TestParseWorkerExtraction(unittest.TestCase):
     def test_all_available_test_files(self):
         """Test that all available test files can be loaded and validated"""
         expected_files = [
-            "simple_app", "scoped_packages", "duplicate_packages", 
-            "invalid_version", "missing_lockfile_version", "empty_packages",
-            "adminportal"
+            "simple_app",
+            "scoped_packages",
+            "duplicate_packages",
+            "invalid_version",
+            "missing_lockfile_version",
+            "empty_packages",
+            "adminportal",
         ]
-        
+
         # Test that we can load all expected files
         for filename in expected_files:
             try:

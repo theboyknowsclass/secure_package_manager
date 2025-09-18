@@ -4,7 +4,7 @@ RequestPackage model for linking requests to packages
 
 from typing import Any
 
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, ForeignKey, Integer, String
 
 from .base import Base
 

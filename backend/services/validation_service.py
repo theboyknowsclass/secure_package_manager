@@ -2,7 +2,7 @@ import logging
 import os
 from typing import Any, Dict, List
 
-from models import Package
+from database.models import Package
 
 logger = logging.getLogger(__name__)
 
