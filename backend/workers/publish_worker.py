@@ -66,13 +66,18 @@ class PublishWorker(BaseWorker):
         """Handle packages that have been stuck in publishing state too long"""
         try:
             stuck_threshold = datetime.utcnow() - self.stuck_package_timeout
-            stuck_publish_statuses = ["publishing", "failed"]
+            session = self.ops._get_session()
 
-            # Get packages with stuck publish status
-            stuck_packages = self.ops.get_packages_by_publish_statuses(stuck_publish_statuses, Package, PackageStatus)
-            stuck_packages = [
-                p for p in stuck_packages if p.package_status and p.package_status.updated_at < stuck_threshold
-            ]
+            # Get packages with stuck publish status - need to query directly since there's no specific method
+            stuck_packages = (
+                session.query(Package)
+                .join(PackageStatus)
+                .filter(
+                    PackageStatus.publish_status.in_(["publishing", "failed"]),
+                    PackageStatus.updated_at < stuck_threshold,
+                )
+                .all()
+            )
 
             if stuck_packages:
                 logger.warning(f"Found {len(stuck_packages)} stuck packages in publishing, resetting publish status")
@@ -89,9 +94,11 @@ class PublishWorker(BaseWorker):
     def _process_pending_publishing(self) -> None:
         """Process packages that are approved and ready for publishing"""
         try:
+            session = self.ops._get_session()
+
             # Get packages that need publishing - approved packages with pending publish status
             pending_packages = (
-                self.ops.session.query(Package)
+                session.query(Package)
                 .join(PackageStatus)
                 .filter(
                     PackageStatus.status == "Approved",
@@ -117,11 +124,12 @@ class PublishWorker(BaseWorker):
                     )
                     self._mark_package_publish_failed(package, str(e))
 
-            self.ops.session.commit()
+            session.commit()
 
         except Exception as e:
             logger.error(f"Error in _process_pending_publishing: {str(e)}", exc_info=True)
-            self.ops.session.rollback()
+            session = self.ops._get_session()
+            session.rollback()
 
     def _publish_single_package(self, package: Package) -> None:
         """Publish a single package to the secure repository"""
@@ -132,7 +140,8 @@ class PublishWorker(BaseWorker):
             if package.package_status:
                 package.package_status.publish_status = "publishing"
                 package.package_status.updated_at = datetime.utcnow()
-                self.ops.session.commit()
+                session = self.ops._get_session()
+                session.commit()
 
             # Attempt to publish the package
             success = self.package_service.publish_to_secure_repo(package)

@@ -2,6 +2,8 @@
 # Contains all common services and configurations
 
 services:
+  # ===== CORE SERVICES =====
+  
   # PostgreSQL Database
   db:
     image: postgres:15-alpine
@@ -67,6 +69,8 @@ services:
       - app-network
     restart: unless-stopped
 
+  # ===== APPLICATION SERVICES =====
+  
   # React Frontend
   frontend:
     build:
@@ -79,6 +83,8 @@ services:
       - app-network
     restart: unless-stopped
 
+  # ===== EXTERNAL SERVICES =====
+  
   # Trivy Security Scanner
   trivy:
     image: aquasec/trivy:latest
@@ -97,6 +103,8 @@ services:
       start_period: 60s
     restart: unless-stopped
 
+  # ===== BACKGROUND WORKERS =====
+  
   # License Check Worker Service
   license-worker:
     build:
@@ -215,6 +223,38 @@ services:
       - TRIVY_MAX_RETRIES=${TRIVY_MAX_RETRIES}
       - WORKER_SLEEP_INTERVAL=15
       - WORKER_MAX_PACKAGES_PER_CYCLE=10
+    volumes:
+      - package_cache:/app/package_cache
+      - worker_logs:/app/logs
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Approval Worker Service (Security Scanned -> Pending Approval)
+  approval-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Base database environment variables (required by all workers)
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${DATABASE_PORT}/${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      # Worker-specific configuration
+      - WORKER_TYPE=approval_worker
+      - WORKER_SLEEP_INTERVAL=30
+      - WORKER_MAX_PACKAGES_PER_CYCLE=20
+      - WORKER_STUCK_PACKAGE_TIMEOUT=45
     volumes:
       - package_cache:/app/package_cache
       - worker_logs:/app/logs

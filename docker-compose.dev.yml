@@ -2,6 +2,8 @@
 # Use with: docker compose -f docker-compose.base.yml -f docker-compose.dev.yml up
 
 services:
+  # ===== CORE SERVICES (DEV OVERRIDES) =====
+  
   # Development database overrides
   db:
     volumes:
@@ -29,7 +31,9 @@ services:
       # Expose trivy port for direct access
       - "${TRIVY_PORT}:${TRIVY_PORT}"
 
-  # Development-only services
+  # ===== DEVELOPMENT-ONLY SERVICES =====
+  
+  # Mock Identity Provider (for development)
   mock-idp:
     build:
       context: ./mock-idp
@@ -41,6 +45,7 @@ services:
     networks:
       - app-network
 
+  # Mock NPM Registry (for development)
   mock-npm-registry:
     build:
       context: ./mock-npm-registry
@@ -54,6 +59,8 @@ services:
     networks:
       - app-network
 
+  # ===== DEVELOPMENT TOOLS =====
+  
   # pgAdmin for database management (development only)
   pgadmin:
     image: dpage/pgadmin4:latest

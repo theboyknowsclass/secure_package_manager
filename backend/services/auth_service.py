@@ -3,6 +3,7 @@ from typing import Any, Callable, Dict, Optional
 
 import jwt
 from config.constants import JWT_SECRET, OAUTH_AUDIENCE, OAUTH_ISSUER
+from database import db
 from database.models import User
 from flask import jsonify, request
 

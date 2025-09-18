@@ -81,7 +81,7 @@ class SecurityWorker(BaseWorker):
         logger.info(f"Security scanning {len(packages)} packages")
         for package in packages:
             try:
-                self._scan_single(package, self.ops.session)
+                self._scan_single(package, self.ops._get_session())
             except Exception as e:
                 logger.error(
                     f"Security scan failed for {package.name}@{package.version}: {str(e)}",

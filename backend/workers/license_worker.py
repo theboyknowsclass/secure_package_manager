@@ -173,14 +173,14 @@ class LicenseWorker(BaseWorker):
             self._process_license_group_results(license_groups, unique_licenses, validation_results)
 
             # Commit all changes at once
-            self.ops.session.commit()
+            self.ops._get_session().commit()
 
             total_packages = sum(len(packages) for packages in license_groups.values())
             logger.info(f"Successfully processed {total_packages} packages across {len(license_groups)} license groups")
 
         except Exception as e:
             logger.error(f"Error in batch license group checking: {str(e)}", exc_info=True)
-            self.ops.session.rollback()
+            self.ops._get_session().rollback()
             # Fallback to individual processing
             self._fallback_to_individual_processing([pkg for packages in license_groups.values() for pkg in packages])
 
@@ -237,7 +237,7 @@ class LicenseWorker(BaseWorker):
             # Update failed packages status in batch
             if failed_packages:
                 failed_package_ids = [pkg.id for pkg, _ in failed_packages]
-                self.ops.session.query(PackageStatus).filter(PackageStatus.package_id.in_(failed_package_ids)).update(
+                self.ops._get_session().query(PackageStatus).filter(PackageStatus.package_id.in_(failed_package_ids)).update(
                     {
                         PackageStatus.status: "License Check Failed",
                         PackageStatus.updated_at: datetime.utcnow(),
@@ -282,13 +282,13 @@ class LicenseWorker(BaseWorker):
             self._process_batch_validation_results(packages, packages_data, validation_results)
 
             # Commit all changes at once
-            self.ops.session.commit()
+            self.ops._get_session().commit()
 
             logger.info(f"Successfully processed {len(packages)} packages in batch")
 
         except Exception as e:
             logger.error(f"Error in batch license checking: {str(e)}", exc_info=True)
-            self.ops.session.rollback()
+            self.ops._get_session().rollback()
             # Fallback to individual processing
             self._fallback_to_individual_processing(packages)
 
@@ -298,7 +298,7 @@ class LicenseWorker(BaseWorker):
             package_ids = [pkg.id for pkg in packages]
 
             # Bulk update package statuses
-            self.ops.session.query(PackageStatus).filter(PackageStatus.package_id.in_(package_ids)).update(
+            self.ops._get_session().query(PackageStatus).filter(PackageStatus.package_id.in_(package_ids)).update(
                 {
                     PackageStatus.status: status,
                     PackageStatus.updated_at: datetime.utcnow(),
@@ -357,7 +357,7 @@ class LicenseWorker(BaseWorker):
             # Update failed packages status in batch
             if failed_packages:
                 failed_package_ids = [pkg.id for pkg, _ in failed_packages]
-                self.ops.session.query(PackageStatus).filter(PackageStatus.package_id.in_(failed_package_ids)).update(
+                self.ops._get_session().query(PackageStatus).filter(PackageStatus.package_id.in_(failed_package_ids)).update(
                     {
                         PackageStatus.status: "License Check Failed",
                         PackageStatus.updated_at: datetime.utcnow(),
@@ -388,10 +388,10 @@ class LicenseWorker(BaseWorker):
                 self._mark_package_license_failed(package, str(e))
 
         try:
-            self.ops.session.commit()
+            self.ops._get_session().commit()
         except Exception as e:
             logger.error(f"Error committing fallback processing: {str(e)}")
-            self.ops.session.rollback()
+            self.ops._get_session().rollback()
 
     def _check_single_package_license(self, package: Package) -> None:
         """Check license for a single package"""
@@ -402,7 +402,7 @@ class LicenseWorker(BaseWorker):
             if package.package_status:
                 package.package_status.status = "Checking Licence"
                 package.package_status.updated_at = datetime.utcnow()
-                self.ops.session.commit()
+                self.ops._get_session().commit()
 
             # Perform license validation
             license_validation = self._validate_package_license(package)
@@ -415,7 +415,7 @@ class LicenseWorker(BaseWorker):
                 package.package_status.license_score = license_validation["score"]
                 package.package_status.license_status = license_status
                 package.package_status.updated_at = datetime.utcnow()
-                self.ops.session.commit()
+                self.ops._get_session().commit()
 
             # Check if license validation passed
             if license_validation["score"] == 0:
@@ -485,7 +485,7 @@ class LicenseWorker(BaseWorker):
                     "Licence Checked",
                     "License Check Failed",
                 ]:
-                    count = self.ops.session.query(Package).join(PackageStatus).filter(PackageStatus.status == status).count()
+                    count = self.ops._get_session().query(Package).join(PackageStatus).filter(PackageStatus.status == status).count()
                     status_counts[status] = count
 
                 return {
@@ -501,7 +501,7 @@ class LicenseWorker(BaseWorker):
         """Retry failed license check packages"""
         try:
             failed_packages = (
-                self.ops.session.query(Package)
+                self.ops._get_session().query(Package)
                 .join(PackageStatus)
                 .filter(PackageStatus.status == "License Check Failed")
                 .all()
@@ -520,7 +520,7 @@ class LicenseWorker(BaseWorker):
                     package.package_status.updated_at = datetime.utcnow()
                     retried_count += 1
 
-            self.ops.session.commit()
+            self.ops._get_session().commit()
 
             logger.info(f"Retried {retried_count} failed license check packages")
             return {
@@ -530,13 +530,13 @@ class LicenseWorker(BaseWorker):
 
         except Exception as e:
             logger.error(f"Error retrying failed license check packages: {str(e)}")
-            self.ops.session.rollback()
+            self.ops._get_session().rollback()
             return {"error": str(e)}
 
     def force_license_check(self, package_ids: List[int]) -> Dict[str, Any]:
         """Force license check for specific packages"""
         try:
-            packages = self.ops.session.query(Package).join(PackageStatus).filter(Package.id.in_(package_ids)).all()
+            packages = self.ops._get_session().query(Package).join(PackageStatus).filter(Package.id.in_(package_ids)).all()
 
             if not packages:
                 return {"message": "No packages found", "processed": 0}
@@ -548,7 +548,7 @@ class LicenseWorker(BaseWorker):
                     package.package_status.updated_at = datetime.utcnow()
                     processed_count += 1
 
-            self.ops.session.commit()
+            self.ops._get_session().commit()
 
             logger.info(f"Force queued {processed_count} packages for license checking")
             return {
@@ -558,5 +558,5 @@ class LicenseWorker(BaseWorker):
 
         except Exception as e:
             logger.error(f"Error force queuing packages for license checking: {str(e)}")
-            self.ops.session.rollback()
+            self.ops._get_session().rollback()
             return {"error": str(e)}
