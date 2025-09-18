@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 def main():
     """Main entry point for the worker"""
     # Get worker type from environment
-    worker_type = os.getenv("WORKER_TYPE", "package_processor")
+    worker_type = os.getenv("WORKER_TYPE", "parse_worker")
     sleep_interval = int(os.getenv("WORKER_SLEEP_INTERVAL", "10"))
     max_packages_per_cycle = int(os.getenv("WORKER_MAX_PACKAGES_PER_CYCLE", "5"))
     max_license_groups_per_cycle = int(os.getenv("WORKER_MAX_LICENSE_GROUPS_PER_CYCLE", "20"))
@@ -47,12 +47,6 @@ def main():
 
             worker = LicenseWorker(sleep_interval=sleep_interval)
             worker.max_license_groups_per_cycle = max_license_groups_per_cycle
-
-        elif worker_type == "package_processor":
-            from workers.package_worker import PackageWorker
-
-            worker = PackageWorker(sleep_interval=sleep_interval)
-            worker.max_packages_per_cycle = max_packages_per_cycle
 
         elif worker_type == "package_publisher":
             from workers.publish_worker import PublishWorker
@@ -77,10 +71,15 @@ def main():
             worker = SecurityWorker(sleep_interval=sleep_interval)
             worker.max_packages_per_cycle = max_packages_per_cycle
 
+        elif worker_type == "approval_worker":
+            from workers.approval_worker import ApprovalWorker
+
+            worker = ApprovalWorker(sleep_interval=sleep_interval)
+
         else:
             logger.error(f"Unknown worker type: {worker_type}")
             logger.error(
-                "Supported worker types: license_checker, package_processor, package_publisher, parse_worker, download_worker, security_worker"
+                "Supported worker types: license_checker, package_publisher, parse_worker, download_worker, security_worker, approval_worker"
             )
             sys.exit(1)
 

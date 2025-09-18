@@ -22,7 +22,7 @@ package_service = PackageService()
 @package_bp.route("/upload", methods=["POST"])  # type: ignore[misc]
 @auth_service.require_auth
 def upload_package_lock() -> ResponseReturnValue:
-    """Upload and process package-lock.json file"""
+    """Upload package-lock.json file for background processing"""
     try:
         # Validate the uploaded file
         file = _validate_uploaded_file()
@@ -34,13 +34,8 @@ def upload_package_lock() -> ResponseReturnValue:
         if isinstance(package_data, tuple):  # Error response
             return package_data
 
-        # Create request record
-        request_record = _create_request(package_data)
-
-        # Process packages and handle validation errors
-        result = _process_package_validation(request_record, package_data)
-        if isinstance(result, tuple):  # Error response
-            return result
+        # Create request record with raw blob
+        request_record = _create_request_with_blob(package_data)
 
         return _create_success_response(request_record, package_data)
 
@@ -89,8 +84,8 @@ def _parse_package_lock_file(file: Any) -> Union[Dict[str, Any], ResponseReturnV
     return package_data
 
 
-def _create_request(package_data: Dict[str, Any]) -> Request:
-    """Create a new request record"""
+def _create_request_with_blob(package_data: Dict[str, Any]) -> Request:
+    """Create a new request record with raw blob"""
     app_name = package_data.get("name", "Unknown Application")
     app_version = package_data.get("version", "1.0.0")
 
@@ -98,44 +93,11 @@ def _create_request(package_data: Dict[str, Any]) -> Request:
         application_name=app_name,
         version=app_version,
         requestor_id=request.user.id,
-        package_lock_file=json.dumps(package_data),
+        raw_request_blob=json.dumps(package_data),  # Store raw JSON blob
     )
     db.session.add(request_record)
     db.session.commit()
     return request_record
-
-
-def _process_package_validation(request_record: Request, package_data: Dict[str, Any]) -> ResponseReturnValue | None:
-    """Process package validation and handle errors"""
-    try:
-        package_service.process_package_lock(request_record.id, package_data)
-        return None  # Success
-    except ValueError as ve:
-        # Handle validation errors (unsupported lockfile version, wrong file type, etc.)
-        logger.warning(f"Package validation error: {str(ve)}")
-
-        # Update package statuses to reflect error
-        packages = (
-            db.session.query(Package).join(RequestPackage).filter(RequestPackage.request_id == request_record.id).all()
-        )
-
-        for package in packages:
-            if package.package_status:
-                package.package_status.status = "Rejected"
-                package.package_status.updated_at = datetime.utcnow()
-
-        db.session.commit()
-
-        return (
-            jsonify(
-                {
-                    "error": "Package validation failed",
-                    "details": str(ve),
-                    "request_id": request_record.id,
-                }
-            ),
-            400,
-        )
 
 
 def _create_success_response(

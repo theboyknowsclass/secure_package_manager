@@ -74,7 +74,7 @@ class Request(db.Model):  # type: ignore[misc]
     application_name = db.Column(db.String(255), nullable=False)
     version = db.Column(db.String(100), nullable=False)
     requestor_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    package_lock_file = db.Column(db.Text, nullable=False)
+    raw_request_blob = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships

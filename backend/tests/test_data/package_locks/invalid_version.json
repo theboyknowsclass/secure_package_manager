@@ -1,0 +1,12 @@
+{
+  "name": "invalid-version-app",
+  "version": "1.0.0",
+  "lockfileVersion": 1,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "invalid-version-app",
+      "version": "1.0.0"
+    }
+  }
+}

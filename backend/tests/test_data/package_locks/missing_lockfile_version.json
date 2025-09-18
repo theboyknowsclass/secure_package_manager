@@ -1,0 +1,11 @@
+{
+  "name": "missing-lockfile-version-app",
+  "version": "1.0.0",
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "missing-lockfile-version-app",
+      "version": "1.0.0"
+    }
+  }
+}

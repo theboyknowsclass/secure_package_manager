@@ -1,0 +1,40 @@
+{
+  "name": "scoped-packages-app",
+  "version": "2.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "scoped-packages-app",
+      "version": "2.0.0",
+      "dependencies": {
+        "@types/lodash": "^4.14.191",
+        "@angular/core": "^15.0.0"
+      }
+    },
+    "node_modules/@angular/core": {
+      "version": "15.0.0",
+      "resolved": "https://registry.npmjs.org/@angular/core/-/core-15.0.0.tgz",
+      "integrity": "sha512-AngularCoreHash==",
+      "license": "MIT",
+      "dependencies": {
+        "tslib": "^2.3.0"
+      }
+    },
+    "node_modules/@types/lodash": {
+      "version": "4.14.191",
+      "resolved": "https://registry.npmjs.org/@types/lodash/-/lodash-4.14.191.tgz",
+      "integrity": "sha512-Bd/1/2/2DLUN2dlLZD4b2FllodxFAJbO6jbA6eFz5pnTTAprKyRgGYgTd3F9yVfHne3aJ1y2L5c5S9DygQxWVg==",
+      "license": "MIT",
+      "dependencies": {
+        "@types/node": "*"
+      }
+    },
+    "node_modules/tslib": {
+      "version": "2.3.0",
+      "resolved": "https://registry.npmjs.org/tslib/-/tslib-2.3.0.tgz",
+      "integrity": "sha512-tslibHash==",
+      "license": "0BSD"
+    }
+  }
+}
