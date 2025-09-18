@@ -210,7 +210,7 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                             "id": pkg.id,
                             "name": pkg.name,
                             "version": pkg.version,
-                            "status": (pkg.package_status.status if pkg.package_status else "Requested"),
+                            "status": (pkg.package_status.status if pkg.package_status else "Submitted"),
                             "security_score": (pkg.package_status.security_score if pkg.package_status else None),
                             "license_score": (pkg.package_status.license_score if pkg.package_status else None),
                             "security_scan_status": (
@@ -437,7 +437,8 @@ def get_processing_status() -> ResponseReturnValue:
         # Count packages by status
         status_counts = {}
         for status in [
-            "Requested",
+            "Submitted",
+            "Parsed",
             "Checking Licence",
             "Downloading",
             "Security Scanning",
@@ -514,7 +515,7 @@ def retry_failed_packages() -> ResponseReturnValue:
         retried_count = 0
         for package in failed_packages:
             if package.package_status:
-                package.package_status.status = "Requested"
+                package.package_status.status = "Submitted"
                 package.package_status.updated_at = datetime.utcnow()
                 retried_count += 1
 

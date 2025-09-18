@@ -77,7 +77,8 @@ CREATE TABLE IF NOT EXISTS package_status (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(package_id), -- Only one status record per package
     CONSTRAINT package_status_status_check CHECK (status IN (
-        'Requested', 
+        'Submitted',
+        'Parsed',
         'Checking Licence',
         'Licence Checked', 
         'Downloading',

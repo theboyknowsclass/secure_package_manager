@@ -1,7 +1,8 @@
 // Package Status Types and Constants
 
 export const PACKAGE_STATUS = {
-  REQUESTED: "Requested",
+  SUBMITTED: "Submitted",
+  PARSED: "Parsed",
   CHECKING_LICENCE: "Checking Licence",
   LICENCE_CHECKED: "Licence Checked",
   DOWNLOADING: "Downloading",
@@ -29,7 +30,8 @@ export type StatusCategory =
 // Helper functions
 export const getStatusCategory = (status: PackageStatus): StatusCategory => {
   switch (status) {
-    case PACKAGE_STATUS.REQUESTED:
+    case PACKAGE_STATUS.SUBMITTED:
+    case PACKAGE_STATUS.PARSED:
       return STATUS_CATEGORIES.PENDING;
     case PACKAGE_STATUS.CHECKING_LICENCE:
     case PACKAGE_STATUS.LICENCE_CHECKED:
@@ -84,7 +86,8 @@ export const isCompletedProcessingStatus = (status: PackageStatus): boolean => {
 
 export const getStatusDisplayName = (status: PackageStatus): string => {
   const displayNames: Record<PackageStatus, string> = {
-    [PACKAGE_STATUS.REQUESTED]: "Requested",
+    [PACKAGE_STATUS.SUBMITTED]: "Submitted",
+    [PACKAGE_STATUS.PARSED]: "Parsed",
     [PACKAGE_STATUS.CHECKING_LICENCE]: "Checking License",
     [PACKAGE_STATUS.LICENCE_CHECKED]: "License Checked",
     [PACKAGE_STATUS.DOWNLOADING]: "Downloading",

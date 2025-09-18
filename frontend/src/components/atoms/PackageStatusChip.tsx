@@ -24,8 +24,10 @@ const getPackageStatusColor = (status: PackageStatus) => {
 
 const getPackageStatusLabel = (status: PackageStatus): string => {
   switch (status) {
-    case PACKAGE_STATUS.REQUESTED:
-      return "Requested";
+    case PACKAGE_STATUS.SUBMITTED:
+      return "Submitted";
+    case PACKAGE_STATUS.PARSED:
+      return "Parsed";
     case PACKAGE_STATUS.CHECKING_LICENCE:
       return "Checking License";
     case PACKAGE_STATUS.LICENCE_CHECKED:

@@ -61,14 +61,14 @@ class LicenseWorker(BaseWorker):
 
             if stuck_packages:
                 logger.warning(
-                    f"Found {len(stuck_packages)} stuck packages in license checking, resetting to Requested"
+                    f"Found {len(stuck_packages)} stuck packages in license checking, resetting to Submitted"
                 )
 
                 for package in stuck_packages:
                     if package.package_status:
-                        package.package_status.status = "Requested"
+                        package.package_status.status = "Submitted"
                         package.package_status.updated_at = datetime.utcnow()
-                        logger.info(f"Reset stuck package {package.name}@{package.version} to Requested")
+                        logger.info(f"Reset stuck package {package.name}@{package.version} to Submitted")
 
                 db.session.commit()
 
@@ -100,7 +100,7 @@ class LicenseWorker(BaseWorker):
         try:
             # Get all packages that need license checking
             pending_packages = (
-                db.session.query(Package).join(PackageStatus).filter(PackageStatus.status == "Requested").all()
+                db.session.query(Package).join(PackageStatus).filter(PackageStatus.status == "Parsed").all()
             )
 
             if not pending_packages:
@@ -473,7 +473,8 @@ class LicenseWorker(BaseWorker):
                 # Count packages by status
                 status_counts = {}
                 for status in [
-                    "Requested",
+                    "Submitted",
+                    "Parsed",
                     "Checking Licence",
                     "Licence Checked",
                     "License Check Failed",
@@ -509,7 +510,7 @@ class LicenseWorker(BaseWorker):
             retried_count = 0
             for package in failed_packages:
                 if package.package_status:
-                    package.package_status.status = "Requested"
+                    package.package_status.status = "Submitted"
                     package.package_status.updated_at = datetime.utcnow()
                     retried_count += 1
 
@@ -537,7 +538,7 @@ class LicenseWorker(BaseWorker):
             processed_count = 0
             for package in packages:
                 if package.package_status:
-                    package.package_status.status = "Requested"
+                    package.package_status.status = "Submitted"
                     package.package_status.updated_at = datetime.utcnow()
                     processed_count += 1
 

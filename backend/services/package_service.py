@@ -231,7 +231,7 @@ class PackageService:
             # Create package status record
             package_status = PackageStatus(
                 package_id=package.id,
-                status="Requested",
+                status="Submitted",
                 security_scan_status="pending",
             )
             db.session.add(package_status)

@@ -545,8 +545,10 @@ function getPackageStatusColor(status: string) {
 
 function getPackageStatusLabel(status: string): string {
   switch (status) {
-    case PACKAGE_STATUS.REQUESTED:
-      return "Requested";
+    case PACKAGE_STATUS.SUBMITTED:
+      return "Submitted";
+    case PACKAGE_STATUS.PARSED:
+      return "Parsed";
     case PACKAGE_STATUS.LICENCE_CHECKED:
       return "License Checked";
     case PACKAGE_STATUS.DOWNLOADED:

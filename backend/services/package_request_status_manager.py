@@ -59,13 +59,10 @@ class PackageRequestStatusManager:
         if total_packages == 0:
             return "no_packages"
 
-        # Rule 1: If there are still requested packages, keep processing
-        if counts["Requested"] > 0:
+        # Rule 1: If there are still early-stage packages, keep processing
+        if counts["Submitted"] > 0 or counts["Parsed"] > 0:
             return "processing"
 
-        # Rule 2: If any packages failed validation, reject the entire request
-        if counts["Rejected"] > 0:
-            return "rejected"
 
         # Rule 3: If all packages are pending approval, request is ready for approval
         if counts["Pending Approval"] == total_packages:
@@ -77,7 +74,9 @@ class PackageRequestStatusManager:
 
         # Rule 5: If some packages are still processing, determine the stage
         processing_count = (
-            counts["Checking Licence"]
+            counts["Submitted"]
+            + counts["Parsed"]
+            + counts["Checking Licence"]
             + counts["Downloading"]
             + counts["Security Scanning"]
             + counts["Licence Checked"]
@@ -107,7 +106,8 @@ class PackageRequestStatusManager:
 
         counts = {
             "total": len(packages),
-            "Requested": 0,
+            "Submitted": 0,
+            "Parsed": 0,
             "Checking Licence": 0,
             "Licence Checked": 0,
             "Downloading": 0,
@@ -126,10 +126,10 @@ class PackageRequestStatusManager:
                     counts[status] += 1
                 else:
                     # Handle unknown statuses
-                    counts["Requested"] += 1
+                    counts["Submitted"] += 1
             else:
-                # Package without status is considered requested
-                counts["Requested"] += 1
+                # Package without status is considered submitted
+                counts["Submitted"] += 1
 
         return counts
 

@@ -63,13 +63,13 @@ class PackageWorker(BaseWorker):
             )
 
             if stuck_packages:
-                logger.warning(f"Found {len(stuck_packages)} stuck packages, resetting to Requested status")
+                logger.warning(f"Found {len(stuck_packages)} stuck packages, resetting to Submitted status")
 
                 for package in stuck_packages:
                     if package.package_status:
-                        package.package_status.status = "Requested"
+                        package.package_status.status = "Submitted"
                         package.package_status.updated_at = datetime.utcnow()
-                        logger.info(f"Reset stuck package {package.name}@{package.version} to Requested")
+                        logger.info(f"Reset stuck package {package.name}@{package.version} to Submitted")
 
                 db.session.commit()
 
@@ -227,7 +227,8 @@ class PackageWorker(BaseWorker):
                 # Count packages by status
                 status_counts = {}
                 for status in [
-                    "Requested",
+                    "Submitted",
+                    "Parsed",
                     "Checking Licence",
                     "Downloading",
                     "Security Scanning",
@@ -266,7 +267,7 @@ class PackageWorker(BaseWorker):
             retried_count = 0
             for package in failed_packages:
                 if package.package_status:
-                    package.package_status.status = "Requested"
+                    package.package_status.status = "Submitted"
                     package.package_status.updated_at = datetime.utcnow()
                     retried_count += 1
 

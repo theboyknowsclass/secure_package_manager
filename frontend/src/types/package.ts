@@ -48,7 +48,8 @@ export interface PackageRequest {
   packages: Package[];
   package_counts: {
     total: number;
-    Requested: number;
+    Submitted: number;
+    Parsed: number;
     "Checking Licence": number;
     "Licence Checked": number;
     Downloading: number;

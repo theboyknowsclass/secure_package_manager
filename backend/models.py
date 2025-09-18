@@ -141,7 +141,7 @@ class PackageStatus(db.Model):  # type: ignore[misc]
     __tablename__ = "package_status"
 
     package_id = db.Column(db.Integer, db.ForeignKey("packages.id"), primary_key=True)
-    status = db.Column(db.String(50), default="Requested", nullable=False)
+    status = db.Column(db.String(50), default="Submitted", nullable=False)
     file_size = db.Column(db.BigInteger)
     checksum = db.Column(db.String(255))
     license_score = db.Column(db.Integer)
@@ -180,7 +180,8 @@ class PackageStatus(db.Model):  # type: ignore[misc]
     def is_processing(self) -> bool:
         """Check if package is in a processing state"""
         processing_statuses = {
-            "Requested",
+            "Submitted",
+            "Parsed",
             "Checking Licence",
             "Downloading",
             "Security Scanning",
@@ -206,7 +207,8 @@ class PackageStatus(db.Model):  # type: ignore[misc]
     def get_processing_stage(self) -> str:
         """Get the current processing stage for display purposes"""
         stage_mapping = {
-            "Requested": "Initial",
+            "Submitted": "Submitted",
+            "Parsed": "Parsed",
             "Checking Licence": "License Validation",
             "Licence Checked": "License Complete",
             "Downloading": "Downloading Package",
