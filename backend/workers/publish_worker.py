@@ -91,7 +91,7 @@ class PublishWorker(BaseWorker):
         try:
             # Get packages that need publishing - approved packages with pending publish status
             pending_packages = (
-                db.session.query(Package)
+                self.ops.session.query(Package)
                 .join(PackageStatus)
                 .filter(
                     PackageStatus.status == "Approved",
@@ -117,11 +117,11 @@ class PublishWorker(BaseWorker):
                     )
                     self._mark_package_publish_failed(package, str(e))
 
-            db.session.commit()
+            self.ops.session.commit()
 
         except Exception as e:
             logger.error(f"Error in _process_pending_publishing: {str(e)}", exc_info=True)
-            db.session.rollback()
+            self.ops.session.rollback()
 
     def _publish_single_package(self, package: Package) -> None:
         """Publish a single package to the secure repository"""
@@ -132,7 +132,7 @@ class PublishWorker(BaseWorker):
             if package.package_status:
                 package.package_status.publish_status = "publishing"
                 package.package_status.updated_at = datetime.utcnow()
-                db.session.commit()
+                self.ops.session.commit()
 
             # Attempt to publish the package
             success = self.package_service.publish_to_secure_repo(package)
@@ -165,12 +165,12 @@ class PublishWorker(BaseWorker):
     def get_publishing_stats(self) -> Dict[str, Any]:
         """Get current publishing statistics"""
         try:
-            with self.app.app_context():
+            with self.db_service.get_session() as session:
                 # Count packages by publish status
                 publish_status_counts = {}
                 for status in ["pending", "publishing", "published", "failed"]:
                     count = (
-                        db.session.query(Package)
+                        session.query(Package)
                         .join(PackageStatus)
                         .filter(PackageStatus.publish_status == status)
                         .count()
@@ -179,7 +179,7 @@ class PublishWorker(BaseWorker):
 
                 # Count approved packages (main status)
                 approved_count = (
-                    db.session.query(Package).join(PackageStatus).filter(PackageStatus.status == "Approved").count()
+                    session.query(Package).join(PackageStatus).filter(PackageStatus.status == "Approved").count()
                 )
 
                 return {
@@ -195,29 +195,29 @@ class PublishWorker(BaseWorker):
     def retry_failed_publishing(self) -> Dict[str, Any]:
         """Retry failed publishing packages"""
         try:
-            failed_packages = (
-                db.session.query(Package).join(PackageStatus).filter(PackageStatus.publish_status == "failed").all()
-            )
+            with self.db_service.get_session() as session:
+                failed_packages = (
+                    session.query(Package).join(PackageStatus).filter(PackageStatus.publish_status == "failed").all()
+                )
 
-            if not failed_packages:
-                return {"message": "No failed publishing packages found", "retried": 0}
+                if not failed_packages:
+                    return {"message": "No failed publishing packages found", "retried": 0}
 
-            retried_count = 0
-            for package in failed_packages:
-                if package.package_status:
-                    package.package_status.publish_status = "pending"
-                    package.package_status.updated_at = datetime.utcnow()
-                    retried_count += 1
+                retried_count = 0
+                for package in failed_packages:
+                    if package.package_status:
+                        package.package_status.publish_status = "pending"
+                        package.package_status.updated_at = datetime.utcnow()
+                        retried_count += 1
 
-            db.session.commit()
+                session.commit()
 
-            logger.info(f"Retried {retried_count} failed publishing packages")
-            return {
-                "message": f"Retried {retried_count} packages",
-                "retried": retried_count,
-            }
+                logger.info(f"Retried {retried_count} failed publishing packages")
+                return {
+                    "message": f"Retried {retried_count} packages",
+                    "retried": retried_count,
+                }
 
         except Exception as e:
             logger.error(f"Error retrying failed publishing packages: {str(e)}")
-            db.session.rollback()
             return {"error": str(e)}

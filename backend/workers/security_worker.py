@@ -81,7 +81,7 @@ class SecurityWorker(BaseWorker):
         logger.info(f"Security scanning {len(packages)} packages")
         for package in packages:
             try:
-                self._scan_single(package)
+                self._scan_single(package, self.ops.session)
             except Exception as e:
                 logger.error(
                     f"Security scan failed for {package.name}@{package.version}: {str(e)}",
@@ -89,14 +89,14 @@ class SecurityWorker(BaseWorker):
                 )
                 self._mark_failed(package)
 
-    def _scan_single(self, package: Package) -> None:
+    def _scan_single(self, package: Package, session) -> None:
         if not self.trivy_service or not package.package_status:
             return
 
         package.package_status.status = "Security Scanning"
         package.package_status.security_scan_status = "running"
         package.package_status.updated_at = datetime.utcnow()
-        db.session.flush()
+        session.flush()
 
         result = self.trivy_service.scan_package(package)
 
@@ -110,7 +110,7 @@ class SecurityWorker(BaseWorker):
                 package.package_status.security_score = result["security_score"]
 
         package.package_status.updated_at = datetime.utcnow()
-        db.session.flush()
+        session.flush()
 
     def _mark_failed(self, package: Package) -> None:
         try:
