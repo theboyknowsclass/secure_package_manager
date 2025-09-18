@@ -73,7 +73,20 @@ services:
       - db
     restart: unless-stopped
 
+  # Portainer for Docker management UI (development only)
+  portainer:
+    image: portainer/portainer-ce:latest
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - app-network
+    restart: unless-stopped
+
 volumes:
   # Add dev-specific volumes
   npm_storage:
   pgadmin_data:
+  portainer_data:
