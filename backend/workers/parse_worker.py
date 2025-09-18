@@ -206,12 +206,13 @@ class ParseWorker(BaseWorker):
                 existing_packages.append(existing_package)
                 continue
 
-            # Create new package object
+            # Create new package object with proper field mapping
             package_data = {
                 "name": package_name,
                 "version": package_version,
-                "package_info": package_info,
-                "request_id": request_id,
+                "npm_url": package_info.get("resolved"),  # Map resolved URL to npm_url
+                "integrity": package_info.get("integrity"),  # Map integrity hash
+                "license_identifier": package_info.get("license"),  # Map license to license_identifier
             }
             packages_to_process.append(package_data)
 

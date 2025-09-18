@@ -6,17 +6,22 @@ from flask_sqlalchemy import SQLAlchemy
 # Create a SQLAlchemy instance that will be initialized by the app
 db = SQLAlchemy()
 
+# Import the pure SQLAlchemy models to inherit from
+from database.models import (
+    User as BaseUser,
+    Request as BaseRequest, 
+    Package as BasePackage,
+    RequestPackage as BaseRequestPackage,
+    PackageStatus as BasePackageStatus,
+    SecurityScan as BaseSecurityScan,
+    SupportedLicense as BaseSupportedLicense,
+    AuditLog as BaseAuditLog
+)
 
-class User(db.Model):  # type: ignore[misc]
+
+# Flask-SQLAlchemy models that inherit from pure SQLAlchemy models
+class User(BaseUser, db.Model):  # type: ignore[misc]
     __tablename__ = "users"
-
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(255), unique=True, nullable=False)
-    email = db.Column(db.String(255), unique=True, nullable=False)
-    full_name = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(20), default="user", nullable=False)  # 'user', 'approver', 'admin'
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     requests = db.relationship("Request", backref="requestor", lazy=True)
@@ -67,15 +72,8 @@ class User(db.Model):  # type: ignore[misc]
         }
 
 
-class Request(db.Model):  # type: ignore[misc]
+class Request(BaseRequest, db.Model):  # type: ignore[misc]
     __tablename__ = "requests"
-
-    id = db.Column(db.Integer, primary_key=True)
-    application_name = db.Column(db.String(255), nullable=False)
-    version = db.Column(db.String(100), nullable=False)
-    requestor_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    raw_request_blob = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
     request_packages = db.relationship("RequestPackage", backref="request", lazy=True)
@@ -90,18 +88,8 @@ class Request(db.Model):  # type: ignore[misc]
         }
 
 
-class Package(db.Model):  # type: ignore[misc]
+class Package(BasePackage, db.Model):  # type: ignore[misc]
     __tablename__ = "packages"
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), nullable=False)
-    version = db.Column(db.String(100), nullable=False)
-    npm_url = db.Column(db.String(500))
-    local_path = db.Column(db.String(500))
-    integrity = db.Column(db.String(255))
-    license_identifier = db.Column(db.String(100))  # SPDX license identifier
-    license_text = db.Column(db.Text)  # Full license text
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
     request_packages = db.relationship("RequestPackage", backref="package", lazy=True)
@@ -122,12 +110,8 @@ class Package(db.Model):  # type: ignore[misc]
         }
 
 
-class RequestPackage(db.Model):  # type: ignore[misc]
+class RequestPackage(BaseRequestPackage, db.Model):  # type: ignore[misc]
     __tablename__ = "request_packages"
-
-    request_id = db.Column(db.Integer, db.ForeignKey("requests.id"), primary_key=True)
-    package_id = db.Column(db.Integer, db.ForeignKey("packages.id"), primary_key=True)
-    package_type = db.Column(db.String(20), default="new", nullable=False)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -137,27 +121,8 @@ class RequestPackage(db.Model):  # type: ignore[misc]
         }
 
 
-class PackageStatus(db.Model):  # type: ignore[misc]
+class PackageStatus(BasePackageStatus, db.Model):  # type: ignore[misc]
     __tablename__ = "package_status"
-
-    package_id = db.Column(db.Integer, db.ForeignKey("packages.id"), primary_key=True)
-    status = db.Column(db.String(50), default="Submitted", nullable=False)
-    file_size = db.Column(db.BigInteger)
-    checksum = db.Column(db.String(255))
-    license_score = db.Column(db.Integer)
-    security_score = db.Column(db.Integer)
-    security_scan_status = db.Column(
-        db.String(50), default="pending", nullable=False
-    )  # pending, running, completed, failed, skipped
-    license_status = db.Column(db.String(20))  # Primary license status calculated from supported_licenses table
-    approver_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)  # User who approved the package
-    rejector_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)  # User who rejected the package
-    published_at = db.Column(db.DateTime, nullable=True)  # Timestamp when package was successfully published
-    publish_status = db.Column(
-        db.String(20), default="pending", nullable=False
-    )  # Publishing status: pending, publishing, published, failed
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -222,22 +187,8 @@ class PackageStatus(db.Model):  # type: ignore[misc]
         return stage_mapping.get(self.status, "Unknown")
 
 
-class SecurityScan(db.Model):  # type: ignore[misc]
+class SecurityScan(BaseSecurityScan, db.Model):  # type: ignore[misc]
     __tablename__ = "security_scans"
-
-    id = db.Column(db.Integer, primary_key=True)
-    package_id = db.Column(db.Integer, db.ForeignKey("packages.id", ondelete="CASCADE"), nullable=False)
-    scan_type = db.Column(db.String(50), default="trivy", nullable=False)  # trivy, snyk, npm_audit
-    scan_result = db.Column(db.JSON)  # Store the full Trivy scan result
-    critical_count = db.Column(db.Integer, default=0)
-    high_count = db.Column(db.Integer, default=0)
-    medium_count = db.Column(db.Integer, default=0)
-    low_count = db.Column(db.Integer, default=0)
-    info_count = db.Column(db.Integer, default=0)
-    scan_duration_ms = db.Column(db.Integer)  # Scan duration in milliseconds
-    trivy_version = db.Column(db.String(50))  # Version of Trivy used for the scan
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    completed_at = db.Column(db.DateTime)
 
     def get_total_vulnerabilities(self) -> int:
         """Calculate total vulnerability count from granular counts"""
@@ -262,16 +213,8 @@ class SecurityScan(db.Model):  # type: ignore[misc]
         }
 
 
-class SupportedLicense(db.Model):  # type: ignore[misc]
+class SupportedLicense(BaseSupportedLicense, db.Model):  # type: ignore[misc]
     __tablename__ = "supported_licenses"
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), unique=True, nullable=False)
-    identifier = db.Column(db.String(100), unique=True, nullable=False)  # SPDX identifier
-    status = db.Column(db.String(20), default="allowed")  # 'always_allowed', 'allowed', 'avoid', 'blocked'
-    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -285,16 +228,8 @@ class SupportedLicense(db.Model):  # type: ignore[misc]
         }
 
 
-class AuditLog(db.Model):  # type: ignore[misc]
+class AuditLog(BaseAuditLog, db.Model):  # type: ignore[misc]
     __tablename__ = "audit_log"
-
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    action = db.Column(db.String(100), nullable=False)
-    resource_type = db.Column(db.String(100), nullable=False)
-    resource_id = db.Column(db.Integer)
-    details = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self) -> dict[str, Any]:
         return {

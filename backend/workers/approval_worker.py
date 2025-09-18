@@ -6,9 +6,11 @@ This is a lightweight worker that can be extended for auto-approval logic in the
 """
 
 import logging
+import os
 from datetime import datetime, timedelta
 
-from models import Package, PackageStatus, db
+from database.models import Package, PackageStatus
+from database.service import DatabaseService
 from workers.base_worker import BaseWorker
 
 logger = logging.getLogger(__name__)
@@ -23,6 +25,10 @@ class ApprovalWorker(BaseWorker):
         super().__init__("ApprovalWorker", sleep_interval)
         self.max_packages_per_cycle = 50  # Can handle many packages since it's just status updates
         self.stuck_package_timeout = timedelta(minutes=10)  # Short timeout since this should be fast
+        self.db_service = DatabaseService(
+            database_url=os.getenv("DATABASE_URL", "postgresql://user:password@localhost/secure_package_manager"),
+            echo=False
+        )
 
     def initialize(self) -> None:
         """Initialize the approval worker"""

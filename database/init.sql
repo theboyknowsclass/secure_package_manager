@@ -60,8 +60,7 @@ CREATE TABLE IF NOT EXISTS request_packages (
 
 -- Create package_status table (replaces package_validations and status tracking)
 CREATE TABLE IF NOT EXISTS package_status (
-    id SERIAL PRIMARY KEY,
-    package_id INTEGER REFERENCES packages(id) ON DELETE CASCADE,
+    package_id INTEGER PRIMARY KEY REFERENCES packages(id) ON DELETE CASCADE,
     status VARCHAR(50) NOT NULL,
     file_size BIGINT,
     checksum VARCHAR(255),
@@ -75,7 +74,6 @@ CREATE TABLE IF NOT EXISTS package_status (
     publish_status VARCHAR(20) DEFAULT 'pending', -- Publishing status: pending, publishing, published, failed
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(package_id), -- Only one status record per package
     CONSTRAINT package_status_status_check CHECK (status IN (
         'Submitted',
         'Parsed',
@@ -129,7 +127,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE INDEX IF NOT EXISTS idx_requests_requestor_id ON requests(requestor_id);
 CREATE INDEX IF NOT EXISTS idx_request_packages_request_id ON request_packages(request_id);
 CREATE INDEX IF NOT EXISTS idx_request_packages_package_id ON request_packages(package_id);
-CREATE INDEX IF NOT EXISTS idx_package_status_package_id ON package_status(package_id);
+-- package_id is already the primary key, so no separate index needed
 CREATE INDEX IF NOT EXISTS idx_package_status_approver_id ON package_status(approver_id);
 CREATE INDEX IF NOT EXISTS idx_package_status_rejector_id ON package_status(rejector_id);
 CREATE INDEX IF NOT EXISTS idx_security_scans_package_id ON security_scans(package_id);
