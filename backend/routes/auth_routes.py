@@ -5,7 +5,7 @@ from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from services.auth_service import AuthService
 
-from database import db
+from database.flask_utils import get_db_operations
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +35,17 @@ def login() -> ResponseReturnValue:
 
         # Authentication - validates against mock-idp in dev, ADFS in production
         if username == "admin" and password == "admin":
-            user = User.query.filter_by(username=username).first()
+            with get_db_operations() as ops:
+                user = ops.get_user_by_username(username, User)
             if not user:
-                user = User(
-                    username=username,
-                    email=f"{username}@example.com",
-                    full_name="Admin User",
-                    role="admin",
-                )
-                db.session.add(user)
-                db.session.commit()
+                user_data = {
+                    "username": username,
+                    "email": f"{username}@example.com",
+                    "full_name": "Admin User",
+                    "role": "admin",
+                }
+                with get_db_operations() as ops:
+                    user = ops.create_user(user_data, User)
 
             logger.info("Generating token...")
             token = auth_service.generate_token(user)

@@ -9,7 +9,7 @@ from typing import Any, Dict, List
 from config.constants import TARGET_REPOSITORY_URL
 from database.models import Package, PackageStatus, RequestPackage
 
-from database import db
+from database.flask_utils import get_db_operations
 
 from .license_service import LicenseService
 from .trivy_service import TrivyService
@@ -142,30 +142,31 @@ class PackageService:
             package_info = package_data["info"]
 
             # Check if package already exists in database (deduplicated across all requests)
-            existing_package = Package.query.filter_by(
-                name=package_name,
-                version=package_version,
-            ).first()
-
-            if existing_package:
-                # Check if this package is already linked to this request
-                existing_link = RequestPackage.query.filter_by(
-                    request_id=request_id, package_id=existing_package.id
+            with get_db_operations() as ops:
+                existing_package = ops.query(Package).filter_by(
+                    name=package_name,
+                    version=package_version,
                 ).first()
 
-                if not existing_link:
-                    # Create link between request and existing package
-                    # Since package exists in DB, it's "existing" for this request
-                    request_package = RequestPackage(
-                        request_id=request_id,
-                        package_id=existing_package.id,
-                        package_type="existing",
-                    )
-                    db.session.add(request_package)
-                    db.session.commit()
+                if existing_package:
+                    # Check if this package is already linked to this request
+                    existing_link = ops.query(RequestPackage).filter_by(
+                        request_id=request_id, package_id=existing_package.id
+                    ).first()
 
-                existing_packages.append(existing_package)
-                continue
+                    if not existing_link:
+                        # Create link between request and existing package
+                        # Since package exists in DB, it's "existing" for this request
+                        request_package = RequestPackage(
+                            request_id=request_id,
+                            package_id=existing_package.id,
+                            package_type="existing",
+                        )
+                        ops.add(request_package)
+                        ops.commit()
+
+                    existing_packages.append(existing_package)
+                    continue
 
             # Create new package object
             package_data = {
@@ -227,42 +228,46 @@ class PackageService:
                 package_data["package_info"],
                 request_id,
             )
-            db.session.add(package)
-            db.session.flush()  # Get the package ID
+            with get_db_operations() as ops:
+                ops.add(package)
+                ops.commit()  # Commit to get the package ID
 
-            # Create package status record
-            package_status = PackageStatus(
-                package_id=package.id,
-                status="Submitted",
-                security_scan_status="pending",
-            )
-            db.session.add(package_status)
+                # Create package status record
+                package_status = PackageStatus(
+                    package_id=package.id,
+                    status="Submitted",
+                    security_scan_status="pending",
+                )
+                ops.add(package_status)
 
-            # Create request-package link
-            # Since this is a newly created package, it's "new" for this request
-            request_package = RequestPackage(request_id=request_id, package_id=package.id, package_type="new")
-            db.session.add(request_package)
+                # Create request-package link
+                # Since this is a newly created package, it's "new" for this request
+                request_package = RequestPackage(request_id=request_id, package_id=package.id, package_type="new")
+                ops.add(request_package)
 
             package_objects.append(package)
             logger.info(f"Added package for processing: {package.name}@{package.version} (type: new)")
 
-        db.session.commit()
+        with get_db_operations() as ops:
+            ops.commit()
         return package_objects
 
     def _handle_processing_error(self, request_id: int, error: Exception) -> None:
         """Handle errors during package processing"""
         try:
             # Update package statuses to reflect error
-            packages = (
-                db.session.query(Package).join(RequestPackage).filter(RequestPackage.request_id == request_id).all()
-            )
+            with get_db_operations() as ops:
+                packages = (
+                    ops.query(Package).join(RequestPackage).filter(RequestPackage.request_id == request_id).all()
+                )
 
             for package in packages:
                 if package.package_status:
                     package.package_status.status = "Rejected"
                     package.package_status.updated_at = datetime.utcnow()
 
-            db.session.commit()
+            with get_db_operations() as ops:
+                ops.commit()
             logger.info(f"Updated package statuses for request {request_id} to Rejected due to error")
         except Exception as commit_error:
             logger.error(f"Failed to update package statuses after error: {str(commit_error)}")

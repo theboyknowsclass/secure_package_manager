@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime
 
 # Import centralized configuration
@@ -41,11 +42,7 @@ def create_app() -> Flask:
     logging.basicConfig(level=logging.INFO)
     logging.getLogger(__name__)
 
-    # Import database instance
-    from database import db
-
-    # Now initialize the database with the app
-    db.init_app(app)
+    # Database will be initialized per-request using DatabaseService
 
     from routes.admin_routes import admin_bp
     from routes.approver_routes import approver_bp
@@ -75,17 +72,18 @@ def health_check() -> Response:
 def wait_for_db(max_retries: int = 30, delay: int = 2) -> bool:
     """Wait for database to be ready"""
     import time
+    from database.service import DatabaseService
 
     for attempt in range(max_retries):
         try:
-            with app.app_context():
-                # Import db inside the app context
-                from database import db
-
-                with db.engine.connect() as connection:
-                    connection.execute(db.text("SELECT 1"))
-            logging.info("Database connection successful")
-            return True
+            database_url = os.getenv("DATABASE_URL")
+            if not database_url:
+                raise ValueError("DATABASE_URL environment variable is required")
+            
+            db_service = DatabaseService(database_url)
+            if db_service.test_connection():
+                logging.info("Database connection successful")
+                return True
         except Exception as e:
             logging.warning(f"Database connection attempt {attempt + 1} failed: {str(e)}")
             if attempt < max_retries - 1:
@@ -100,11 +98,15 @@ if __name__ == "__main__":
     # Wait for database to be ready
     wait_for_db()
 
-    with app.app_context():
-        # Import db inside the app context
-        from database import db
-
-        db.create_all()
+    # Create database tables using pure SQLAlchemy
+    from database.service import DatabaseService
+    from database.models import Base
+    from sqlalchemy import create_engine
+    
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        engine = create_engine(database_url)
+        Base.metadata.create_all(engine)
         logging.getLogger(__name__).info("Database tables created/verified")
 
     app.run(host="0.0.0.0", port=5000, debug=True)

@@ -9,7 +9,7 @@ from flask.typing import ResponseReturnValue
 from services.auth_service import AuthService
 from services.package_service import PackageService
 
-from database import db
+from database.flask_utils import get_db_operations
 
 logger = logging.getLogger(__name__)
 
@@ -97,8 +97,9 @@ def _create_request_with_blob(package_data: Dict[str, Any]) -> Request:
         requestor_id=request.user.id,
         raw_request_blob=json.dumps(package_data),  # Store raw JSON blob
     )
-    db.session.add(request_record)
-    db.session.commit()
+    with get_db_operations() as ops:
+        ops.add(request_record)
+        ops.commit()
     return request_record
 
 
@@ -130,20 +131,24 @@ def _create_success_response(
 def get_package_request(request_id: int) -> ResponseReturnValue:
     """Get package request details"""
     try:
-        request_record = Request.query.get_or_404(request_id)
+        with get_db_operations() as ops:
+            request_record = ops.query(Request).filter(Request.id == request_id).first()
+            if not request_record:
+                return jsonify({"error": "Request not found"}), 404
 
         # Check if user has access to this request
         if not request.user.is_admin() and request_record.requestor_id != request.user.id:
             return jsonify({"error": "Access denied"}), 403
 
         # Get packages for this request with their creation context and scan results
-        packages_with_context = (
-            db.session.query(Package, RequestPackage, SecurityScan)
-            .join(RequestPackage)
-            .outerjoin(SecurityScan)  # LEFT JOIN - allows null scan results
-            .filter(RequestPackage.request_id == request_id)
-            .all()
-        )
+        with get_db_operations() as ops:
+            packages_with_context = (
+                ops.query(Package, RequestPackage, SecurityScan)
+                .join(RequestPackage)
+                .outerjoin(SecurityScan)  # LEFT JOIN - allows null scan results
+                .filter(RequestPackage.request_id == request_id)
+                .all()
+            )
 
         # Get request status from status manager
         from services.package_request_status_manager import PackageRequestStatusManager
@@ -217,10 +222,11 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
 def list_package_requests() -> ResponseReturnValue:
     """List package requests for the user"""
     try:
-        if request.user.is_admin():
-            requests = Request.query.all()
-        else:
-            requests = Request.query.filter_by(requestor_id=request.user.id).all()
+        with get_db_operations() as ops:
+            if request.user.is_admin():
+                requests = ops.query(Request).all()
+            else:
+                requests = ops.query(Request).filter_by(requestor_id=request.user.id).all()
 
         result_requests = []
         for req in requests:
@@ -262,18 +268,22 @@ def list_package_requests() -> ResponseReturnValue:
 def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
     """Get security scan status for a package"""
     try:
-        package = Package.query.get_or_404(package_id)
+        with get_db_operations() as ops:
+            package = ops.query(Package).filter(Package.id == package_id).first()
+            if not package:
+                return jsonify({"error": "Package not found"}), 404
 
         # Check if user has access to this package
         if not request.user.is_admin():
             # Check if user has access through any request
-            has_access = (
-                db.session.query(RequestPackage)
-                .join(Request)
-                .filter(
-                    RequestPackage.package_id == package_id,
-                    Request.requestor_id == request.user.id,
-                )
+            with get_db_operations() as ops:
+                has_access = (
+                    ops.query(RequestPackage)
+                    .join(Request)
+                    .filter(
+                        RequestPackage.package_id == package_id,
+                        Request.requestor_id == request.user.id,
+                    )
                 .first()
             )
 
@@ -307,18 +317,22 @@ def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
 def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
     """Get detailed security scan report for a package"""
     try:
-        package = Package.query.get_or_404(package_id)
+        with get_db_operations() as ops:
+            package = ops.query(Package).filter(Package.id == package_id).first()
+            if not package:
+                return jsonify({"error": "Package not found"}), 404
 
         # Check if user has access to this package
         if not request.user.is_admin():
             # Check if user has access through any request
-            has_access = (
-                db.session.query(RequestPackage)
-                .join(Request)
-                .filter(
-                    RequestPackage.package_id == package_id,
-                    Request.requestor_id == request.user.id,
-                )
+            with get_db_operations() as ops:
+                has_access = (
+                    ops.query(RequestPackage)
+                    .join(Request)
+                    .filter(
+                        RequestPackage.package_id == package_id,
+                        Request.requestor_id == request.user.id,
+                    )
                 .first()
             )
 
@@ -355,18 +369,22 @@ def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
 def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
     """Trigger a new security scan for a package"""
     try:
-        package = Package.query.get_or_404(package_id)
+        with get_db_operations() as ops:
+            package = ops.query(Package).filter(Package.id == package_id).first()
+            if not package:
+                return jsonify({"error": "Package not found"}), 404
 
         # Check if user has access to this package
         if not request.user.is_admin():
             # Check if user has access through any request
-            has_access = (
-                db.session.query(RequestPackage)
-                .join(Request)
-                .filter(
-                    RequestPackage.package_id == package_id,
-                    Request.requestor_id == request.user.id,
-                )
+            with get_db_operations() as ops:
+                has_access = (
+                    ops.query(RequestPackage)
+                    .join(Request)
+                    .filter(
+                        RequestPackage.package_id == package_id,
+                        Request.requestor_id == request.user.id,
+                    )
                 .first()
             )
 
@@ -409,21 +427,23 @@ def get_processing_status() -> ResponseReturnValue:
             "Pending Approval",
             "Rejected",
         ]:
-            count = db.session.query(Package).join(PackageStatus).filter(PackageStatus.status == status).count()
+            with get_db_operations() as ops:
+                count = ops.query(Package).join(PackageStatus).filter(PackageStatus.status == status).count()
             status_counts[status] = count
 
         # Count total requests
-        total_requests = db.session.query(Request).count()
+        with get_db_operations() as ops:
+            total_requests = ops.query(Request).count()
 
-        # Get recent activity (last 10 packages processed)
-        recent_packages = (
-            db.session.query(Package, PackageStatus)
-            .join(PackageStatus)
-            .filter(PackageStatus.updated_at.isnot(None))
-            .order_by(PackageStatus.updated_at.desc())
-            .limit(10)
-            .all()
-        )
+            # Get recent activity (last 10 packages processed)
+            recent_packages = (
+                ops.query(Package, PackageStatus)
+                .join(PackageStatus)
+                .filter(PackageStatus.updated_at.isnot(None))
+                .order_by(PackageStatus.updated_at.desc())
+                .limit(10)
+                .all()
+            )
 
         recent_activity = []
         for package, status in recent_packages:
@@ -466,7 +486,8 @@ def retry_failed_packages() -> ResponseReturnValue:
             return jsonify({"error": "Admin access required"}), 403
 
         # Build query for failed packages
-        query = db.session.query(Package).join(PackageStatus).filter(PackageStatus.status == "Rejected")
+        with get_db_operations() as ops:
+            query = ops.query(Package).join(PackageStatus).filter(PackageStatus.status == "Rejected")
 
         if request_id:
             query = query.join(RequestPackage).filter(RequestPackage.request_id == request_id)
@@ -483,7 +504,8 @@ def retry_failed_packages() -> ResponseReturnValue:
                 package.package_status.updated_at = datetime.utcnow()
                 retried_count += 1
 
-        db.session.commit()
+        with get_db_operations() as ops:
+            ops.commit()
 
         logger.info(f"Retried {retried_count} failed packages")
         return (
@@ -499,5 +521,6 @@ def retry_failed_packages() -> ResponseReturnValue:
 
     except Exception as e:
         logger.error(f"Retry failed packages error: {str(e)}")
-        db.session.rollback()
+        with get_db_operations() as ops:
+            ops.rollback()
         return jsonify({"error": "Internal server error"}), 500

@@ -339,3 +339,100 @@ class DatabaseOperations:
             logger.error(f"Error creating request-package link: {str(e)}")
             session.rollback()
             return False
+
+    # ===== USER OPERATIONS =====
+
+    def get_user_by_username(self, username: str, model_class) -> Optional[Any]:
+        """Get user by username"""
+        try:
+            if self.is_flask_sqlalchemy:
+                return model_class.query.filter_by(username=username).first()
+            else:
+                from sqlalchemy import select
+                session = self._get_session()
+                stmt = select(model_class).where(model_class.username == username)
+                return session.execute(stmt).scalar_one_or_none()
+        except Exception as e:
+            logger.error(f"Error getting user by username {username}: {str(e)}")
+            return None
+
+    def get_user_by_id(self, user_id: int, model_class) -> Optional[Any]:
+        """Get user by ID"""
+        try:
+            if self.is_flask_sqlalchemy:
+                return model_class.query.get(user_id)
+            else:
+                from sqlalchemy import select
+                session = self._get_session()
+                stmt = select(model_class).where(model_class.id == user_id)
+                return session.execute(stmt).scalar_one_or_none()
+        except Exception as e:
+            logger.error(f"Error getting user by ID {user_id}: {str(e)}")
+            return None
+
+    def create_user(self, user_data: Dict[str, Any], model_class) -> Optional[Any]:
+        """Create a new user"""
+        try:
+            session = self._get_session()
+            user = model_class(**user_data)
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            logger.info(f"Created user: {user.username}")
+            return user
+        except Exception as e:
+            logger.error(f"Error creating user: {str(e)}")
+            session.rollback()
+            return None
+
+    def update_user(self, user: Any, update_data: Dict[str, Any]) -> bool:
+        """Update an existing user"""
+        try:
+            session = self._get_session()
+            for key, value in update_data.items():
+                if hasattr(user, key):
+                    setattr(user, key, value)
+            session.commit()
+            logger.info(f"Updated user: {user.username}")
+            return True
+        except Exception as e:
+            logger.error(f"Error updating user {user.username}: {str(e)}")
+            session.rollback()
+            return False
+
+    # ===== BASIC SESSION OPERATIONS =====
+
+    def add(self, obj: Any) -> None:
+        """Add an object to the session"""
+        session = self._get_session()
+        session.add(obj)
+
+    def commit(self) -> None:
+        """Commit the current transaction"""
+        session = self._get_session()
+        session.commit()
+
+    def rollback(self) -> None:
+        """Rollback the current transaction"""
+        session = self._get_session()
+        session.rollback()
+
+    def delete(self, obj: Any) -> None:
+        """Delete an object from the session"""
+        session = self._get_session()
+        session.delete(obj)
+
+    def query(self, *entities):
+        """Create a query object"""
+        if self.is_flask_sqlalchemy:
+            # For Flask-SQLAlchemy, we need to use the model's query attribute
+            if len(entities) == 1:
+                return entities[0].query
+            else:
+                # Multi-entity query - use session.query
+                session = self._get_session()
+                return session.query(*entities)
+        else:
+            # For pure SQLAlchemy, use session.query
+            session = self._get_session()
+            return session.query(*entities)

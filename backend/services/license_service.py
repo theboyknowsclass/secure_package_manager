@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 
 from database.models import PackageStatus, SupportedLicense
 
-from database import db
+from database.flask_utils import get_db_operations
 
 logger = logging.getLogger(__name__)
 
@@ -74,22 +74,24 @@ class LicenseService:
             warnings: List of validation warnings
         """
         try:
-            package_status = PackageStatus.query.filter_by(package_id=package_id).first()
-            if package_status:
-                package_status.license_score = license_score
-                package_status.status = "Licence Checked"
-                package_status.updated_at = datetime.utcnow()
-                db.session.commit()
+            with get_db_operations() as ops:
+                package_status = ops.query(PackageStatus).filter_by(package_id=package_id).first()
+                if package_status:
+                    package_status.license_score = license_score
+                    package_status.status = "Licence Checked"
+                    package_status.updated_at = datetime.utcnow()
+                    ops.commit()
 
-                self.logger.info(
-                    f"Updated package {package_id} license status: score={license_score}, status={package_status.status}"
-                )
-            else:
-                self.logger.warning(f"Package status not found for package {package_id}")
+                    self.logger.info(
+                        f"Updated package {package_id} license status: score={license_score}, status={package_status.status}"
+                    )
+                else:
+                    self.logger.warning(f"Package status not found for package {package_id}")
 
         except Exception as e:
             self.logger.error(f"Error updating package license status: {str(e)}")
-            db.session.rollback()
+            with get_db_operations() as ops:
+                ops.rollback()
 
     def _parse_license_info(self, package_data: Dict[str, Any]) -> Optional[str]:
         """Parse and normalize license information from package data"""

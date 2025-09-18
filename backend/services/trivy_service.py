@@ -12,7 +12,7 @@ from config.constants import (
 )
 from database.models import Package, SecurityScan
 
-from database import db
+from database.flask_utils import get_db_operations
 
 logger = logging.getLogger(__name__)
 
@@ -34,17 +34,18 @@ class TrivyService:
             Dict containing scan results and status
         """
         try:
-            # Create security scan record
-            security_scan = SecurityScan(package_id=package.id, scan_type="trivy")
-            db.session.add(security_scan)
-            db.session.commit()
+            with get_db_operations() as ops:
+                # Create security scan record
+                security_scan = SecurityScan(package_id=package.id, scan_type="trivy")
+                ops.add(security_scan)
+                ops.commit()
 
-            # Update package security scan status
-            if package.package_status:
-                package.package_status.status = "Security Scanning"
-                package.package_status.security_scan_status = "running"
-                package.package_status.updated_at = datetime.utcnow()
-                db.session.commit()
+                # Update package security scan status
+                if package.package_status:
+                    package.package_status.status = "Security Scanning"
+                    package.package_status.security_scan_status = "running"
+                    package.package_status.updated_at = datetime.utcnow()
+                    ops.commit()
 
             logger.info(f"Starting Trivy scan for package {package.name}@{package.version}")
 
@@ -408,7 +409,8 @@ class TrivyService:
                 )
                 package.package_status.updated_at = datetime.utcnow()
 
-            db.session.commit()
+            with get_db_operations() as ops:
+                ops.commit()
 
             total_vulnerabilities = security_scan.get_total_vulnerabilities()
             logger.info(
@@ -488,7 +490,8 @@ class TrivyService:
                 package.package_status.security_scan_status = "failed"
                 package.package_status.updated_at = datetime.utcnow()
 
-            db.session.commit()
+            with get_db_operations() as ops:
+                ops.commit()
 
             logger.error(f"Trivy scan failed for {package.name}@{package.version}: {error_message}")
 

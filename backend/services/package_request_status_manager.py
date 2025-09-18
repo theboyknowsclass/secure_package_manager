@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from database.models import Package, PackageStatus, Request, RequestPackage
 
-from database import db
+from database.flask_utils import get_db_operations
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class PackageRequestStatusManager:
     """Manages package request status updates based on package states"""
 
     def __init__(self, db_session: Any = None) -> None:
-        self.db = db_session or db
+        self.db = db_session
 
     def update_request_status(self, request_id: int) -> Optional[str]:
         """
@@ -32,7 +32,8 @@ class PackageRequestStatusManager:
         Returns:
             The new status if updated, None if no change needed
         """
-        request = Request.query.get(request_id)
+        with get_db_operations() as ops:
+            request = ops.query(Request).filter(Request.id == request_id).first()
         if not request:
             logger.warning(f"Request {request_id} not found")
             return None
@@ -101,9 +102,8 @@ class PackageRequestStatusManager:
             Dictionary with status counts
         """
         # Get all packages for this request through the many-to-many relationship
-        packages = (
-            self.db.session.query(Package).join(RequestPackage).filter(RequestPackage.request_id == request_id).all()
-        )
+        with get_db_operations() as ops:
+            packages = ops.query(Package).join(RequestPackage).filter(RequestPackage.request_id == request_id).all()
 
         counts = {
             "total": len(packages),
@@ -144,7 +144,8 @@ class PackageRequestStatusManager:
         Returns:
             Dictionary with status summary information
         """
-        request = Request.query.get(request_id)
+        with get_db_operations() as ops:
+            request = ops.query(Request).filter(Request.id == request_id).first()
         if not request:
             return {"error": f"Request {request_id} not found"}
 
@@ -190,13 +191,14 @@ class PackageRequestStatusManager:
         Returns:
             List of packages with the specified status
         """
-        packages = (
-            self.db.session.query(Package)
-            .join(RequestPackage)
-            .join(PackageStatus)
-            .filter(RequestPackage.request_id == request_id, PackageStatus.status == status)
-            .all()
-        )
+        with get_db_operations() as ops:
+            packages = (
+                ops.query(Package)
+                .join(RequestPackage)
+                .join(PackageStatus)
+                .filter(RequestPackage.request_id == request_id, PackageStatus.status == status)
+                .all()
+            )
 
         return packages
 
@@ -223,15 +225,16 @@ class PackageRequestStatusManager:
         Returns:
             List of packages with the specified security scan status
         """
-        packages = (
-            self.db.session.query(Package)
-            .join(RequestPackage)
-            .join(PackageStatus)
-            .filter(
-                RequestPackage.request_id == request_id,
-                PackageStatus.security_scan_status == scan_status,
+        with get_db_operations() as ops:
+            packages = (
+                ops.query(Package)
+                .join(RequestPackage)
+                .join(PackageStatus)
+                .filter(
+                    RequestPackage.request_id == request_id,
+                    PackageStatus.security_scan_status == scan_status,
+                )
+                .all()
             )
-            .all()
-        )
 
         return packages
