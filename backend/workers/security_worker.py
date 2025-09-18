@@ -6,9 +6,12 @@ storing scan status/score.
 """
 
 import logging
+import os
 from datetime import datetime, timedelta
 
-from models import Package, PackageStatus, db
+from database.service import DatabaseService
+from database.operations import DatabaseOperations
+from database.models import Package, PackageStatus
 from services.trivy_service import TrivyService
 from workers.base_worker import BaseWorker
 
@@ -16,20 +19,38 @@ logger = logging.getLogger(__name__)
 
 
 class SecurityWorker(BaseWorker):
+    # Extend base environment variables with Trivy-specific ones
+    required_env_vars = BaseWorker.required_env_vars + [
+        "TRIVY_URL",
+        "TRIVY_TIMEOUT",
+        "TRIVY_MAX_RETRIES"
+    ]
+
     def __init__(self, sleep_interval: int = 15):
         super().__init__("SecurityWorker", sleep_interval)
         self.max_packages_per_cycle = 10
         self.stuck_package_timeout = timedelta(minutes=45)
         self.trivy_service: TrivyService | None = None
+        self.db_service = None
+        self.ops = None
 
     def initialize(self) -> None:
         logger.info("Initializing SecurityWorker...")
         self.trivy_service = TrivyService()
+        
+        # Initialize database service
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise ValueError("DATABASE_URL environment variable is required")
+        
+        self.db_service = DatabaseService(database_url)
 
     def process_cycle(self) -> None:
         try:
-            self._handle_stuck_packages()
-            self._process_downloaded_packages()
+            with self.db_service.get_session() as session:
+                self.ops = DatabaseOperations(session)
+                self._handle_stuck_packages()
+                self._process_downloaded_packages()
         except Exception as e:
             logger.error(f"Security cycle error: {str(e)}", exc_info=True)
 
@@ -37,35 +58,20 @@ class SecurityWorker(BaseWorker):
         try:
             stuck_threshold = datetime.utcnow() - self.stuck_package_timeout
             stuck_statuses = ["Security Scanning"]
-            stuck_packages = (
-                db.session.query(Package)
-                .join(PackageStatus)
-                .filter(
-                    PackageStatus.status.in_(stuck_statuses),
-                    PackageStatus.updated_at < stuck_threshold,
-                )
-                .all()
-            )
+            stuck_packages = self.ops.get_packages_by_statuses(stuck_statuses, Package, PackageStatus)
+            stuck_packages = [p for p in stuck_packages if p.package_status and p.package_status.updated_at < stuck_threshold]
             if not stuck_packages:
                 return
             logger.warning(f"Found {len(stuck_packages)} stuck security scans; resetting to Downloaded")
             for package in stuck_packages:
                 if package.package_status:
-                    package.package_status.status = "Downloaded"
-                    package.package_status.updated_at = datetime.utcnow()
-            db.session.commit()
+                    self.ops.update_package_status(package.id, "Downloaded", PackageStatus)
         except Exception:
             logger.exception("Error handling stuck security scans")
-            db.session.rollback()
 
     def _process_downloaded_packages(self) -> None:
-        packages = (
-            db.session.query(Package)
-            .join(PackageStatus)
-            .filter(PackageStatus.status == "Downloaded")
-            .limit(self.max_packages_per_cycle)
-            .all()
-        )
+        packages = self.ops.get_packages_by_status("Downloaded", Package, PackageStatus)
+        packages = packages[:self.max_packages_per_cycle]
         if not packages:
             return
 
@@ -79,7 +85,6 @@ class SecurityWorker(BaseWorker):
                     exc_info=True,
                 )
                 self._mark_failed(package)
-        db.session.commit()
 
     def _scan_single(self, package: Package) -> None:
         if not self.trivy_service or not package.package_status:

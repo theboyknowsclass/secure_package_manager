@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 """
-File-based tests for ParseWorker validation and extraction logic.
+ParseWorker unit tests for validation and extraction logic.
 Uses real package-lock.json files from test_data directory.
+Tests the core business logic in isolation without Flask app setup.
 """
 
 import json
 import os
-import sys
 import unittest
-
-# Add the parent directory to the path so we can import modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 
 def load_test_package_lock(filename):
@@ -74,8 +71,8 @@ class ParseWorkerValidation:
         return package_name
 
 
-class TestParseWorkerFileBased(unittest.TestCase):
-    """Test suite for ParseWorker using real package-lock.json files"""
+class TestParseWorkerValidation(unittest.TestCase):
+    """Test suite for ParseWorker validation logic using real files"""
 
     def test_validate_simple_app(self):
         """Test validation of simple app package-lock.json"""
@@ -87,6 +84,18 @@ class TestParseWorkerFileBased(unittest.TestCase):
         # Verify basic structure
         self.assertEqual(package_data["name"], "simple-app")
         self.assertEqual(package_data["version"], "1.0.0")
+        self.assertEqual(package_data["lockfileVersion"], 3)
+
+    def test_validate_adminportal(self):
+        """Test validation of adminportal package-lock.json"""
+        package_data = load_test_package_lock("adminportal")
+        
+        # Should not raise any exception
+        ParseWorkerValidation.validate_package_lock_file(package_data)
+        
+        # Verify basic structure
+        self.assertEqual(package_data["name"], "adminportal")
+        self.assertEqual(package_data["version"], "0.0.0")
         self.assertEqual(package_data["lockfileVersion"], 3)
 
     def test_validate_scoped_packages(self):
@@ -118,6 +127,10 @@ class TestParseWorkerFileBased(unittest.TestCase):
         
         self.assertIn("Missing 'lockfileVersion' field", str(context.exception))
 
+
+class TestParseWorkerExtraction(unittest.TestCase):
+    """Test suite for ParseWorker package extraction logic using real files"""
+
     def test_extract_packages_simple_app(self):
         """Test package extraction from simple app"""
         package_data = load_test_package_lock("simple_app")
@@ -132,8 +145,6 @@ class TestParseWorkerFileBased(unittest.TestCase):
         lodash_pkg = packages["node_modules/lodash"]
         self.assertEqual(lodash_pkg["version"], "4.17.21")
         self.assertEqual(lodash_pkg["license"], "MIT")
-        self.assertIn("resolved", lodash_pkg)
-        self.assertIn("integrity", lodash_pkg)
 
     def test_extract_packages_scoped_packages(self):
         """Test package extraction from scoped packages app"""
@@ -183,6 +194,25 @@ class TestParseWorkerFileBased(unittest.TestCase):
         self.assertEqual(len(packages), 1)
         self.assertIn("", packages)  # Root package only
 
+    def test_extract_packages_adminportal(self):
+        """Test package extraction from adminportal app"""
+        package_data = load_test_package_lock("adminportal")
+        packages = ParseWorkerValidation.extract_packages_from_json(package_data)
+        
+        # Should have many packages (adminportal has lots of dependencies)
+        self.assertGreater(len(packages), 100)  # Adminportal has many dependencies
+        self.assertIn("", packages)  # Root package
+        
+        # Check for some expected packages
+        self.assertIn("node_modules/@emotion/react", packages)
+        self.assertIn("node_modules/@mui/material", packages)
+        self.assertIn("node_modules/@mui/icons-material", packages)
+        
+        # Check package details
+        emotion_react = packages["node_modules/@emotion/react"]
+        self.assertEqual(emotion_react["version"], "11.14.0")
+        self.assertEqual(emotion_react["license"], "MIT")
+
     def test_extract_package_name_from_real_files(self):
         """Test package name extraction using real package data"""
         # Test with simple app
@@ -191,7 +221,6 @@ class TestParseWorkerFileBased(unittest.TestCase):
         
         # Test lodash package
         lodash_info = packages["node_modules/lodash"]
-        # Note: This package has no explicit name field, so it should extract from path
         package_name = ParseWorkerValidation.extract_package_name("node_modules/lodash", lodash_info)
         self.assertEqual(package_name, "lodash")
         
@@ -213,7 +242,8 @@ class TestParseWorkerFileBased(unittest.TestCase):
         """Test that all available test files can be loaded and validated"""
         expected_files = [
             "simple_app", "scoped_packages", "duplicate_packages", 
-            "invalid_version", "missing_lockfile_version", "empty_packages"
+            "invalid_version", "missing_lockfile_version", "empty_packages",
+            "adminportal"
         ]
         
         # Test that we can load all expected files

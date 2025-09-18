@@ -7,10 +7,13 @@ Handles the Submitted -> Parsed transition by parsing the stored JSON blob.
 
 import json
 import logging
+import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from models import Package, PackageStatus, Request, RequestPackage, db
+from database.service import DatabaseService
+from database.operations import DatabaseOperations
+from database.models import Package, PackageStatus, Request, RequestPackage
 from workers.base_worker import BaseWorker
 
 logger = logging.getLogger(__name__)
@@ -23,14 +26,25 @@ class ParseWorker(BaseWorker):
         super().__init__("ParseWorker", sleep_interval)
         self.max_requests_per_cycle = 5  # Process max 5 requests per cycle
         self.stuck_request_timeout = timedelta(minutes=15)
+        self.db_service = None
+        self.ops = None
 
     def initialize(self) -> None:
         logger.info("Initializing ParseWorker...")
+        # Initialize database service
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise ValueError("DATABASE_URL environment variable is required")
+        
+        self.db_service = DatabaseService(database_url)
+        logger.info("ParseWorker database service initialized")
 
     def process_cycle(self) -> None:
         try:
-            self._handle_stuck_requests()
-            self._process_submitted_requests()
+            with self.db_service.get_session() as session:
+                self.ops = DatabaseOperations(session)
+                self._handle_stuck_requests()
+                self._process_submitted_requests()
         except Exception as e:
             logger.error(f"Error in parse cycle: {str(e)}", exc_info=True)
 
@@ -40,20 +54,13 @@ class ParseWorker(BaseWorker):
             stuck_threshold = datetime.utcnow() - self.stuck_request_timeout
             
             # Find requests that have been processing too long
-            stuck_requests = (
-                db.session.query(Request)
-                .filter(
-                    Request.created_at < stuck_threshold,
-                    ~Request.request_packages.any()  # No packages created yet
-                )
-                .all()
-            )
+            # Note: This is a simplified version - in practice, you might want to add a status field to Request
+            stuck_requests = self.ops.get_pending_requests(Request)
+            stuck_requests = [r for r in stuck_requests if r.created_at < stuck_threshold]
             
             if stuck_requests:
-                logger.warning(f"Found {len(stuck_requests)} stuck requests, refreshing timestamps")
-                for request in stuck_requests:
-                    # Just refresh the timestamp to avoid constant reprocessing
-                    pass  # No timestamp field to update on Request
+                logger.warning(f"Found {len(stuck_requests)} potentially stuck requests")
+                # In a real implementation, you might want to add retry logic or error handling
                     
         except Exception as e:
             logger.error(f"Error handling stuck requests: {str(e)}", exc_info=True)
@@ -62,17 +69,20 @@ class ParseWorker(BaseWorker):
         """Process requests that need package extraction"""
         try:
             # Find requests that have raw_request_blob but no packages yet
-            requests_to_process = (
-                db.session.query(Request)
-                .filter(
-                    Request.raw_request_blob.isnot(None),
-                    ~Request.request_packages.any()  # No packages created yet
-                )
-                .limit(self.max_requests_per_cycle)
-                .all()
-            )
+            # This is a simplified version - in practice, you might want to add a status field to Request
+            all_requests = self.ops.get_pending_requests(Request)
+            logger.debug(f"Found {len(all_requests)} total requests in database")
+            
+            requests_to_process = [
+                r for r in all_requests 
+                if r.raw_request_blob and not r.request_packages
+            ][:self.max_requests_per_cycle]
             
             if not requests_to_process:
+                if not all_requests:
+                    logger.debug("No requests found in database to parse")
+                else:
+                    logger.debug(f"No requests found to parse - {len(all_requests)} requests exist but all are either processed or have no raw_request_blob")
                 return
                 
             logger.info(f"Processing {len(requests_to_process)} requests for package extraction")
@@ -89,7 +99,6 @@ class ParseWorker(BaseWorker):
                     
         except Exception as e:
             logger.error(f"Error processing submitted requests: {str(e)}", exc_info=True)
-            db.session.rollback()
 
     def _parse_request_blob(self, request: Request) -> None:
         """Parse a request's raw blob and extract packages"""
@@ -182,25 +191,15 @@ class ParseWorker(BaseWorker):
             package_info = package_data["info"]
 
             # Check if package already exists in database (deduplicated across all requests)
-            existing_package = Package.query.filter_by(
-                name=package_name,
-                version=package_version,
-            ).first()
+            existing_package = self.ops.get_package_by_name_version(package_name, package_version, Package)
 
             if existing_package:
                 # Check if this package is already linked to this request
-                existing_link = RequestPackage.query.filter_by(
-                    request_id=request_id, package_id=existing_package.id
-                ).first()
+                existing_link = self.ops.get_request_package_link(request_id, existing_package.id, RequestPackage)
 
                 if not existing_link:
                     # Create link between request and existing package
-                    request_package = RequestPackage(
-                        request_id=request_id,
-                        package_id=existing_package.id,
-                        package_type="existing",
-                    )
-                    db.session.add(request_package)
+                    self.ops.create_request_package_link(request_id, existing_package.id, "existing", RequestPackage)
 
                 existing_packages.append(existing_package)
                 continue
@@ -241,33 +240,18 @@ class ParseWorker(BaseWorker):
 
     def _create_package_records(self, packages_to_process: List[Dict[str, Any]], request_id: int) -> List[Package]:
         """Create database records for new packages"""
-        package_objects = []
-        for package_data in packages_to_process:
-            package = self._create_package_object(
-                package_data["name"],
-                package_data["version"],
-                package_data["package_info"],
-                request_id,
-            )
-            db.session.add(package)
-            db.session.flush()  # Get the package ID
-
-            # Create package status record
-            package_status = PackageStatus(
-                package_id=package.id,
-                status="Submitted",  # Will be advanced to Parsed after processing
-                security_scan_status="pending",
-            )
-            db.session.add(package_status)
-
-            # Create request-package link
-            request_package = RequestPackage(request_id=request_id, package_id=package.id, package_type="new")
-            db.session.add(request_package)
-
-            package_objects.append(package)
+        # Use the shared operations to create package records
+        package_objects = self.ops.create_package_records(
+            packages_to_process, 
+            request_id, 
+            Package, 
+            PackageStatus, 
+            RequestPackage
+        )
+        
+        for package in package_objects:
             logger.info(f"Added package for processing: {package.name}@{package.version} (type: new)")
-
-        db.session.commit()
+        
         return package_objects
 
     def _create_package_object(

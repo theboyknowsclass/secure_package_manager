@@ -21,8 +21,7 @@ backend/tests/
 │       └── empty_packages.json        # App with no dependencies
 ├── workers/                           # Worker module unit tests
 │   ├── __init__.py
-│   ├── test_parse_worker_standalone.py # ✅ Standalone ParseWorker tests (9 tests)
-│   └── test_parse_worker_file_based.py # ✅ File-based ParseWorker tests (10 tests)
+│   └── test_parse_worker.py           # ✅ ParseWorker unit tests (12 tests)
 ├── test_license_service.py            # License service tests
 ├── test_license_integration.py        # License integration tests
 ├── test_npm_license_formats.py        # NPM license format tests
@@ -55,19 +54,14 @@ python run_backend_tests.py workers/test_parse_worker_standalone.py
 
 **ParseWorker Tests** - Test package-lock.json parsing and validation:
 
-- **`test_parse_worker_standalone.py`** ✅ **9 passing tests**
+- **`test_parse_worker.py`** ✅ **12 passing tests**
   - **Validation Tests**: package-lock.json validation logic using real files
   - **Extraction Tests**: Package extraction from JSON using real files
   - **Name Parsing Tests**: Package name extraction from paths using real files
-  - **No Dependencies**: Runs without Flask app setup
-  - **Real Data**: Uses actual package-lock.json files from `test_data/package_locks/`
-
-- **`test_parse_worker_file_based.py`** ✅ **10 passing tests**
-  - **Comprehensive Testing**: More detailed tests using real package-lock.json files
   - **Edge Cases**: Tests invalid versions, missing fields, empty packages
   - **Real Scenarios**: Tests scoped packages, duplicate packages, complex structures
   - **No Dependencies**: Runs without Flask app setup
-  - **File-Based**: Loads real package-lock.json files instead of inline JSON
+  - **Real Data**: Uses actual package-lock.json files from `test_data/package_locks/`
 
 **Usage:**
 ```bash
@@ -113,8 +107,7 @@ python run_worker_tests.py
 ## Test Requirements
 
 ### Unit Tests (No Setup Required)
-- ✅ `test_parse_worker_standalone.py` - 9 tests
-- ✅ `test_parse_worker_file_based.py` - 10 tests
+- ✅ `test_parse_worker.py` - 12 tests
 - Pure unit tests with no external dependencies
 - Fast execution, perfect for development
 - Use real package-lock.json files for testing
@@ -160,7 +153,7 @@ python run_worker_tests.py
 ## Test Results
 
 ### Current Status:
-- ✅ **19/19** ParseWorker unit tests passing (9 + 10 file-based tests)
+- ✅ **12/12** ParseWorker unit tests passing
 - ✅ License service tests passing
 - ✅ NPM license format tests passing
 - ✅ Scoped package parsing tests passing

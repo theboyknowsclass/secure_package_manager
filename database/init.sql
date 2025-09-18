@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS requests (
     application_name VARCHAR(255) NOT NULL, -- from package-lock.json
     version VARCHAR(100) NOT NULL, -- from package-lock.json
     requestor_id INTEGER REFERENCES users(id) ON DELETE RESTRICT,
-    package_lock_file TEXT, -- Store original package-lock.json content
+    raw_request_blob TEXT, -- Store original package-lock.json content
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -6,10 +6,13 @@ Processes packages that are approved but not yet published.
 """
 
 import logging
+import os
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
-from models import Package, PackageStatus, db
+from database.service import DatabaseService
+from database.operations import DatabaseOperations
+from database.models import Package, PackageStatus
 from services.package_service import PackageService
 from workers.base_worker import BaseWorker
 
@@ -18,10 +21,17 @@ logger = logging.getLogger(__name__)
 
 class PublishWorker(BaseWorker):
     """Background worker for publishing approved packages"""
+    
+    # Extend base environment variables with publish-specific ones
+    required_env_vars = BaseWorker.required_env_vars + [
+        "TARGET_REPOSITORY_URL"
+    ]
 
     def __init__(self, sleep_interval: int = 30):
         super().__init__("PackagePublisher", sleep_interval)
         self.package_service = None
+        self.db_service = None
+        self.ops = None
         self.max_packages_per_cycle = 3  # Process max 3 packages per cycle (publishing is slow)
         self.stuck_package_timeout = timedelta(hours=2)  # Consider packages stuck after 2 hours
 
@@ -29,16 +39,25 @@ class PublishWorker(BaseWorker):
         """Initialize services"""
         logger.info("Initializing PublishWorker services...")
         self.package_service = PackageService()
+        
+        # Initialize database service
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise ValueError("DATABASE_URL environment variable is required")
+        
+        self.db_service = DatabaseService(database_url)
         logger.info("PublishWorker services initialized")
 
     def process_cycle(self) -> None:
         """Process one cycle of package publishing"""
         try:
-            # Check for stuck packages first
-            self._handle_stuck_packages()
+            with self.db_service.get_session() as session:
+                self.ops = DatabaseOperations(session)
+                # Check for stuck packages first
+                self._handle_stuck_packages()
 
-            # Process packages ready for publishing
-            self._process_pending_publishing()
+                # Process packages ready for publishing
+                self._process_pending_publishing()
 
         except Exception as e:
             logger.error(f"Error in package publishing cycle: {str(e)}", exc_info=True)
@@ -49,15 +68,9 @@ class PublishWorker(BaseWorker):
             stuck_threshold = datetime.utcnow() - self.stuck_package_timeout
             stuck_publish_statuses = ["publishing", "failed"]
 
-            stuck_packages = (
-                db.session.query(Package)
-                .join(PackageStatus)
-                .filter(
-                    PackageStatus.publish_status.in_(stuck_publish_statuses),
-                    PackageStatus.updated_at < stuck_threshold,
-                )
-                .all()
-            )
+            # Get packages with stuck publish status
+            stuck_packages = self.ops.get_packages_by_publish_statuses(stuck_publish_statuses, Package, PackageStatus)
+            stuck_packages = [p for p in stuck_packages if p.package_status and p.package_status.updated_at < stuck_threshold]
 
             if stuck_packages:
                 logger.warning(f"Found {len(stuck_packages)} stuck packages in publishing, resetting publish status")
@@ -68,11 +81,8 @@ class PublishWorker(BaseWorker):
                         package.package_status.updated_at = datetime.utcnow()
                         logger.info(f"Reset stuck package {package.name}@{package.version} publish status to pending")
 
-                db.session.commit()
-
         except Exception as e:
             logger.error(f"Error handling stuck packages: {str(e)}", exc_info=True)
-            db.session.rollback()
 
     def _process_pending_publishing(self) -> None:
         """Process packages that are approved and ready for publishing"""

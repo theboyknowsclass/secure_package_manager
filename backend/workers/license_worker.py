@@ -6,10 +6,13 @@ Processes packages that need license checking and validation.
 """
 
 import logging
+import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
-from models import Package, PackageStatus, db
+from database.service import DatabaseService
+from database.operations import DatabaseOperations
+from database.models import Package, PackageStatus
 from services.license_service import LicenseService
 from workers.base_worker import BaseWorker
 
@@ -22,6 +25,8 @@ class LicenseWorker(BaseWorker):
     def __init__(self, sleep_interval: int = 15):
         super().__init__("LicenseChecker", sleep_interval)
         self.license_service = None
+        self.db_service = None
+        self.ops = None
         self.max_license_groups_per_cycle = 20  # Process max 20 unique license groups per cycle
         self.stuck_package_timeout = timedelta(minutes=15)  # Consider packages stuck after 15 minutes
 
@@ -29,16 +34,25 @@ class LicenseWorker(BaseWorker):
         """Initialize services"""
         logger.info("Initializing LicenseWorker services...")
         self.license_service = LicenseService()
+        
+        # Initialize database service
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise ValueError("DATABASE_URL environment variable is required")
+        
+        self.db_service = DatabaseService(database_url)
         logger.info("LicenseWorker services initialized")
 
     def process_cycle(self) -> None:
         """Process one cycle of license checking"""
         try:
-            # Check for stuck packages first
-            self._handle_stuck_packages()
+            with self.db_service.get_session() as session:
+                self.ops = DatabaseOperations(session)
+                # Check for stuck packages first
+                self._handle_stuck_packages()
 
-            # Process packages that need license checking
-            self._process_pending_license_checks()
+                # Process packages that need license checking
+                self._process_pending_license_checks()
 
         except Exception as e:
             logger.error(f"Error in license checking cycle: {str(e)}", exc_info=True)
@@ -49,15 +63,9 @@ class LicenseWorker(BaseWorker):
             stuck_threshold = datetime.utcnow() - self.stuck_package_timeout
             stuck_statuses = ["Checking Licence", "License Check Failed"]
 
-            stuck_packages = (
-                db.session.query(Package)
-                .join(PackageStatus)
-                .filter(
-                    PackageStatus.status.in_(stuck_statuses),
-                    PackageStatus.updated_at < stuck_threshold,
-                )
-                .all()
-            )
+            # Get packages with stuck statuses
+            stuck_packages = self.ops.get_packages_by_statuses(stuck_statuses, Package, PackageStatus)
+            stuck_packages = [p for p in stuck_packages if p.package_status and p.package_status.updated_at < stuck_threshold]
 
             if stuck_packages:
                 logger.warning(
@@ -66,15 +74,15 @@ class LicenseWorker(BaseWorker):
 
                 for package in stuck_packages:
                     if package.package_status:
-                        package.package_status.status = "Submitted"
-                        package.package_status.updated_at = datetime.utcnow()
+                        self.ops.update_package_status(
+                            package.id, 
+                            "Submitted", 
+                            PackageStatus
+                        )
                         logger.info(f"Reset stuck package {package.name}@{package.version} to Submitted")
-
-                db.session.commit()
 
         except Exception as e:
             logger.error(f"Error handling stuck packages: {str(e)}", exc_info=True)
-            db.session.rollback()
 
     def _process_pending_license_checks(self) -> None:
         """Process packages that need license checking using license-based grouping"""
@@ -93,15 +101,12 @@ class LicenseWorker(BaseWorker):
 
         except Exception as e:
             logger.error(f"Error in _process_pending_license_checks: {str(e)}", exc_info=True)
-            db.session.rollback()
 
     def _get_packages_grouped_by_license(self) -> Dict[str, List[Package]]:
         """Get packages grouped by their license string for efficient batch processing"""
         try:
             # Get all packages that need license checking
-            pending_packages = (
-                db.session.query(Package).join(PackageStatus).filter(PackageStatus.status == "Parsed").all()
-            )
+            pending_packages = self.ops.get_packages_by_status("Parsed", Package, PackageStatus)
 
             if not pending_packages:
                 return {}
