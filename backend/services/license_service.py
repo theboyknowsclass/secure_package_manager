@@ -83,14 +83,7 @@ class LicenseService:
             ).first()
             if package_status:
                 package_status.license_score = license_score
-                # Update status based on license score
-                if license_score >= 80:
-                    package_status.status = "Licence Checked"
-                elif license_score >= 30:
-                    package_status.status = "Licence Checked"  # Still allow but with warning
-                else:
-                    package_status.status = "Rejected"
-
+                package_status.status = "Licence Checked"
                 package_status.updated_at = datetime.utcnow()
                 db.session.commit()
 
