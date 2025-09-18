@@ -77,12 +77,12 @@ class PackageRequestStatusManager:
 
         # Rule 5: If some packages are still processing, determine the stage
         processing_count = (
-            counts["Checking Licence"] + 
-            counts["Downloading"] + 
-            counts["Security Scanning"] +
-            counts["Licence Checked"] + 
-            counts["Downloaded"] + 
-            counts["Security Scanned"]
+            counts["Checking Licence"]
+            + counts["Downloading"]
+            + counts["Security Scanning"]
+            + counts["Licence Checked"]
+            + counts["Downloaded"]
+            + counts["Security Scanned"]
         )
         if processing_count > 0:
             return "processing"
@@ -102,10 +102,7 @@ class PackageRequestStatusManager:
         """
         # Get all packages for this request through the many-to-many relationship
         packages = (
-            self.db.session.query(Package)
-            .join(RequestPackage)
-            .filter(RequestPackage.request_id == request_id)
-            .all()
+            self.db.session.query(Package).join(RequestPackage).filter(RequestPackage.request_id == request_id).all()
         )
 
         counts = {
@@ -158,14 +155,10 @@ class PackageRequestStatusManager:
             "current_status": current_status,
             "total_packages": counts["total"],
             "package_counts": counts,
-            "completion_percentage": self._calculate_completion_percentage(
-                counts, counts["total"]
-            ),
+            "completion_percentage": self._calculate_completion_percentage(counts, counts["total"]),
         }
 
-    def _calculate_completion_percentage(
-        self, counts: Dict[str, int], total_packages: int
-    ) -> float:
+    def _calculate_completion_percentage(self, counts: Dict[str, int], total_packages: int) -> float:
         """
         Calculate the completion percentage of a request
 
@@ -200,9 +193,7 @@ class PackageRequestStatusManager:
             self.db.session.query(Package)
             .join(RequestPackage)
             .join(PackageStatus)
-            .filter(
-                RequestPackage.request_id == request_id, PackageStatus.status == status
-            )
+            .filter(RequestPackage.request_id == request_id, PackageStatus.status == status)
             .all()
         )
 
@@ -220,9 +211,7 @@ class PackageRequestStatusManager:
         """
         return self.get_packages_by_status(request_id, "Pending Approval")
 
-    def get_packages_by_security_scan_status(
-        self, request_id: int, scan_status: str
-    ) -> List[Package]:
+    def get_packages_by_security_scan_status(self, request_id: int, scan_status: str) -> List[Package]:
         """
         Get all packages for a request with a specific security scan status
 

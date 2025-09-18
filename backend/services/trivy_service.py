@@ -1,13 +1,15 @@
-import json
 import logging
 import os
-import subprocess
 import tempfile
 from datetime import datetime
 from typing import Any, Dict, Optional
 
 import requests
-from config.constants import SOURCE_REPOSITORY_URL, TRIVY_MAX_RETRIES, TRIVY_TIMEOUT, TRIVY_URL
+from config.constants import (
+    TRIVY_MAX_RETRIES,
+    TRIVY_TIMEOUT,
+    TRIVY_URL,
+)
 from models import Package, SecurityScan, db
 
 logger = logging.getLogger(__name__)
@@ -42,34 +44,24 @@ class TrivyService:
                 package.package_status.updated_at = datetime.utcnow()
                 db.session.commit()
 
-            logger.info(
-                f"Starting Trivy scan for package {package.name}@{package.version}"
-            )
+            logger.info(f"Starting Trivy scan for package {package.name}@{package.version}")
 
             # Download package if not already downloaded
             package_path = self._download_package_for_scanning(package)
             if not package_path:
-                return self._handle_scan_failure(
-                    security_scan, package, "Failed to download package for scanning"
-                )
+                return self._handle_scan_failure(security_scan, package, "Failed to download package for scanning")
 
             # Perform the scan
             scan_result = self._perform_trivy_scan(package_path, package)
             if not scan_result:
-                return self._handle_scan_failure(
-                    security_scan, package, "Trivy scan failed"
-                )
+                return self._handle_scan_failure(security_scan, package, "Trivy scan failed")
 
             # Process and store results
             return self._process_scan_results(security_scan, package, scan_result)
 
         except Exception as e:
-            logger.error(
-                f"Error scanning package {package.name}@{package.version}: {str(e)}"
-            )
-            return self._handle_scan_failure(
-                security_scan, package, f"Scan error: {str(e)}"
-            )
+            logger.error(f"Error scanning package {package.name}@{package.version}: {str(e)}")
+            return self._handle_scan_failure(security_scan, package, f"Scan error: {str(e)}")
 
     def _download_package_for_scanning(self, package: Package) -> Optional[str]:
         """
@@ -84,10 +76,10 @@ class TrivyService:
         try:
             # Import here to avoid circular imports
             from .download_service import DownloadService
-            
+
             download_service = DownloadService()
             package_path = download_service.get_package_path(package)
-            
+
             if package_path and os.path.exists(package_path):
                 logger.info(f"Using cached package for scanning: {package_path}")
                 return package_path
@@ -112,10 +104,8 @@ class TrivyService:
         """
         try:
             # Create temporary directory for package
-            safe_package_name = package.name.replace('/', '-').replace('@', '')
-            temp_dir = tempfile.mkdtemp(
-                prefix=f"trivy_scan_{safe_package_name}_{package.version}_"
-            )
+            safe_package_name = package.name.replace("/", "-").replace("@", "")
+            temp_dir = tempfile.mkdtemp(prefix=f"trivy_scan_{safe_package_name}_{package.version}_")
 
             if not package.npm_url:
                 logger.error(f"No npm_url available for package {package.name}@{package.version}")
@@ -123,7 +113,7 @@ class TrivyService:
 
             logger.info(f"Downloading package tarball for scanning: {package.npm_url}")
             response = requests.get(package.npm_url, timeout=60)
-            
+
             if response.status_code != 200:
                 logger.error(f"Failed to download tarball: HTTP {response.status_code}")
                 return None
@@ -145,10 +135,7 @@ class TrivyService:
             logger.error(f"Error downloading package for scanning: {str(e)}")
             return None
 
-
-    def _perform_trivy_scan(
-        self, package_path: str, package: Package
-    ) -> Optional[Dict]:
+    def _perform_trivy_scan(self, package_path: str, package: Package) -> Optional[Dict]:
         """
         Perform actual Trivy scan using the Trivy server
 
@@ -162,9 +149,7 @@ class TrivyService:
         try:
             # Check if Trivy server is available
             if not self._is_trivy_server_available():
-                logger.error(
-                    "Trivy server not available - cannot perform security scan"
-                )
+                logger.error("Trivy server not available - cannot perform security scan")
                 return None
 
             logger.info(f"Performing Trivy scan on {package_path}")
@@ -172,10 +157,10 @@ class TrivyService:
             # Use Trivy filesystem scanning via subprocess
             # This is the most reliable way to scan local files
             try:
-                import subprocess
                 import json
+                import subprocess
                 import time
-                
+
                 # Run Trivy filesystem scan
                 cmd = [
                     "trivy",
@@ -193,11 +178,9 @@ class TrivyService:
 
                 # Record start time for duration calculation
                 start_time = time.time()
-                
-                result = subprocess.run(
-                    cmd, capture_output=True, text=True, timeout=self.timeout
-                )
-                
+
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=self.timeout)
+
                 # Calculate scan duration
                 scan_duration_ms = int((time.time() - start_time) * 1000)
 
@@ -206,11 +189,9 @@ class TrivyService:
                     logger.info(f"Trivy scan completed successfully for {package.name}")
                     return self._format_trivy_result(scan_result, package, scan_duration_ms)
                 else:
-                    logger.error(
-                        f"Trivy scan failed with return code {result.returncode}: {result.stderr}"
-                    )
+                    logger.error(f"Trivy scan failed with return code {result.returncode}: {result.stderr}")
                     return None
-                    
+
             except subprocess.TimeoutExpired:
                 logger.error(f"Trivy scan timed out after {self.timeout} seconds")
                 return None
@@ -224,7 +205,6 @@ class TrivyService:
         except Exception as e:
             logger.error(f"Error performing Trivy scan: {str(e)}")
             return None
-
 
     def _format_trivy_result(self, trivy_response: Dict, package: Package, scan_duration_ms: int) -> Dict:
         """
@@ -241,7 +221,7 @@ class TrivyService:
         try:
             # Get Trivy version from the binary
             trivy_version = self._get_trivy_version()
-            
+
             # Extract vulnerabilities from Trivy response
             vulnerabilities = []
             summary = {
@@ -257,27 +237,27 @@ class TrivyService:
             # Trivy response has a "Results" array, each with "Vulnerabilities" array
             if "Results" in trivy_response:
                 logger.info(f"Processing {len(trivy_response.get('Results', []))} results from Trivy scan")
-                
+
                 for result in trivy_response.get("Results", []):
                     result_vulnerabilities = result.get("Vulnerabilities", [])
-                    logger.info(f"Found {len(result_vulnerabilities)} vulnerabilities in result: {result.get('Target', 'Unknown target')}")
-                    
+                    logger.info(
+                        f"Found {len(result_vulnerabilities)} vulnerabilities in result: {result.get('Target', 'Unknown target')}"
+                    )
+
                     for vuln in result_vulnerabilities:
                         severity = vuln.get("Severity", "UNKNOWN").upper()
                         vulnerability = {
                             "vulnerability_id": vuln.get("VulnerabilityID", "UNKNOWN"),
                             "severity": severity,
                             "title": vuln.get("Title", "Unknown vulnerability"),
-                            "description": vuln.get(
-                                "Description", "No description available"
-                            ),
+                            "description": vuln.get("Description", "No description available"),
                             "package_name": vuln.get("PkgName", package.name),
-                            "installed_version": vuln.get(
-                                "InstalledVersion", package.version
-                            ),
+                            "installed_version": vuln.get("InstalledVersion", package.version),
                             "fixed_version": vuln.get("FixedVersion"),
                             "references": vuln.get("References", []),
-                            "cvss_score": vuln.get("CVSS", {}).get("nvd", {}).get("V3Score") if vuln.get("CVSS") else None,
+                            "cvss_score": vuln.get("CVSS", {}).get("nvd", {}).get("V3Score")
+                            if vuln.get("CVSS")
+                            else None,
                             "published_date": vuln.get("PublishedDate"),
                             "last_modified_date": vuln.get("LastModifiedDate"),
                         }
@@ -289,11 +269,13 @@ class TrivyService:
                             summary[severity.lower()] += 1
                         else:
                             summary["info"] += 1
-                            
+
                         logger.debug(f"Added vulnerability: {vulnerability['vulnerability_id']} ({severity})")
 
             else:
-                logger.info("No 'Results' found in Trivy response - this is normal for packages with no vulnerabilities")
+                logger.info(
+                    "No 'Results' found in Trivy response - this is normal for packages with no vulnerabilities"
+                )
 
             # Extract additional metadata from Trivy response
             metadata = trivy_response.get("Metadata", {})
@@ -303,13 +285,13 @@ class TrivyService:
                 "schema_version": trivy_response.get("SchemaVersion", 2),
                 "created_at": trivy_response.get("CreatedAt"),
             }
-            
+
             # Add OS information if available
             if "OS" in metadata:
                 artifact_info["os"] = {
                     "family": metadata["OS"].get("Family"),
                     "name": metadata["OS"].get("Name"),
-                    "eosl": metadata["OS"].get("EOSL", False)
+                    "eosl": metadata["OS"].get("EOSL", False),
                 }
 
             return {
@@ -321,7 +303,7 @@ class TrivyService:
                 "scan_metadata": {
                     "total_results": len(trivy_response.get("Results", [])),
                     "scan_completed_at": trivy_response.get("CreatedAt"),
-                }
+                },
             }
 
         except Exception as e:
@@ -347,7 +329,7 @@ class TrivyService:
                 "scan_metadata": {
                     "total_results": 0,
                     "error": str(e),
-                }
+                },
             }
 
     def _get_trivy_version(self) -> str:
@@ -360,9 +342,7 @@ class TrivyService:
         try:
             import subprocess
 
-            result = subprocess.run(
-                ["trivy", "--version"], capture_output=True, text=True, timeout=10
-            )
+            result = subprocess.run(["trivy", "--version"], capture_output=True, text=True, timeout=10)
             if result.returncode == 0:
                 # Extract version from output like "Version: 0.66.0"
                 version_line = result.stdout.strip()
@@ -384,17 +364,13 @@ class TrivyService:
         try:
             import subprocess
 
-            result = subprocess.run(
-                ["trivy", "--version"], capture_output=True, text=True, timeout=10
-            )
+            result = subprocess.run(["trivy", "--version"], capture_output=True, text=True, timeout=10)
             return result.returncode == 0
         except Exception as e:
             logger.warning(f"Trivy binary not available: {str(e)}")
             return False
 
-    def _process_scan_results(
-        self, security_scan: SecurityScan, package: Package, scan_result: Dict
-    ) -> Dict:
+    def _process_scan_results(self, security_scan: SecurityScan, package: Package, scan_result: Dict) -> Dict:
         """
         Process and store scan results
 
@@ -425,8 +401,8 @@ class TrivyService:
             if package.package_status:
                 package.package_status.status = "Security Scanned"
                 package.package_status.security_scan_status = "completed"
-                package.package_status.security_score = (
-                    self._calculate_security_score_from_vulnerabilities(security_scan)
+                package.package_status.security_score = self._calculate_security_score_from_vulnerabilities(
+                    security_scan
                 )
                 package.package_status.updated_at = datetime.utcnow()
 
@@ -444,26 +420,18 @@ class TrivyService:
                 "high_count": security_scan.high_count,
                 "medium_count": security_scan.medium_count,
                 "low_count": security_scan.low_count,
-                "security_score": (
-                    package.package_status.security_score
-                    if package.package_status
-                    else 100
-                ),
+                "security_score": (package.package_status.security_score if package.package_status else 100),
                 "scan_duration_ms": security_scan.scan_duration_ms,
             }
 
         except Exception as e:
             logger.error(f"Error processing scan results: {str(e)}")
-            return self._handle_scan_failure(
-                security_scan, package, f"Error processing results: {str(e)}"
-            )
+            return self._handle_scan_failure(security_scan, package, f"Error processing results: {str(e)}")
 
-    def _calculate_security_score_from_vulnerabilities(
-        self, security_scan: SecurityScan
-    ) -> int:
+    def _calculate_security_score_from_vulnerabilities(self, security_scan: SecurityScan) -> int:
         """
         Calculate security score based on vulnerability counts
-        
+
         Business Rules:
         - Any critical vulnerability = 0 (blocks approval)
         - High/medium/low vulnerabilities reduce score proportionally
@@ -495,9 +463,7 @@ class TrivyService:
             logger.error(f"Error calculating security score: {str(e)}")
             return 50  # Default score on error
 
-    def _handle_scan_failure(
-        self, security_scan: SecurityScan, package: Package, error_message: str
-    ) -> Dict:
+    def _handle_scan_failure(self, security_scan: SecurityScan, package: Package, error_message: str) -> Dict:
         """
         Handle scan failure
 
@@ -522,9 +488,7 @@ class TrivyService:
 
             db.session.commit()
 
-            logger.error(
-                f"Trivy scan failed for {package.name}@{package.version}: {error_message}"
-            )
+            logger.error(f"Trivy scan failed for {package.name}@{package.version}: {error_message}")
 
             return {
                 "status": "failed",
@@ -563,11 +527,7 @@ class TrivyService:
                 return None
 
             return {
-                "status": (
-                    security_scan.status
-                    if hasattr(security_scan, "status")
-                    else "completed"
-                ),
+                "status": (security_scan.status if hasattr(security_scan, "status") else "completed"),
                 "vulnerability_count": security_scan.vulnerability_count,
                 "critical_count": security_scan.critical_count,
                 "high_count": security_scan.high_count,
@@ -575,22 +535,12 @@ class TrivyService:
                 "low_count": security_scan.low_count,
                 "scan_duration_ms": security_scan.scan_duration_ms,
                 "trivy_version": security_scan.trivy_version,
-                "created_at": (
-                    security_scan.created_at.isoformat()
-                    if security_scan.created_at
-                    else None
-                ),
-                "completed_at": (
-                    security_scan.completed_at.isoformat()
-                    if security_scan.completed_at
-                    else None
-                ),
+                "created_at": (security_scan.created_at.isoformat() if security_scan.created_at else None),
+                "completed_at": (security_scan.completed_at.isoformat() if security_scan.completed_at else None),
             }
 
         except Exception as e:
-            logger.error(
-                f"Error getting scan status for package {package_id}: {str(e)}"
-            )
+            logger.error(f"Error getting scan status for package {package_id}: {str(e)}")
             return None
 
     def get_scan_report(self, package_id: int) -> Optional[Dict]:
@@ -616,11 +566,7 @@ class TrivyService:
             return {
                 "scan_id": security_scan.id,
                 "package_id": package_id,
-                "status": (
-                    security_scan.status
-                    if hasattr(security_scan, "status")
-                    else "completed"
-                ),
+                "status": (security_scan.status if hasattr(security_scan, "status") else "completed"),
                 "scan_result": security_scan.scan_result,
                 "vulnerability_count": security_scan.vulnerability_count,
                 "critical_count": security_scan.critical_count,
@@ -629,20 +575,10 @@ class TrivyService:
                 "low_count": security_scan.low_count,
                 "scan_duration_ms": security_scan.scan_duration_ms,
                 "trivy_version": security_scan.trivy_version,
-                "created_at": (
-                    security_scan.created_at.isoformat()
-                    if security_scan.created_at
-                    else None
-                ),
-                "completed_at": (
-                    security_scan.completed_at.isoformat()
-                    if security_scan.completed_at
-                    else None
-                ),
+                "created_at": (security_scan.created_at.isoformat() if security_scan.created_at else None),
+                "completed_at": (security_scan.completed_at.isoformat() if security_scan.completed_at else None),
             }
 
         except Exception as e:
-            logger.error(
-                f"Error getting scan report for package {package_id}: {str(e)}"
-            )
+            logger.error(f"Error getting scan report for package {package_id}: {str(e)}")
             return None

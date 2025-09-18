@@ -28,18 +28,13 @@ class ValidationService:
                 validation_results.append(result)
 
                 # If any critical validation fails, stop processing
-                if (
-                    validation_type in ["file_integrity", "malware_scan"]
-                    and result["status"] == "failed"
-                ):
+                if validation_type in ["file_integrity", "malware_scan"] and result["status"] == "failed":
                     break
 
             return validation_results
 
         except Exception as e:
-            logger.error(
-                f"Error running full validation for package {package.name}@{package.version}: {str(e)}"
-            )
+            logger.error(f"Error running full validation for package {package.name}@{package.version}: {str(e)}")
             return []
 
     def _run_validation(self, package: Package, validation_type: str) -> Dict[str, Any]:
@@ -83,11 +78,7 @@ class ValidationService:
                 }
 
             # Check file size
-            if (
-                package.package_status
-                and package.package_status.file_size
-                and package.package_status.file_size > 0
-            ):
+            if package.package_status and package.package_status.file_size and package.package_status.file_size > 0:
                 actual_size = os.path.getsize(package.local_path)
                 if actual_size != package.package_status.file_size:
                     return {
@@ -120,19 +111,13 @@ class ValidationService:
         # Security scanning is handled by the Trivy service
         # This validation just checks if the scan was completed
         try:
-            if (
-                package.package_status
-                and package.package_status.security_scan_status == "completed"
-            ):
+            if package.package_status and package.package_status.security_scan_status == "completed":
                 return {
                     "type": "security_scan",
                     "status": "passed",
                     "details": "Security scan completed successfully",
                 }
-            elif (
-                package.package_status
-                and package.package_status.security_scan_status == "failed"
-            ):
+            elif package.package_status and package.package_status.security_scan_status == "failed":
                 return {
                     "type": "security_scan",
                     "status": "failed",
@@ -158,7 +143,7 @@ class ValidationService:
             # License validation is now handled by LicenseWorker
             # This method is deprecated and should not be used
             logger.warning("_validate_license is deprecated - license validation is handled by LicenseWorker")
-            
+
             return {
                 "type": "license_check",
                 "status": "deprecated",
@@ -178,7 +163,7 @@ class ValidationService:
             # Dependency analysis is now handled by TrivyService
             # This method is deprecated and should not be used
             logger.warning("_validate_dependencies is deprecated - dependency analysis is handled by TrivyService")
-            
+
             return {
                 "type": "dependency_analysis",
                 "status": "deprecated",
@@ -198,7 +183,7 @@ class ValidationService:
             # Malware scanning is now handled by TrivyService
             # This method is deprecated and should not be used
             logger.warning("_validate_malware_scan is deprecated - malware scanning is handled by TrivyService")
-            
+
             return {
                 "type": "malware_scan",
                 "status": "deprecated",
@@ -217,8 +202,10 @@ class ValidationService:
         try:
             # Vulnerability assessment is now handled by TrivyService
             # This method is deprecated and should not be used
-            logger.warning("_validate_vulnerabilities is deprecated - vulnerability assessment is handled by TrivyService")
-            
+            logger.warning(
+                "_validate_vulnerabilities is deprecated - vulnerability assessment is handled by TrivyService"
+            )
+
             return {
                 "type": "vulnerability_assessment",
                 "status": "deprecated",

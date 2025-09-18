@@ -7,7 +7,7 @@ Can resume processing from database state after service restarts.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from models import Package, PackageStatus, Request, RequestPackage, db
 from services.download_service import DownloadService
@@ -39,10 +39,10 @@ class PackageWorker(BaseWorker):
         try:
             # Check for stuck packages first
             self._handle_stuck_packages()
-            
+
             # Process pending packages
             self._process_pending_packages()
-            
+
         except Exception as e:
             logger.error(f"Error in package processing cycle: {str(e)}", exc_info=True)
 
@@ -51,28 +51,28 @@ class PackageWorker(BaseWorker):
         try:
             stuck_threshold = datetime.utcnow() - self.stuck_package_timeout
             stuck_statuses = ["Checking Licence", "Downloading", "Security Scanning"]
-            
+
             stuck_packages = (
                 db.session.query(Package)
                 .join(PackageStatus)
                 .filter(
                     PackageStatus.status.in_(stuck_statuses),
-                    PackageStatus.updated_at < stuck_threshold
+                    PackageStatus.updated_at < stuck_threshold,
                 )
                 .all()
             )
-            
+
             if stuck_packages:
                 logger.warning(f"Found {len(stuck_packages)} stuck packages, resetting to Requested status")
-                
+
                 for package in stuck_packages:
                     if package.package_status:
                         package.package_status.status = "Requested"
                         package.package_status.updated_at = datetime.utcnow()
                         logger.info(f"Reset stuck package {package.name}@{package.version} to Requested")
-                
+
                 db.session.commit()
-                
+
         except Exception as e:
             logger.error(f"Error handling stuck packages: {str(e)}", exc_info=True)
             db.session.rollback()
@@ -88,21 +88,24 @@ class PackageWorker(BaseWorker):
                 .limit(self.max_packages_per_cycle)
                 .all()
             )
-            
+
             if not pending_packages:
                 return
-            
+
             logger.info(f"Processing {len(pending_packages)} pending packages")
-            
+
             for package in pending_packages:
                 try:
                     self._process_single_package(package)
                 except Exception as e:
-                    logger.error(f"Error processing package {package.name}@{package.version}: {str(e)}", exc_info=True)
+                    logger.error(
+                        f"Error processing package {package.name}@{package.version}: {str(e)}",
+                        exc_info=True,
+                    )
                     self._mark_package_failed(package, str(e))
-            
+
             db.session.commit()
-            
+
         except Exception as e:
             logger.error(f"Error in _process_pending_packages: {str(e)}", exc_info=True)
             db.session.rollback()
@@ -110,22 +113,22 @@ class PackageWorker(BaseWorker):
     def _process_single_package(self, package: Package) -> None:
         """Process a single package through the validation pipeline (after license checking)"""
         logger.info(f"Processing package {package.name}@{package.version} (license already checked)")
-        
+
         # Step 1: Mark as downloaded (license check already done by LicenseWorker)
         if not self._mark_as_downloaded(package):
             self._mark_package_failed(package, "Failed to mark as downloaded")
             return
-        
+
         # Step 2: Security scan
         if not self._perform_security_scan(package):
             self._mark_package_failed(package, "Security scan failed")
             return
-        
+
         # Step 3: Mark as ready for approval
         if package.package_status:
             package.package_status.status = "Pending Approval"
             package.package_status.updated_at = datetime.utcnow()
-        
+
         logger.info(f"Successfully processed package {package.name}@{package.version}")
 
     def _mark_as_downloaded(self, package: Package) -> bool:
@@ -133,7 +136,7 @@ class PackageWorker(BaseWorker):
         try:
             if not package.package_status:
                 return False
-            
+
             # Check if package is already downloaded
             if self.download_service.is_package_downloaded(package):
                 logger.info(f"Package {package.name}@{package.version} already downloaded, skipping download")
@@ -141,25 +144,25 @@ class PackageWorker(BaseWorker):
                 package.package_status.updated_at = datetime.utcnow()
                 db.session.commit()
                 return True
-            
+
             # Update status to downloading
             package.package_status.status = "Downloading"
             package.package_status.updated_at = datetime.utcnow()
             db.session.commit()
-            
+
             # Download package from npm registry
             if not self.download_service.download_package(package):
                 logger.error(f"Failed to download package {package.name}@{package.version}")
                 return False
-            
+
             # Update status to downloaded
             package.package_status.status = "Downloaded"
             package.package_status.updated_at = datetime.utcnow()
             db.session.commit()
-            
+
             logger.info(f"Successfully downloaded package {package.name}@{package.version}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error downloading package {package.name}@{package.version}: {str(e)}")
             return False
@@ -169,31 +172,35 @@ class PackageWorker(BaseWorker):
         try:
             if not package.package_status:
                 return False
-            
+
             # Update status to security scanning
             package.package_status.status = "Security Scanning"
             package.package_status.security_scan_status = "running"
             package.package_status.updated_at = datetime.utcnow()
             db.session.commit()
-            
+
             logger.info(f"Starting security scan for package {package.name}@{package.version}")
             scan_result = self.trivy_service.scan_package(package)
-            
+
             if scan_result["status"] == "failed":
-                logger.warning(f"Security scan failed for {package.name}@{package.version}: {scan_result.get('error', 'Unknown error')}")
+                logger.warning(
+                    f"Security scan failed for {package.name}@{package.version}: {scan_result.get('error', 'Unknown error')}"
+                )
                 package.package_status.status = "Security Scanned"  # Still mark as scanned even if failed
                 package.package_status.security_scan_status = "failed"
             else:
-                logger.info(f"Security scan completed for {package.name}@{package.version}: {scan_result.get('vulnerability_count', 0)} vulnerabilities found")
+                logger.info(
+                    f"Security scan completed for {package.name}@{package.version}: {scan_result.get('vulnerability_count', 0)} vulnerabilities found"
+                )
                 package.package_status.status = "Security Scanned"
                 package.package_status.security_scan_status = "completed"
                 package.package_status.security_score = scan_result.get("security_score", 100)
-            
+
             package.package_status.updated_at = datetime.utcnow()
             db.session.commit()
-            
+
             return True
-            
+
         except Exception as e:
             logger.error(f"Security scan failed for {package.name}@{package.version}: {str(e)}")
             if package.package_status:
@@ -202,9 +209,6 @@ class PackageWorker(BaseWorker):
                 package.package_status.updated_at = datetime.utcnow()
             db.session.commit()
             return False
-
-
-
 
     def _mark_package_failed(self, package: Package, error_message: str) -> None:
         """Mark a package as failed with error message"""
@@ -222,13 +226,20 @@ class PackageWorker(BaseWorker):
             with self.app.app_context():
                 # Count packages by status
                 status_counts = {}
-                for status in ["Requested", "Checking Licence", "Downloading", "Security Scanning", "Pending Approval", "Rejected"]:
+                for status in [
+                    "Requested",
+                    "Checking Licence",
+                    "Downloading",
+                    "Security Scanning",
+                    "Pending Approval",
+                    "Rejected",
+                ]:
                     count = db.session.query(Package).join(PackageStatus).filter(PackageStatus.status == status).count()
                     status_counts[status] = count
-                
+
                 # Count total requests
                 total_requests = db.session.query(Request).count()
-                
+
                 return {
                     "worker_status": self.get_worker_status(),
                     "package_status_counts": status_counts,
@@ -243,27 +254,30 @@ class PackageWorker(BaseWorker):
         """Retry failed packages, optionally for a specific request"""
         try:
             query = db.session.query(Package).join(PackageStatus).filter(PackageStatus.status == "Rejected")
-            
+
             if request_id:
                 query = query.join(RequestPackage).filter(RequestPackage.request_id == request_id)
-            
+
             failed_packages = query.all()
-            
+
             if not failed_packages:
                 return {"message": "No failed packages found", "retried": 0}
-            
+
             retried_count = 0
             for package in failed_packages:
                 if package.package_status:
                     package.package_status.status = "Requested"
                     package.package_status.updated_at = datetime.utcnow()
                     retried_count += 1
-            
+
             db.session.commit()
-            
+
             logger.info(f"Retried {retried_count} failed packages")
-            return {"message": f"Retried {retried_count} packages", "retried": retried_count}
-            
+            return {
+                "message": f"Retried {retried_count} packages",
+                "retried": retried_count,
+            }
+
         except Exception as e:
             logger.error(f"Error retrying failed packages: {str(e)}")
             db.session.rollback()

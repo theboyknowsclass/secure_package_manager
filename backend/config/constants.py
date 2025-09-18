@@ -7,6 +7,7 @@ to prevent accidental use of development values in production.
 """
 
 import os
+from typing import Optional
 
 # =============================================================================
 # CONFIGURATION VALIDATION
@@ -48,7 +49,7 @@ def get_required_env_int(key: str, description: str | None = None) -> int:
         desc = f" ({description})" if description else ""
         _missing_env_vars.append(f"  - {key}{desc}")
         return 0  # Return 0 as placeholder (will be caught by validation)
-    
+
     try:
         return int(value)
     except ValueError:
@@ -63,9 +64,7 @@ def validate_all_required_env() -> None:
     Raises ValueError with all missing variables if any are missing.
     """
     if _missing_env_vars:
-        error_msg = "Missing required environment variables:\n" + "\n".join(
-            _missing_env_vars
-        )
+        error_msg = "Missing required environment variables:\n" + "\n".join(_missing_env_vars)
         error_msg += "\n\nPlease set these environment variables before starting the application."
         error_msg += "\nSee env.example for reference values."
         raise ValueError(error_msg)
@@ -73,6 +72,33 @@ def validate_all_required_env() -> None:
 
 # Global list to collect missing environment variables
 _missing_env_vars: list[str] = []
+
+# -----------------------------------------------------------------------------
+# Contextual validation (validate only the variables you care about)
+# -----------------------------------------------------------------------------
+
+
+def validate_env_vars(*names: str, context: Optional[str] = None) -> None:
+    """
+    Validate only by variable names (presence and non-empty strings).
+
+    Usage:
+        validate_env_vars("TRIVY_URL", "SOURCE_REPOSITORY_URL", context="PackageWorker")
+    """
+    # Reuse messages accumulated during import; just filter by name prefix.
+    if names:
+        wanted = set(names)
+        local_errors = [e for e in _missing_env_vars for n in wanted if e.startswith(f"  - {n}")]
+    else:
+        local_errors = list(_missing_env_vars)
+
+    if local_errors:
+        header = f"Missing required environment variables{f' for {context}' if context else ''}:\n"
+        error_msg = header + "\n".join(local_errors)
+        error_msg += "\n\nPlease set these environment variables before starting this component."
+        error_msg += "\nSee env.example for reference values."
+        raise ValueError(error_msg)
+
 
 # =============================================================================
 # APPLICATION CONFIGURATION
@@ -125,7 +151,9 @@ TRIVY_TIMEOUT = get_required_env_int("TRIVY_TIMEOUT", "Trivy timeout in seconds"
 TRIVY_MAX_RETRIES = get_required_env_int("TRIVY_MAX_RETRIES", "Trivy maximum retry attempts")
 
 # Repository Configuration
-SOURCE_REPOSITORY_URL = get_required_env("SOURCE_REPOSITORY_URL", "Source repository URL (e.g., https://registry.npmjs.org)")
+SOURCE_REPOSITORY_URL = get_required_env(
+    "SOURCE_REPOSITORY_URL", "Source repository URL (e.g., https://registry.npmjs.org)"
+)
 TARGET_REPOSITORY_URL = get_required_env("TARGET_REPOSITORY_URL", "Target repository URL (e.g., http://localhost:8080)")
 
 # =============================================================================
@@ -162,12 +190,8 @@ INTERNAL_TRIVY_URL = f"http://trivy:{TRIVY_PORT}"
 # =============================================================================
 
 # Default admin credentials (should only be used in development)
-DEFAULT_ADMIN_USERNAME = get_required_env(
-    "DEFAULT_ADMIN_USERNAME", "Default admin username"
-)
-DEFAULT_ADMIN_PASSWORD = get_required_env(
-    "DEFAULT_ADMIN_PASSWORD", "Default admin password"
-)
+DEFAULT_ADMIN_USERNAME = get_required_env("DEFAULT_ADMIN_USERNAME", "Default admin username")
+DEFAULT_ADMIN_PASSWORD = get_required_env("DEFAULT_ADMIN_PASSWORD", "Default admin password")
 DEFAULT_ADMIN_EMAIL = get_required_env("DEFAULT_ADMIN_EMAIL", "Default admin email")
 
 # =============================================================================
@@ -192,6 +216,5 @@ def is_production() -> bool:
 
 # Validate all required environment variables at module load time
 # Only validate if not running as a worker (workers may not need all variables)
-import os
-if not os.getenv('WORKER_TYPE'):
+if not os.getenv("WORKER_TYPE"):
     validate_all_required_env()

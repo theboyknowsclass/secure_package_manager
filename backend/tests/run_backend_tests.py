@@ -33,9 +33,7 @@ def run_license_tests():
         print("🎉 All license tests passed!")
         return True
     else:
-        print(
-            f"❌ {len(result.failures)} test(s) failed, {len(result.errors)} error(s)"
-        )
+        print(f"❌ {len(result.failures)} test(s) failed, {len(result.errors)} error(s)")
         return False
 
 
@@ -53,9 +51,7 @@ def run_specific_test(test_file):
         return False
 
     # Run the specific test
-    result = subprocess.run(
-        [sys.executable, test_path], capture_output=False, text=True
-    )
+    result = subprocess.run([sys.executable, test_path], capture_output=False, text=True)
 
     if result.returncode == 0:
         print(f"\n🎉 {test_file} passed!")

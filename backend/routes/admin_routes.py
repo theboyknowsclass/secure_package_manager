@@ -2,12 +2,7 @@ import logging
 
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
-from models import (
-    AuditLog,
-    Package,
-    SupportedLicense,
-    db,
-)
+from models import AuditLog, Package, SupportedLicense, db
 from services.auth_service import AuthService
 from services.package_service import PackageService
 
@@ -32,9 +27,7 @@ package_service = PackageService()
 def get_supported_licenses() -> ResponseReturnValue:
     """Get all supported licenses"""
     try:
-        status = request.args.get(
-            "status"
-        )  # 'always_allowed', 'allowed', 'avoid', 'blocked'
+        status = request.args.get("status")  # 'always_allowed', 'allowed', 'avoid', 'blocked'
         query = SupportedLicense.query
 
         if status:
@@ -62,9 +55,7 @@ def create_supported_license() -> ResponseReturnValue:
             return jsonify({"error": "Name and identifier are required"}), 400
 
         # Check if identifier already exists
-        existing = SupportedLicense.query.filter_by(
-            identifier=data["identifier"]
-        ).first()
+        existing = SupportedLicense.query.filter_by(identifier=data["identifier"]).first()
         if existing:
             return jsonify({"error": "License identifier already exists"}), 400
 
@@ -136,9 +127,7 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
         db.session.add(audit_log)
         db.session.commit()
 
-        return jsonify(
-            {"message": "License updated successfully", "license": license.to_dict()}
-        )
+        return jsonify({"message": "License updated successfully", "license": license.to_dict()})
     except Exception as e:
         logger.error(f"Update license error: {str(e)}")
         db.session.rollback()
@@ -156,15 +145,11 @@ def delete_supported_license(license_id: int) -> ResponseReturnValue:
         license = SupportedLicense.query.get_or_404(license_id)
 
         # Check if license is being used by any packages
-        package_count = Package.query.filter_by(
-            license_identifier=license.identifier
-        ).count()
+        package_count = Package.query.filter_by(license_identifier=license.identifier).count()
         if package_count > 0:
             return (
                 jsonify(
-                    {
-                        "error": f"Cannot delete license. It is used by {package_count} package(s). Disable it instead."
-                    }
+                    {"error": f"Cannot delete license. It is used by {package_count} package(s). Disable it instead."}
                 ),
                 400,
             )
@@ -197,15 +182,21 @@ def get_config() -> ResponseReturnValue:
     """Get system configuration including status and environment variables"""
     try:
         import os
+
         from config.constants import (
-            SOURCE_REPOSITORY_URL, TARGET_REPOSITORY_URL, TRIVY_URL, API_URL, 
-            FRONTEND_URL, DATABASE_URL, IDP_URL
+            API_URL,
+            DATABASE_URL,
+            FRONTEND_URL,
+            IDP_URL,
+            SOURCE_REPOSITORY_URL,
+            TARGET_REPOSITORY_URL,
+            TRIVY_URL,
         )
-        
+
         # Check configuration status
         is_complete = package_service.is_configuration_complete()
         missing_keys = package_service.get_missing_config_keys()
-        
+
         # Get configuration values (mask sensitive data)
         config = {
             "repository": {
@@ -233,18 +224,20 @@ def get_config() -> ResponseReturnValue:
                 "flask_env": os.getenv("FLASK_ENV", "development"),
                 "flask_debug": os.getenv("FLASK_DEBUG", "0"),
                 "max_content_length": os.getenv("MAX_CONTENT_LENGTH", "16777216"),
-            }
+            },
         }
-        
-        return jsonify({
-            "config": config,
-            "status": {
-                "is_complete": is_complete,
-                "missing_keys": missing_keys,
-                "requires_admin_setup": not is_complete,
-                "note": "Repository configuration is now managed via environment variables",
+
+        return jsonify(
+            {
+                "config": config,
+                "status": {
+                    "is_complete": is_complete,
+                    "missing_keys": missing_keys,
+                    "requires_admin_setup": not is_complete,
+                    "note": "Repository configuration is now managed via environment variables",
+                },
             }
-        })
+        )
 
     except Exception as e:
         logger.error(f"Get config error: {str(e)}")
@@ -255,7 +248,7 @@ def _mask_url(url: str) -> str:
     """Mask sensitive parts of URLs for display"""
     if not url:
         return "Not configured"
-    
+
     # Mask password in database URLs
     if "://" in url and "@" in url:
         parts = url.split("://")
@@ -267,5 +260,5 @@ def _mask_url(url: str) -> str:
                 if ":" in user_pass:
                     user, _ = user_pass.split(":", 1)
                     return f"{protocol}://{user}:***@{host_db}"
-    
+
     return url

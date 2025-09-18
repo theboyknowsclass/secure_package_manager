@@ -2,21 +2,14 @@ import base64
 import json
 import logging
 import os
-import subprocess
 import tempfile
 from datetime import datetime
 from typing import Any, Dict, List
 
 from config.constants import TARGET_REPOSITORY_URL
-from models import (
-    Package,
-    PackageStatus,
-    RequestPackage,
-    db,
-)
+from models import Package, PackageStatus, RequestPackage, db
 
 from .license_service import LicenseService
-from .package_request_status_manager import PackageRequestStatusManager
 from .trivy_service import TrivyService
 
 logger = logging.getLogger(__name__)
@@ -52,10 +45,7 @@ class PackageService:
     def target_repo_url(self) -> str:
         return os.getenv("TARGET_REPOSITORY_URL", "")
 
-
-    def process_package_lock(
-        self, request_id: int, package_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def process_package_lock(self, request_id: int, package_data: Dict[str, Any]) -> Dict[str, Any]:
         """Process package-lock.json and extract all packages"""
         try:
             # Validate the package-lock.json file
@@ -65,16 +55,16 @@ class PackageService:
             packages = self._extract_packages_from_json(package_data)
 
             # Filter and process packages
-            packages_to_process, existing_packages = self._filter_new_packages(
-                packages, request_id
-            )
+            packages_to_process, existing_packages = self._filter_new_packages(packages, request_id)
 
             # Create database records for new packages
             self._create_package_records(packages_to_process, request_id)
 
             # Packages are now processed by the background worker
             # No need to process synchronously - worker will pick them up
-            logger.info(f"Created {len(packages_to_process)} packages for request {request_id}, worker will process them")
+            logger.info(
+                f"Created {len(packages_to_process)} packages for request {request_id}, worker will process them"
+            )
 
             return {
                 "packages_to_process": len(packages_to_process),
@@ -101,14 +91,10 @@ class PackageService:
                 f"Please upgrade your npm version (npm 8+) and regenerate the lockfile."
             )
 
-    def _extract_packages_from_json(
-        self, package_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _extract_packages_from_json(self, package_data: Dict[str, Any]) -> Dict[str, Any]:
         """Extract package information from package-lock.json data"""
         packages = package_data.get("packages", {})
-        logger.info(
-            f"Processing package-lock.json with {len(packages)} package entries"
-        )
+        logger.info(f"Processing package-lock.json with {len(packages)} package entries")
         return dict(packages)
 
     def _filter_new_packages(
@@ -145,9 +131,7 @@ class PackageService:
                     "info": package_info,
                 }
 
-        logger.info(
-            f"Deduplicated {len(packages)} package entries to {len(unique_packages)} unique packages"
-        )
+        logger.info(f"Deduplicated {len(packages)} package entries to {len(unique_packages)} unique packages")
 
         # Now process the deduplicated packages
         for package_key, package_data in unique_packages.items():
@@ -171,9 +155,9 @@ class PackageService:
                     # Create link between request and existing package
                     # Since package exists in DB, it's "existing" for this request
                     request_package = RequestPackage(
-                        request_id=request_id, 
+                        request_id=request_id,
                         package_id=existing_package.id,
-                        package_type="existing"
+                        package_type="existing",
                     )
                     db.session.add(request_package)
                     db.session.commit()
@@ -192,9 +176,7 @@ class PackageService:
 
         return packages_to_process, existing_packages
 
-    def _extract_package_name(
-        self, package_path: str, package_info: Dict[str, Any]
-    ) -> str | None:
+    def _extract_package_name(self, package_path: str, package_info: Dict[str, Any]) -> str | None:
         """Extract package name from package info or infer from path"""
         package_name = package_info.get("name")
 
@@ -233,9 +215,7 @@ class PackageService:
             npm_url=package_info.get("resolved"),
         )
 
-    def _create_package_records(
-        self, packages_to_process: List[Dict[str, Any]], request_id: int
-    ) -> List[Package]:
+    def _create_package_records(self, packages_to_process: List[Dict[str, Any]], request_id: int) -> List[Package]:
         """Create database records for new packages"""
         package_objects = []
         for package_data in packages_to_process:
@@ -258,31 +238,21 @@ class PackageService:
 
             # Create request-package link
             # Since this is a newly created package, it's "new" for this request
-            request_package = RequestPackage(
-                request_id=request_id, 
-                package_id=package.id,
-                package_type="new"
-            )
+            request_package = RequestPackage(request_id=request_id, package_id=package.id, package_type="new")
             db.session.add(request_package)
 
             package_objects.append(package)
-            logger.info(
-                f"Added package for processing: {package.name}@{package.version} (type: new)"
-            )
+            logger.info(f"Added package for processing: {package.name}@{package.version} (type: new)")
 
         db.session.commit()
         return package_objects
-
 
     def _handle_processing_error(self, request_id: int, error: Exception) -> None:
         """Handle errors during package processing"""
         try:
             # Update package statuses to reflect error
             packages = (
-                db.session.query(Package)
-                .join(RequestPackage)
-                .filter(RequestPackage.request_id == request_id)
-                .all()
+                db.session.query(Package).join(RequestPackage).filter(RequestPackage.request_id == request_id).all()
             )
 
             for package in packages:
@@ -291,13 +261,9 @@ class PackageService:
                     package.package_status.updated_at = datetime.utcnow()
 
             db.session.commit()
-            logger.info(
-                f"Updated package statuses for request {request_id} to Rejected due to error"
-            )
+            logger.info(f"Updated package statuses for request {request_id} to Rejected due to error")
         except Exception as commit_error:
-            logger.error(
-                f"Failed to update package statuses after error: {str(commit_error)}"
-            )
+            logger.error(f"Failed to update package statuses after error: {str(commit_error)}")
 
     def _calculate_security_score(self, package: Package) -> int:
         """Calculate security score for package based on Trivy scan results"""
@@ -305,11 +271,7 @@ class PackageService:
             # Use Trivy service to calculate security score from vulnerabilities
             if package.security_scans:
                 latest_scan = package.security_scans[-1]
-                return (
-                    self.trivy_service._calculate_security_score_from_vulnerabilities(
-                        latest_scan
-                    )
-                )
+                return self.trivy_service._calculate_security_score_from_vulnerabilities(latest_scan)
             else:
                 return 100  # Default to perfect score if no scans yet
 
@@ -317,28 +279,20 @@ class PackageService:
             logger.error(f"Error calculating security score: {str(e)}")
             return 100  # Default to perfect score on error
 
-    def get_package_security_scan_status(
-        self, package_id: int
-    ) -> Dict[str, Any] | None:
+    def get_package_security_scan_status(self, package_id: int) -> Dict[str, Any] | None:
         """Get security scan status for a package"""
         try:
             return self.trivy_service.get_scan_status(package_id)
         except Exception as e:
-            logger.error(
-                f"Error getting security scan status for package {package_id}: {str(e)}"
-            )
+            logger.error(f"Error getting security scan status for package {package_id}: {str(e)}")
             return None
 
-    def get_package_security_scan_report(
-        self, package_id: int
-    ) -> Dict[str, Any] | None:
+    def get_package_security_scan_report(self, package_id: int) -> Dict[str, Any] | None:
         """Get detailed security scan report for a package"""
         try:
             return self.trivy_service.get_scan_report(package_id)
         except Exception as e:
-            logger.error(
-                f"Error getting security scan report for package {package_id}: {str(e)}"
-            )
+            logger.error(f"Error getting security scan report for package {package_id}: {str(e)}")
             return None
 
     def publish_to_secure_repo(self, package: Package) -> bool:
@@ -347,13 +301,9 @@ class PackageService:
             # Get the target repository URL
             target_url = self.target_repo_url or TARGET_REPOSITORY_URL
             if not target_url:
-                raise ValueError(
-                    "TARGET_REPOSITORY_URL environment variable is required"
-                )
+                raise ValueError("TARGET_REPOSITORY_URL environment variable is required")
 
-            logger.info(
-                f"Publishing {package.name}@{package.version} to repository at {target_url}"
-            )
+            logger.info(f"Publishing {package.name}@{package.version} to repository at {target_url}")
 
             # Create a temporary directory for the package
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -395,17 +345,13 @@ class PackageService:
                 with open(readme_path, "w") as f:
                     f.write(f"# {package.name}\n\n")
                     f.write(f"Version: {package.version}\n\n")
-                    f.write(
-                        "This package has been validated and approved by the Secure Package Manager.\n\n"
-                    )
+                    f.write("This package has been validated and approved by the Secure Package Manager.\n\n")
                     f.write("## Security Information\n\n")
                     f.write(
                         f'- Security Score: {package.package_status.security_score if package.package_status else "N/A"}\n'
                     )
                     f.write(f'- License: {package.license_identifier or "N/A"}\n')
-                    f.write(
-                        f"- Status: {package.package_status.status if package.package_status else 'N/A'}\n"
-                    )
+                    f.write(f"- Status: {package.package_status.status if package.package_status else 'N/A'}\n")
 
                 # Set npm registry to our secure repository
                 registry_url = target_url.rstrip("/")
@@ -414,23 +360,29 @@ class PackageService:
 
                 # Create a tarball of the package
                 import tarfile
+
                 # Sanitize package name for filesystem (replace @ and / with -)
                 safe_name = package.name.replace("@", "").replace("/", "-")
                 tarball_path = os.path.join(temp_dir, f"{safe_name}-{package.version}.tgz")
                 with tarfile.open(tarball_path, "w:gz") as tar:
-                    tar.add(temp_dir, arcname="package", filter=lambda tarinfo: None if tarinfo.name == os.path.basename(tarball_path) else tarinfo)
+                    tar.add(
+                        temp_dir,
+                        arcname="package",
+                        filter=lambda tarinfo: None if tarinfo.name == os.path.basename(tarball_path) else tarinfo,
+                    )
 
                 # Use curl to directly publish to the registry
                 try:
                     # Read the tarball as base64
-                    with open(tarball_path, 'rb') as f:
+                    with open(tarball_path, "rb") as f:
                         tarball_data = f.read()
-                    tarball_b64 = base64.b64encode(tarball_data).decode('ascii')
+                    tarball_b64 = base64.b64encode(tarball_data).decode("ascii")
 
                     # URL encode the package name for scoped packages like @babel/core
                     from urllib.parse import quote
-                    encoded_package_name = quote(package.name, safe='')
-                    
+
+                    encoded_package_name = quote(package.name, safe="")
+
                     # Create the npm publish payload
                     publish_payload = {
                         "_id": package.name,
@@ -449,27 +401,28 @@ class PackageService:
                                 "license": package.license_identifier or "MIT",
                                 "dist": {
                                     "shasum": "mock-shasum",
-                                    "tarball": f"{registry_url}/{encoded_package_name}/-/{safe_name}-{package.version}.tgz"
-                                }
+                                    "tarball": f"{registry_url}/{encoded_package_name}/-/{safe_name}-{package.version}.tgz",
+                                },
                             }
                         },
                         "_attachments": {
                             f"{safe_name}-{package.version}.tgz": {
                                 "content_type": "application/octet-stream",
                                 "data": tarball_b64,
-                                "length": len(tarball_data)
+                                "length": len(tarball_data),
                             }
-                        }
+                        },
                     }
 
                     # Use curl to publish directly to the registry
                     import requests
+
                     response = requests.put(
                         f"{registry_url}/{encoded_package_name}",
                         json=publish_payload,
-                        headers={"Content-Type": "application/json"}
+                        headers={"Content-Type": "application/json"},
                     )
-                    
+
                     if response.status_code in [200, 201]:
                         logger.info(f"Successfully published {package.name}@{package.version} to secure repository")
                         return True
@@ -482,7 +435,5 @@ class PackageService:
                     return False
 
         except Exception as e:
-            logger.error(
-                f"Error publishing package {package.name}@{package.version}: {str(e)}"
-            )
+            logger.error(f"Error publishing package {package.name}@{package.version}: {str(e)}")
             return False

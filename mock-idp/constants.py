@@ -12,17 +12,18 @@ import os
 # CONFIGURATION FUNCTIONS
 # =============================================================================
 
+
 def get_required_env(key: str, description: str = None) -> str:
     """
     Get a required environment variable or raise an error.
-    
+
     Args:
         key: Environment variable name
         description: Optional description for error message
-        
+
     Returns:
         Environment variable value
-        
+
     Raises:
         ValueError: If the environment variable is not set
     """
@@ -36,11 +37,11 @@ def get_required_env(key: str, description: str = None) -> str:
 def get_optional_env(key: str, default: str = None) -> str:
     """
     Get an optional environment variable with a default value.
-    
+
     Args:
         key: Environment variable name
         default: Default value if not set
-        
+
     Returns:
         Environment variable value or default
     """
@@ -89,6 +90,4 @@ IDP_URL = f"http://{LOCALHOST}:{IDP_PORT}"
 
 # Flask App Configuration
 FLASK_ENV = get_optional_env("FLASK_ENV", "development")
-FLASK_DEBUG = get_optional_env(
-    "FLASK_DEBUG", "1" if FLASK_ENV == "development" else "0"
-)
+FLASK_DEBUG = get_optional_env("FLASK_DEBUG", "1" if FLASK_ENV == "development" else "0")

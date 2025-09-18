@@ -97,9 +97,7 @@ class TestNpmLicenseFormats(unittest.TestCase):
 
         # The current implementation doesn't handle the "licenses" field
         # This test documents the limitation
-        with patch.object(
-            self.license_service, "_lookup_license_in_db", return_value=None
-        ):
+        with patch.object(self.license_service, "_lookup_license_in_db", return_value=None):
             result = self.license_service.validate_package_license(package_data)
 
             # Should return no license result since "license" field is missing
@@ -113,9 +111,7 @@ class TestNpmLicenseFormats(unittest.TestCase):
             "license": {"type": "MIT", "url": "https://opensource.org/licenses/MIT"},
         }
 
-        with patch.object(
-            self.license_service, "_lookup_license_in_db", return_value=self.mock_mit
-        ):
+        with patch.object(self.license_service, "_lookup_license_in_db", return_value=self.mock_mit):
             result = self.license_service.validate_package_license(package_data)
 
             self.assertEqual(result["score"], 100)
@@ -137,9 +133,7 @@ class TestNpmLicenseFormats(unittest.TestCase):
             with self.subTest(license=license_format):
                 package_data = {"name": "test-package", "license": license_format}
 
-                with patch.object(
-                    self.license_service, "_lookup_license_in_db", return_value=None
-                ):
+                with patch.object(self.license_service, "_lookup_license_in_db", return_value=None):
                     result = self.license_service.validate_package_license(package_data)
 
                     # Should be treated as unknown license
@@ -163,9 +157,7 @@ class TestNpmLicenseFormats(unittest.TestCase):
             with self.subTest(license=license_format):
                 package_data = {"name": "test-package", "license": license_format}
 
-                with patch.object(
-                    self.license_service, "_lookup_license_in_db", return_value=None
-                ):
+                with patch.object(self.license_service, "_lookup_license_in_db", return_value=None):
                     result = self.license_service.validate_package_license(package_data)
 
                     # Should be treated as unknown license
@@ -189,9 +181,7 @@ class TestNpmLicenseFormats(unittest.TestCase):
             with self.subTest(license=license_format):
                 package_data = {"name": "test-package", "license": license_format}
 
-                with patch.object(
-                    self.license_service, "_lookup_license_in_db", return_value=None
-                ):
+                with patch.object(self.license_service, "_lookup_license_in_db", return_value=None):
                     result = self.license_service.validate_package_license(package_data)
 
                     # Should be treated as unknown license
@@ -238,9 +228,7 @@ class TestNpmLicenseFormats(unittest.TestCase):
             with self.subTest(license=license_format):
                 package_data = {"name": "test-package", "license": license_format}
 
-                with patch.object(
-                    self.license_service, "_lookup_license_in_db", return_value=None
-                ):
+                with patch.object(self.license_service, "_lookup_license_in_db", return_value=None):
                     result = self.license_service.validate_package_license(package_data)
 
                     # Should be treated as unknown license
@@ -255,9 +243,7 @@ class TestNpmLicenseFormats(unittest.TestCase):
             with self.subTest(license=license_format):
                 package_data = {"name": "test-package", "license": license_format}
 
-                with patch.object(
-                    self.license_service, "_lookup_license_in_db", return_value=None
-                ):
+                with patch.object(self.license_service, "_lookup_license_in_db", return_value=None):
                     result = self.license_service.validate_package_license(package_data)
 
                     # Should be treated as unknown license
@@ -276,9 +262,7 @@ class TestNpmLicenseFormats(unittest.TestCase):
             with self.subTest(license=license_format):
                 package_data = {"name": "test-package", "license": license_format}
 
-                with patch.object(
-                    self.license_service, "_lookup_license_in_db", return_value=None
-                ):
+                with patch.object(self.license_service, "_lookup_license_in_db", return_value=None):
                     result = self.license_service.validate_package_license(package_data)
 
                     # Should be treated as unknown license
@@ -296,9 +280,7 @@ class TestNpmLicenseFormats(unittest.TestCase):
             with self.subTest(license=license_format):
                 package_data = {"name": "test-package", "license": license_format}
 
-                with patch.object(
-                    self.license_service, "_lookup_license_in_db", return_value=None
-                ):
+                with patch.object(self.license_service, "_lookup_license_in_db", return_value=None):
                     result = self.license_service.validate_package_license(package_data)
 
                     # Should be treated as unknown license
@@ -337,9 +319,7 @@ class TestNpmLicenseFormats(unittest.TestCase):
             with self.subTest(license=license_format):
                 package_data = {"name": "test-package", "license": license_format}
 
-                with patch.object(
-                    self.license_service, "_lookup_license_in_db", return_value=None
-                ):
+                with patch.object(self.license_service, "_lookup_license_in_db", return_value=None):
                     result = self.license_service.validate_package_license(package_data)
 
                     # Should be treated as unknown license
@@ -360,9 +340,7 @@ class TestNpmLicenseFormats(unittest.TestCase):
             ],
         }
 
-        with patch.object(
-            self.license_service, "_lookup_license_in_db", return_value=self.mock_mit
-        ):
+        with patch.object(self.license_service, "_lookup_license_in_db", return_value=self.mock_mit):
             result = self.license_service.validate_package_license(package_data)
 
             # Should use the first license (MIT)
@@ -376,9 +354,7 @@ class TestNpmLicenseFormats(unittest.TestCase):
             "license": {"url": "https://opensource.org/licenses/MIT"},
         }
 
-        with patch.object(
-            self.license_service, "_lookup_license_in_db", return_value=None
-        ):
+        with patch.object(self.license_service, "_lookup_license_in_db", return_value=None):
             result = self.license_service.validate_package_license(package_data)
 
             # Should be treated as no license
@@ -392,9 +368,7 @@ class TestNpmLicenseFormats(unittest.TestCase):
             "license": {"type": "", "url": "https://opensource.org/licenses/MIT"},
         }
 
-        with patch.object(
-            self.license_service, "_lookup_license_in_db", return_value=None
-        ):
+        with patch.object(self.license_service, "_lookup_license_in_db", return_value=None):
             result = self.license_service.validate_package_license(package_data)
 
             # Should be treated as no license

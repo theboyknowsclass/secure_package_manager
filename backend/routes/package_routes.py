@@ -49,8 +49,6 @@ def upload_package_lock() -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
-
-
 def _validate_uploaded_file() -> Union[Any, ResponseReturnValue]:
     """Validate the uploaded file"""
     if "file" not in request.files:
@@ -107,9 +105,7 @@ def _create_request(package_data: Dict[str, Any]) -> Request:
     return request_record
 
 
-def _process_package_validation(
-    request_record: Request, package_data: Dict[str, Any]
-) -> ResponseReturnValue | None:
+def _process_package_validation(request_record: Request, package_data: Dict[str, Any]) -> ResponseReturnValue | None:
     """Process package validation and handle errors"""
     try:
         package_service.process_package_lock(request_record.id, package_data)
@@ -120,10 +116,7 @@ def _process_package_validation(
 
         # Update package statuses to reflect error
         packages = (
-            db.session.query(Package)
-            .join(RequestPackage)
-            .filter(RequestPackage.request_id == request_record.id)
-            .all()
+            db.session.query(Package).join(RequestPackage).filter(RequestPackage.request_id == request_record.id).all()
         )
 
         for package in packages:
@@ -176,10 +169,7 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
         request_record = Request.query.get_or_404(request_id)
 
         # Check if user has access to this request
-        if (
-            not request.user.is_admin()
-            and request_record.requestor_id != request.user.id
-        ):
+        if not request.user.is_admin() and request_record.requestor_id != request.user.id:
             return jsonify({"error": "Access denied"}), 403
 
         # Get packages for this request with their creation context and scan results
@@ -206,9 +196,7 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                         "version": request_record.version,
                         "status": status_summary["current_status"],
                         "total_packages": status_summary["total_packages"],
-                        "completion_percentage": status_summary[
-                            "completion_percentage"
-                        ],
+                        "completion_percentage": status_summary["completion_percentage"],
                         "created_at": request_record.created_at.isoformat(),
                         "requestor": {
                             "id": request_record.requestor.id,
@@ -222,32 +210,14 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                             "id": pkg.id,
                             "name": pkg.name,
                             "version": pkg.version,
-                            "status": (
-                                pkg.package_status.status
-                                if pkg.package_status
-                                else "Requested"
-                            ),
-                            "security_score": (
-                                pkg.package_status.security_score
-                                if pkg.package_status
-                                else None
-                            ),
-                            "license_score": (
-                                pkg.package_status.license_score
-                                if pkg.package_status
-                                else None
-                            ),
+                            "status": (pkg.package_status.status if pkg.package_status else "Requested"),
+                            "security_score": (pkg.package_status.security_score if pkg.package_status else None),
+                            "license_score": (pkg.package_status.license_score if pkg.package_status else None),
                             "security_scan_status": (
-                                pkg.package_status.security_scan_status
-                                if pkg.package_status
-                                else "pending"
+                                pkg.package_status.security_scan_status if pkg.package_status else "pending"
                             ),
                             "license_identifier": pkg.license_identifier,
-                            "license_status": (
-                                pkg.package_status.license_status
-                                if pkg.package_status
-                                else None
-                            ),
+                            "license_status": (pkg.package_status.license_status if pkg.package_status else None),
                             "type": rp.package_type,
                             "scan_result": (
                                 {
@@ -466,13 +436,20 @@ def get_processing_status() -> ResponseReturnValue:
     try:
         # Count packages by status
         status_counts = {}
-        for status in ["Requested", "Checking Licence", "Downloading", "Security Scanning", "Pending Approval", "Rejected"]:
+        for status in [
+            "Requested",
+            "Checking Licence",
+            "Downloading",
+            "Security Scanning",
+            "Pending Approval",
+            "Rejected",
+        ]:
             count = db.session.query(Package).join(PackageStatus).filter(PackageStatus.status == status).count()
             status_counts[status] = count
-        
+
         # Count total requests
         total_requests = db.session.query(Request).count()
-        
+
         # Get recent activity (last 10 packages processed)
         recent_packages = (
             db.session.query(Package, PackageStatus)
@@ -482,23 +459,30 @@ def get_processing_status() -> ResponseReturnValue:
             .limit(10)
             .all()
         )
-        
+
         recent_activity = []
         for package, status in recent_packages:
-            recent_activity.append({
-                "package_name": package.name,
-                "package_version": package.version,
-                "status": status.status,
-                "updated_at": status.updated_at.isoformat() if status.updated_at else None,
-            })
-        
-        return jsonify({
-            "status_counts": status_counts,
-            "total_requests": total_requests,
-            "recent_activity": recent_activity,
-            "timestamp": datetime.utcnow().isoformat(),
-        }), 200
-        
+            recent_activity.append(
+                {
+                    "package_name": package.name,
+                    "package_version": package.version,
+                    "status": status.status,
+                    "updated_at": status.updated_at.isoformat() if status.updated_at else None,
+                }
+            )
+
+        return (
+            jsonify(
+                {
+                    "status_counts": status_counts,
+                    "total_requests": total_requests,
+                    "recent_activity": recent_activity,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            ),
+            200,
+        )
+
     except Exception as e:
         logger.error(f"Get processing status error: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
@@ -511,41 +495,44 @@ def retry_failed_packages() -> ResponseReturnValue:
     try:
         data = request.get_json() or {}
         request_id = data.get("request_id")
-        
+
         # Only admins can retry packages
         if not request.user.is_admin():
             return jsonify({"error": "Admin access required"}), 403
-        
+
         # Build query for failed packages
         query = db.session.query(Package).join(PackageStatus).filter(PackageStatus.status == "Rejected")
-        
+
         if request_id:
             query = query.join(RequestPackage).filter(RequestPackage.request_id == request_id)
-        
+
         failed_packages = query.all()
-        
+
         if not failed_packages:
             return jsonify({"message": "No failed packages found", "retried": 0}), 200
-        
+
         retried_count = 0
         for package in failed_packages:
             if package.package_status:
                 package.package_status.status = "Requested"
                 package.package_status.updated_at = datetime.utcnow()
                 retried_count += 1
-        
+
         db.session.commit()
-        
+
         logger.info(f"Retried {retried_count} failed packages")
-        return jsonify({
-            "message": f"Retried {retried_count} packages",
-            "retried": retried_count,
-            "request_id": request_id,
-        }), 200
-        
+        return (
+            jsonify(
+                {
+                    "message": f"Retried {retried_count} packages",
+                    "retried": retried_count,
+                    "request_id": request_id,
+                }
+            ),
+            200,
+        )
+
     except Exception as e:
         logger.error(f"Retry failed packages error: {str(e)}")
         db.session.rollback()
         return jsonify({"error": "Internal server error"}), 500
-
-

@@ -66,9 +66,7 @@ class TestLicenseIntegration(unittest.TestCase):
             "_validate_package_license",
             return_value=mock_validation_result,
         ):
-            with patch.object(
-                self.package_service, "_simulate_package_download", return_value=True
-            ):
+            with patch.object(self.package_service, "_simulate_package_download", return_value=True):
                 with patch.object(
                     self.package_service,
                     "_create_validation_records",
@@ -79,9 +77,7 @@ class TestLicenseIntegration(unittest.TestCase):
                         mock_db.session.commit.return_value = None
 
                         # Test the validation process
-                        result = self.package_service._validate_package_info(
-                            self.mock_package
-                        )
+                        result = self.package_service._validate_package_info(self.mock_package)
 
                         # Verify that license score was set
                         self.assertEqual(self.mock_package.license_score, 80)
@@ -143,9 +139,7 @@ class TestLicenseIntegration(unittest.TestCase):
             "_validate_package_license",
             return_value=mock_validation_result,
         ):
-            with patch.object(
-                self.package_service, "_simulate_package_download", return_value=True
-            ):
+            with patch.object(self.package_service, "_simulate_package_download", return_value=True):
                 with patch.object(
                     self.package_service,
                     "_create_validation_records",
@@ -155,9 +149,7 @@ class TestLicenseIntegration(unittest.TestCase):
                         mock_db.session.commit.return_value = None
 
                         # Test the validation process
-                        result = self.package_service._validate_package_info(
-                            self.mock_package
-                        )
+                        result = self.package_service._validate_package_info(self.mock_package)
 
                         # Should still store the score and allow processing (for testing)
                         self.assertEqual(self.mock_package.license_score, 0)
@@ -274,9 +266,7 @@ class TestLicenseIntegration(unittest.TestCase):
                     result = self.license_service.validate_package_license(package_data)
 
                     self.assertEqual(result["score"], test_case["expected_score"])
-                    self.assertEqual(
-                        len(result["errors"]), test_case["expected_errors"]
-                    )
+                    self.assertEqual(len(result["errors"]), test_case["expected_errors"])
 
 
 if __name__ == "__main__":

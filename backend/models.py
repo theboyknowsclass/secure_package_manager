@@ -14,20 +14,14 @@ class User(db.Model):  # type: ignore[misc]
     username = db.Column(db.String(255), unique=True, nullable=False)
     email = db.Column(db.String(255), unique=True, nullable=False)
     full_name = db.Column(db.String(255), nullable=False)
-    role = db.Column(
-        db.String(20), default="user", nullable=False
-    )  # 'user', 'approver', 'admin'
+    role = db.Column(db.String(20), default="user", nullable=False)  # 'user', 'approver', 'admin'
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     requests = db.relationship("Request", backref="requestor", lazy=True)
     audit_logs = db.relationship("AuditLog", backref="user", lazy=True)
-    supported_licenses = db.relationship(
-        "SupportedLicense", backref="creator", lazy=True
-    )
+    supported_licenses = db.relationship("SupportedLicense", backref="creator", lazy=True)
 
     # Role helper methods
     def is_user(self) -> bool:
@@ -111,9 +105,7 @@ class Package(db.Model):  # type: ignore[misc]
 
     # Relationships
     request_packages = db.relationship("RequestPackage", backref="package", lazy=True)
-    package_status = db.relationship(
-        "PackageStatus", backref="package", uselist=False, lazy=True
-    )
+    package_status = db.relationship("PackageStatus", backref="package", uselist=False, lazy=True)
     security_scans = db.relationship("SecurityScan", backref="package", lazy=True)
 
     def to_dict(self) -> dict[str, Any]:
@@ -161,11 +153,11 @@ class PackageStatus(db.Model):  # type: ignore[misc]
     approver_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)  # User who approved the package
     rejector_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)  # User who rejected the package
     published_at = db.Column(db.DateTime, nullable=True)  # Timestamp when package was successfully published
-    publish_status = db.Column(db.String(20), default="pending", nullable=False)  # Publishing status: pending, publishing, published, failed
+    publish_status = db.Column(
+        db.String(20), default="pending", nullable=False
+    )  # Publishing status: pending, publishing, published, failed
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -188,14 +180,22 @@ class PackageStatus(db.Model):  # type: ignore[misc]
     def is_processing(self) -> bool:
         """Check if package is in a processing state"""
         processing_statuses = {
-            "Requested", "Checking Licence", "Downloading", "Security Scanning"
+            "Requested",
+            "Checking Licence",
+            "Downloading",
+            "Security Scanning",
         }
         return self.status in processing_statuses
 
     def is_completed_processing(self) -> bool:
         """Check if package has completed all processing steps"""
         completed_statuses = {
-            "Licence Checked", "Downloaded", "Security Scanned", "Pending Approval", "Approved", "Rejected"
+            "Licence Checked",
+            "Downloaded",
+            "Security Scanned",
+            "Pending Approval",
+            "Approved",
+            "Rejected",
         }
         return self.status in completed_statuses
 
@@ -215,7 +215,7 @@ class PackageStatus(db.Model):  # type: ignore[misc]
             "Security Scanned": "Security Complete",
             "Pending Approval": "Awaiting Approval",
             "Approved": "Approved",
-            "Rejected": "Rejected"
+            "Rejected": "Rejected",
         }
         return stage_mapping.get(self.status, "Unknown")
 
@@ -224,12 +224,8 @@ class SecurityScan(db.Model):  # type: ignore[misc]
     __tablename__ = "security_scans"
 
     id = db.Column(db.Integer, primary_key=True)
-    package_id = db.Column(
-        db.Integer, db.ForeignKey("packages.id", ondelete="CASCADE"), nullable=False
-    )
-    scan_type = db.Column(
-        db.String(50), default="trivy", nullable=False
-    )  # trivy, snyk, npm_audit
+    package_id = db.Column(db.Integer, db.ForeignKey("packages.id", ondelete="CASCADE"), nullable=False)
+    scan_type = db.Column(db.String(50), default="trivy", nullable=False)  # trivy, snyk, npm_audit
     scan_result = db.Column(db.JSON)  # Store the full Trivy scan result
     critical_count = db.Column(db.Integer, default=0)
     high_count = db.Column(db.Integer, default=0)
@@ -243,13 +239,7 @@ class SecurityScan(db.Model):  # type: ignore[misc]
 
     def get_total_vulnerabilities(self) -> int:
         """Calculate total vulnerability count from granular counts"""
-        return (
-            self.critical_count + 
-            self.high_count + 
-            self.medium_count + 
-            self.low_count + 
-            self.info_count
-        )
+        return self.critical_count + self.high_count + self.medium_count + self.low_count + self.info_count
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -266,9 +256,7 @@ class SecurityScan(db.Model):  # type: ignore[misc]
             "scan_duration_ms": self.scan_duration_ms,
             "trivy_version": self.trivy_version,
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "completed_at": (
-                self.completed_at.isoformat() if self.completed_at else None
-            ),
+            "completed_at": (self.completed_at.isoformat() if self.completed_at else None),
         }
 
 
@@ -277,17 +265,11 @@ class SupportedLicense(db.Model):  # type: ignore[misc]
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), unique=True, nullable=False)
-    identifier = db.Column(
-        db.String(100), unique=True, nullable=False
-    )  # SPDX identifier
-    status = db.Column(
-        db.String(20), default="allowed"
-    )  # 'always_allowed', 'allowed', 'avoid', 'blocked'
+    identifier = db.Column(db.String(100), unique=True, nullable=False)  # SPDX identifier
+    status = db.Column(db.String(20), default="allowed")  # 'always_allowed', 'allowed', 'avoid', 'blocked'
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def to_dict(self) -> dict[str, Any]:
         return {

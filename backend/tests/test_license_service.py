@@ -173,9 +173,7 @@ class TestLicenseService(unittest.TestCase):
         """Test package with unknown license"""
         package_data = {"name": "test-package", "license": "UNKNOWN-LICENSE"}
 
-        with patch.object(
-            self.license_service, "_lookup_license_in_db", return_value=None
-        ):
+        with patch.object(self.license_service, "_lookup_license_in_db", return_value=None):
             result = self.license_service.validate_package_license(package_data)
 
             self.assertEqual(result["score"], 50)
@@ -193,16 +191,12 @@ class TestLicenseService(unittest.TestCase):
                 return self.mock_apache_license
             return None
 
-        with patch.object(
-            self.license_service, "_lookup_license_in_db", side_effect=mock_lookup
-        ):
+        with patch.object(self.license_service, "_lookup_license_in_db", side_effect=mock_lookup):
             result = self.license_service.validate_package_license(package_data)
 
             self.assertEqual(result["score"], 100)  # Should use best license (MIT)
             self.assertEqual(len(result["errors"]), 0)
-            self.assertGreater(
-                len(result["warnings"]), 0
-            )  # Should have warning about OR expression
+            self.assertGreater(len(result["warnings"]), 0)  # Should have warning about OR expression
 
     def test_or_expression_with_parentheses(self):
         """Test OR expression with parentheses: (MIT OR CC0-1.0)"""
@@ -215,9 +209,7 @@ class TestLicenseService(unittest.TestCase):
                 return self.mock_cc0_license
             return None
 
-        with patch.object(
-            self.license_service, "_lookup_license_in_db", side_effect=mock_lookup
-        ):
+        with patch.object(self.license_service, "_lookup_license_in_db", side_effect=mock_lookup):
             result = self.license_service.validate_package_license(package_data)
 
             self.assertEqual(result["score"], 100)  # Should use best license (MIT)
@@ -235,9 +227,7 @@ class TestLicenseService(unittest.TestCase):
                 return self.mock_apache_license
             return None
 
-        with patch.object(
-            self.license_service, "_lookup_license_in_db", side_effect=mock_lookup
-        ):
+        with patch.object(self.license_service, "_lookup_license_in_db", side_effect=mock_lookup):
             result = self.license_service.validate_package_license(package_data)
 
             self.assertEqual(result["score"], 100)  # Should use best license (MIT)
@@ -255,16 +245,12 @@ class TestLicenseService(unittest.TestCase):
                 return self.mock_gpl_license
             return None
 
-        with patch.object(
-            self.license_service, "_lookup_license_in_db", side_effect=mock_lookup
-        ):
+        with patch.object(self.license_service, "_lookup_license_in_db", side_effect=mock_lookup):
             result = self.license_service.validate_package_license(package_data)
 
             self.assertEqual(result["score"], 30)  # Should use worst license (GPL-3.0)
             self.assertEqual(len(result["errors"]), 0)
-            self.assertGreater(
-                len(result["warnings"]), 0
-            )  # Should have warning about AND expression
+            self.assertGreater(len(result["warnings"]), 0)  # Should have warning about AND expression
 
     def test_and_expression_alternative_syntax(self):
         """Test AND expression with alternative syntax: MIT & GPL-3.0"""
@@ -277,9 +263,7 @@ class TestLicenseService(unittest.TestCase):
                 return self.mock_gpl_license
             return None
 
-        with patch.object(
-            self.license_service, "_lookup_license_in_db", side_effect=mock_lookup
-        ):
+        with patch.object(self.license_service, "_lookup_license_in_db", side_effect=mock_lookup):
             result = self.license_service.validate_package_license(package_data)
 
             self.assertEqual(result["score"], 30)  # Should use worst license (GPL-3.0)
@@ -302,9 +286,7 @@ class TestLicenseService(unittest.TestCase):
                 return self.mock_apache_license
             return None
 
-        with patch.object(
-            self.license_service, "_lookup_license_in_db", side_effect=mock_lookup
-        ):
+        with patch.object(self.license_service, "_lookup_license_in_db", side_effect=mock_lookup):
             result = self.license_service.validate_package_license(package_data)
 
             self.assertEqual(result["score"], 100)  # Should use best license (MIT)
@@ -322,9 +304,7 @@ class TestLicenseService(unittest.TestCase):
                 return None
             return None
 
-        with patch.object(
-            self.license_service, "_lookup_license_in_db", side_effect=mock_lookup
-        ):
+        with patch.object(self.license_service, "_lookup_license_in_db", side_effect=mock_lookup):
             result = self.license_service.validate_package_license(package_data)
 
             self.assertEqual(result["score"], 100)  # Should use known license (MIT)
@@ -335,9 +315,7 @@ class TestLicenseService(unittest.TestCase):
         """Test OR expression where all licenses are unknown"""
         package_data = {"name": "test-package", "license": "UNKNOWN1 OR UNKNOWN2"}
 
-        with patch.object(
-            self.license_service, "_lookup_license_in_db", return_value=None
-        ):
+        with patch.object(self.license_service, "_lookup_license_in_db", return_value=None):
             result = self.license_service.validate_package_license(package_data)
 
             self.assertEqual(result["score"], 0)
@@ -348,9 +326,7 @@ class TestLicenseService(unittest.TestCase):
         """Test 'SEE LICENSE IN' format"""
         package_data = {"name": "test-package", "license": "SEE LICENSE IN LICENSE.txt"}
 
-        with patch.object(
-            self.license_service, "_lookup_license_in_db", return_value=None
-        ):
+        with patch.object(self.license_service, "_lookup_license_in_db", return_value=None):
             result = self.license_service.validate_package_license(package_data)
 
             self.assertEqual(result["score"], 0)
@@ -361,9 +337,7 @@ class TestLicenseService(unittest.TestCase):
         """Test 'UNLICENSED' format"""
         package_data = {"name": "test-package", "license": "UNLICENSED"}
 
-        with patch.object(
-            self.license_service, "_lookup_license_in_db", return_value=None
-        ):
+        with patch.object(self.license_service, "_lookup_license_in_db", return_value=None):
             result = self.license_service.validate_package_license(package_data)
 
             self.assertEqual(result["score"], 0)
@@ -408,9 +382,7 @@ class TestLicenseService(unittest.TestCase):
             "_find_license_variation",
             return_value=self.mock_apache_license,
         ):
-            with patch.object(
-                self.license_service, "_lookup_license_in_db", return_value=None
-            ):
+            with patch.object(self.license_service, "_lookup_license_in_db", return_value=None):
                 result = self.license_service.validate_package_license(package_data)
 
                 self.assertEqual(result["score"], 100)
@@ -439,26 +411,14 @@ class TestLicenseService(unittest.TestCase):
         """Test detection of complex license expressions"""
         # Simple licenses
         self.assertFalse(self.license_service._is_complex_license_expression("MIT"))
-        self.assertFalse(
-            self.license_service._is_complex_license_expression("Apache-2.0")
-        )
+        self.assertFalse(self.license_service._is_complex_license_expression("Apache-2.0"))
 
         # Complex expressions
-        self.assertTrue(
-            self.license_service._is_complex_license_expression("MIT OR Apache-2.0")
-        )
-        self.assertTrue(
-            self.license_service._is_complex_license_expression("MIT AND Apache-2.0")
-        )
-        self.assertTrue(
-            self.license_service._is_complex_license_expression("(MIT OR Apache-2.0)")
-        )
-        self.assertTrue(
-            self.license_service._is_complex_license_expression("MIT | Apache-2.0")
-        )
-        self.assertTrue(
-            self.license_service._is_complex_license_expression("MIT & Apache-2.0")
-        )
+        self.assertTrue(self.license_service._is_complex_license_expression("MIT OR Apache-2.0"))
+        self.assertTrue(self.license_service._is_complex_license_expression("MIT AND Apache-2.0"))
+        self.assertTrue(self.license_service._is_complex_license_expression("(MIT OR Apache-2.0)"))
+        self.assertTrue(self.license_service._is_complex_license_expression("MIT | Apache-2.0"))
+        self.assertTrue(self.license_service._is_complex_license_expression("MIT & Apache-2.0"))
 
         # Edge cases
         self.assertFalse(self.license_service._is_complex_license_expression(""))
@@ -483,9 +443,7 @@ class TestLicenseService(unittest.TestCase):
         self.assertEqual(licenses, ["MIT", "Apache-2.0"])
 
         # Multiple OR
-        licenses = self.license_service._parse_license_expression(
-            "MIT OR CC0-1.0 OR Apache-2.0"
-        )
+        licenses = self.license_service._parse_license_expression("MIT OR CC0-1.0 OR Apache-2.0")
         self.assertEqual(licenses, ["MIT", "CC0-1.0", "Apache-2.0"])
 
         # Single license
@@ -520,13 +478,11 @@ class TestLicenseServiceIntegration(unittest.TestCase):
         """Test finding license variations"""
         # This would require a real database connection
         # For now, we'll test the logic with mocked data
-        pass
 
     def test_license_database_lookup(self):
         """Test actual database lookup"""
         # This would require a real database connection
         # For now, we'll test the logic with mocked data
-        pass
 
 
 if __name__ == "__main__":

@@ -7,12 +7,10 @@ database connection management, logging, and error handling.
 
 import logging
 import signal
-import sys
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
-from models import db
 from app import create_app
 
 logger = logging.getLogger(__name__)
@@ -48,28 +46,31 @@ class BaseWorker(ABC):
     def start(self) -> None:
         """Start the worker"""
         logger.info(f"Starting {self.worker_name} worker...")
-        
+
         # Create Flask app context
         self.app = create_app()
-        
+
         with self.app.app_context():
             self.running = True
-            
+
             # Initialize worker
             self.initialize()
-            
+
             logger.info(f"{self.worker_name} worker started successfully")
-            
+
             # Main processing loop
             while self.running:
                 try:
                     self.process_cycle()
                 except Exception as e:
-                    logger.error(f"Error in {self.worker_name} processing cycle: {str(e)}", exc_info=True)
-                
+                    logger.error(
+                        f"Error in {self.worker_name} processing cycle: {str(e)}",
+                        exc_info=True,
+                    )
+
                 if self.running:
                     time.sleep(self.sleep_interval)
-            
+
             # Cleanup
             self.cleanup()
             logger.info(f"{self.worker_name} worker stopped")
@@ -77,16 +78,13 @@ class BaseWorker(ABC):
     @abstractmethod
     def initialize(self) -> None:
         """Initialize the worker - called once at startup"""
-        pass
 
     @abstractmethod
     def process_cycle(self) -> None:
         """Process one cycle of work - called repeatedly"""
-        pass
 
     def cleanup(self) -> None:
         """Cleanup resources - called on shutdown"""
-        pass
 
     def get_worker_status(self) -> Dict[str, Any]:
         """Get current worker status"""
