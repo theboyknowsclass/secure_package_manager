@@ -7,7 +7,7 @@ from database.models import Package, PackageStatus, Request, RequestPackage, Sec
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from services.auth_service import AuthService
-from services.package_service import PackageService
+from services.trivy_service import TrivyService
 
 from database.flask_utils import get_db_operations
 
@@ -18,7 +18,7 @@ package_bp = Blueprint("packages", __name__, url_prefix="/api/packages")
 
 # Initialize services
 auth_service = AuthService()
-package_service = PackageService()
+trivy_service = TrivyService()
 
 
 @package_bp.route("/upload", methods=["POST"])  # type: ignore[misc]
@@ -290,7 +290,7 @@ def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
             if not has_access:
                 return jsonify({"error": "Access denied"}), 403
 
-        scan_status = package_service.get_package_security_scan_status(package_id)
+        scan_status = trivy_service.get_scan_status(package_id)
 
         if not scan_status:
             return jsonify({"error": "No security scan found for this package"}), 404
@@ -339,7 +339,7 @@ def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
             if not has_access:
                 return jsonify({"error": "Access denied"}), 403
 
-        scan_report = package_service.get_package_security_scan_report(package_id)
+        scan_report = trivy_service.get_scan_report(package_id)
 
         if not scan_report:
             return (
@@ -392,7 +392,7 @@ def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
                 return jsonify({"error": "Access denied"}), 403
 
         # Trigger new scan
-        scan_result = package_service.trivy_service.scan_package(package)
+        scan_result = trivy_service.scan_package(package)
 
         return (
             jsonify(

@@ -4,7 +4,7 @@ from database.models import AuditLog, Package, PackageStatus, Request, RequestPa
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from services.auth_service import AuthService
-from services.package_service import PackageService
+from services.npm_registry_publishing_service import NpmRegistryPublishingService
 
 from database.flask_utils import get_db_operations
 
@@ -16,7 +16,7 @@ approver_bp = Blueprint("approver", __name__, url_prefix="/api/approver")
 
 # Initialize services
 auth_service = AuthService()
-package_service = PackageService()
+publishing_service = NpmRegistryPublishingService()
 
 
 # Package Approval Routes - Batch Operations Only
@@ -37,7 +37,7 @@ def publish_package(package_id: int) -> ResponseReturnValue:
             return jsonify({"error": "Package must be approved before publishing"}), 400
 
         # Publish to secure repository
-        success = package_service.publish_to_secure_repo(package)
+        success = publishing_service.publish_to_secure_repo(package)
 
         if success:
             # Log the action

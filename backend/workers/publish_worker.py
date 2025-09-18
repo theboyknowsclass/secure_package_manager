@@ -13,7 +13,7 @@ from typing import Any, Dict
 from database.models import Package, PackageStatus
 from database.operations import DatabaseOperations
 from database.service import DatabaseService
-from services.package_service import PackageService
+from services.npm_registry_publishing_service import NpmRegistryPublishingService
 from workers.base_worker import BaseWorker
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ class PublishWorker(BaseWorker):
     def initialize(self) -> None:
         """Initialize services"""
         logger.info("Initializing PublishWorker services...")
-        self.package_service = PackageService()
+        self.publishing_service = NpmRegistryPublishingService()
 
         # Initialize database service
         database_url = os.getenv("DATABASE_URL")
@@ -144,7 +144,7 @@ class PublishWorker(BaseWorker):
                 session.commit()
 
             # Attempt to publish the package
-            success = self.package_service.publish_to_secure_repo(package)
+            success = self.publishing_service.publish_to_secure_repo(package)
 
             if success:
                 # Mark as published successfully (keep status as Approved, set published_at and publish_status)

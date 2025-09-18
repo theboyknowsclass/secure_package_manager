@@ -4,7 +4,7 @@ from database.models import AuditLog, Package, SupportedLicense
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from services.auth_service import AuthService
-from services.package_service import PackageService
+from services.configuration_service import ConfigurationService
 
 from database.flask_utils import get_db_operations
 
@@ -15,7 +15,7 @@ admin_bp = Blueprint("admin", __name__, url_prefix="/api/admin")
 
 # Initialize services
 auth_service = AuthService()
-package_service = PackageService()
+config_service = ConfigurationService()
 
 
 # Package Management Routes (moved to approver_routes.py)
@@ -210,8 +210,8 @@ def get_config() -> ResponseReturnValue:
         )
 
         # Check configuration status
-        is_complete = package_service.is_configuration_complete()
-        missing_keys = package_service.get_missing_config_keys()
+        is_complete = config_service.is_configuration_complete()
+        missing_keys = config_service.get_missing_config_keys()
 
         # Get configuration values (mask sensitive data)
         config = {
