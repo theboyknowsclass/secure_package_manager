@@ -60,9 +60,28 @@ def main():
             worker = PublishWorker(sleep_interval=sleep_interval)
             worker.max_packages_per_cycle = max_packages_per_cycle
 
+        elif worker_type == "parse_worker":
+            from workers.parse_worker import ParseWorker
+
+            worker = ParseWorker(sleep_interval=sleep_interval)
+
+        elif worker_type == "download_worker":
+            from workers.download_worker import DownloadWorker
+
+            worker = DownloadWorker(sleep_interval=sleep_interval)
+            worker.max_packages_per_cycle = max_packages_per_cycle
+
+        elif worker_type == "security_worker":
+            from workers.security_worker import SecurityWorker
+
+            worker = SecurityWorker(sleep_interval=sleep_interval)
+            worker.max_packages_per_cycle = max_packages_per_cycle
+
         else:
             logger.error(f"Unknown worker type: {worker_type}")
-            logger.error("Supported worker types: license_checker, package_processor, package_publisher")
+            logger.error(
+                "Supported worker types: license_checker, package_processor, package_publisher, parse_worker, download_worker, security_worker"
+            )
             sys.exit(1)
 
         # Start the worker (this will run until interrupted)
