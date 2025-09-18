@@ -30,11 +30,11 @@ services:
     depends_on:
       - db
     environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${DATABASE_PORT}/${POSTGRES_DB}
       - FLASK_APP=app.py
       - APP_NAME=${APP_NAME}
       - FLASK_ENV=${FLASK_ENV}
       - FLASK_DEBUG=${FLASK_DEBUG}
-      - DATABASE_URL=${DATABASE_URL}
       - DATABASE_PORT=${DATABASE_PORT}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -108,7 +108,7 @@ services:
         condition: service_healthy
     environment:
       # Base database environment variables (required by all workers)
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${DATABASE_PORT}/${POSTGRES_DB}
       - DATABASE_PORT=${DATABASE_PORT}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -140,7 +140,7 @@ services:
         condition: service_healthy
     environment:
       # Base database environment variables (required by all workers)
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${DATABASE_PORT}/${POSTGRES_DB}
       - DATABASE_PORT=${DATABASE_PORT}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -171,7 +171,7 @@ services:
         condition: service_healthy
     environment:
       # Base database environment variables (required by all workers)
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${DATABASE_PORT}/${POSTGRES_DB}
       - DATABASE_PORT=${DATABASE_PORT}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -207,7 +207,7 @@ services:
         condition: service_healthy
     environment:
       # Base database environment variables (required by all workers)
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${DATABASE_PORT}/${POSTGRES_DB}
       - DATABASE_PORT=${DATABASE_PORT}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -243,7 +243,7 @@ services:
         condition: service_healthy
     environment:
       # Base database environment variables (required by all workers)
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${DATABASE_PORT}/${POSTGRES_DB}
       - DATABASE_PORT=${DATABASE_PORT}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}

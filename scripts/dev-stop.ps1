@@ -8,7 +8,7 @@ docker context use default
 
 # Stop and remove all containers
 Write-Host "📦 Stopping containers..." -ForegroundColor Yellow
-docker compose --env-file .env.development -f docker-compose.base.yml -f docker-compose.dev.yml down
+docker compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml down
 
 # Force stop any remaining containers (in case some were started manually)
 Write-Host "🔧 Force stopping any remaining containers..." -ForegroundColor Yellow
@@ -17,7 +17,7 @@ docker rm $(docker ps -aq) 2>$null
 
 # Remove volumes (optional - uncomment if you want to completely reset)
 # Write-Host "🗑️  Removing volumes..." -ForegroundColor Yellow
-# docker compose --env-file .env.development -f docker-compose.base.yml -f docker-compose.dev.yml down -v
+# docker compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml down -v
 
 # Remove any dangling images (optional)
 # Write-Host "🧹 Cleaning up dangling images..." -ForegroundColor Yellow

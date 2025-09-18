@@ -9,7 +9,7 @@ docker context use default
 
 # Stop and remove all containers and volumes
 Write-Host "📦 Stopping containers and removing volumes..." -ForegroundColor Yellow
-docker compose --env-file .env.development -f docker-compose.base.yml -f docker-compose.dev.yml down -v
+docker compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml down -v
 
 # Remove any dangling images and build cache
 Write-Host "🧹 Cleaning up Docker resources..." -ForegroundColor Yellow
