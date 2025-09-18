@@ -25,6 +25,39 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _get_worker_registry():
+    """Get the worker registry using class attributes - DRY implementation"""
+    # Import all worker classes
+    from workers.license_worker import LicenseWorker
+    from workers.publish_worker import PublishWorker
+    from workers.parse_worker import ParseWorker
+    from workers.download_worker import DownloadWorker
+    from workers.security_worker import SecurityWorker
+    from workers.approval_worker import ApprovalWorker
+
+    # Create a registry using the WORKER_TYPE class attribute
+    return {
+        LicenseWorker.WORKER_TYPE: LicenseWorker,
+        PublishWorker.WORKER_TYPE: PublishWorker,
+        ParseWorker.WORKER_TYPE: ParseWorker,
+        DownloadWorker.WORKER_TYPE: DownloadWorker,
+        SecurityWorker.WORKER_TYPE: SecurityWorker,
+        ApprovalWorker.WORKER_TYPE: ApprovalWorker,
+    }
+
+
+def get_worker_class_by_type(worker_type: str):
+    """Get worker class by type using class attributes"""
+    registry = _get_worker_registry()
+    return registry.get(worker_type)
+
+
+def get_available_worker_types():
+    """Get list of all available worker types"""
+    registry = _get_worker_registry()
+    return list(registry.keys())
+
+
 def main():
     """Main entry point for the worker"""
     # Get worker type from environment
@@ -41,29 +74,13 @@ def main():
     logger.info(f"  - Max license groups per cycle: {max_license_groups_per_cycle}")
 
     try:
-        # Import all worker classes
-        from workers.license_worker import LicenseWorker
-        from workers.publish_worker import PublishWorker
-        from workers.parse_worker import ParseWorker
-        from workers.download_worker import DownloadWorker
-        from workers.security_worker import SecurityWorker
-        from workers.approval_worker import ApprovalWorker
-
-        # Create a registry of worker classes by their WORKER_TYPE
-        worker_registry = {
-            LicenseWorker.WORKER_TYPE: LicenseWorker,
-            PublishWorker.WORKER_TYPE: PublishWorker,
-            ParseWorker.WORKER_TYPE: ParseWorker,
-            DownloadWorker.WORKER_TYPE: DownloadWorker,
-            SecurityWorker.WORKER_TYPE: SecurityWorker,
-            ApprovalWorker.WORKER_TYPE: ApprovalWorker,
-        }
-
-        # Get the worker class from the registry
-        worker_class = worker_registry.get(worker_type)
+        # Get the worker class by type
+        worker_class = get_worker_class_by_type(worker_type)
         if not worker_class:
+            available_types = get_available_worker_types()
+            
             logger.error(f"Unknown worker type: {worker_type}")
-            logger.error(f"Supported worker types: {', '.join(worker_registry.keys())}")
+            logger.error(f"Supported worker types: {', '.join(available_types)}")
             sys.exit(1)
 
         # Create the worker instance

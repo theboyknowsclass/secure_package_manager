@@ -82,9 +82,9 @@ class ParseWorker(BaseWorker):
             
             if not requests_to_process:
                 if not all_requests:
-                    logger.debug("No requests found in database to parse")
+                    logger.info("ParseWorker heartbeat: No requests found in database to parse")
                 else:
-                    logger.debug(f"No requests found to parse - {len(all_requests)} requests exist but all are either processed or have no raw_request_blob")
+                    logger.info(f"ParseWorker heartbeat: No requests found to parse - {len(all_requests)} requests exist but all are either processed or have no raw_request_blob")
                 return
                 
             logger.info(f"Processing {len(requests_to_process)} requests for package extraction")
