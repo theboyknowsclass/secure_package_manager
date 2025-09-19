@@ -63,3 +63,16 @@ class SupportedLicenseOperations(BaseOperations):
             List of all supported licenses
         """
         return super().get_all(SupportedLicense)
+
+    def count_packages_by_license(self, identifier: str) -> int:
+        """Count packages using a specific license.
+
+        Args:
+            identifier: The license identifier to count
+
+        Returns:
+            Number of packages using the specified license
+        """
+        from ..models import Package
+        stmt = select(Package).where(Package.license_identifier == identifier)
+        return self.session.execute(stmt).scalars().count()

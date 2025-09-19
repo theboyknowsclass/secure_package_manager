@@ -86,3 +86,26 @@ class RequestPackageOperations(BaseOperations):
             List of all request-package links
         """
         return super().get_all(RequestPackage)
+
+    def check_user_access(self, package_id: int, user_id: int) -> bool:
+        """Check if user has access to a package through any request.
+
+        Args:
+            package_id: The ID of the package
+            user_id: The ID of the user
+
+        Returns:
+            True if user has access, False otherwise
+        """
+        from ..models import Request
+        stmt = (
+            select(RequestPackage)
+            .join(Request)
+            .where(
+                and_(
+                    RequestPackage.package_id == package_id,
+                    Request.requestor_id == user_id,
+                )
+            )
+        )
+        return self.session.execute(stmt).scalar_one_or_none() is not None

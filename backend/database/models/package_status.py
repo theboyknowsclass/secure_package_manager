@@ -19,7 +19,7 @@ class PackageStatus(Base):
     __tablename__ = "package_status"
 
     package_id = Column(Integer, ForeignKey("packages.id"), primary_key=True)
-    status = Column(String(50), default="Submitted", nullable=False)
+    status = Column(String(50), default="Checking Licence", nullable=False)
     file_size = Column(BigInteger)
     checksum = Column(String(255))
     license_score = Column(Integer)
@@ -74,8 +74,6 @@ class PackageStatus(Base):
     def is_processing(self) -> bool:
         """Check if package is in a processing state."""
         processing_statuses = {
-            "Submitted",
-            "Parsed",
             "Checking Licence",
             "Downloading",
             "Security Scanning",
@@ -101,8 +99,6 @@ class PackageStatus(Base):
     def get_processing_stage(self) -> str:
         """Get the current processing stage for display purposes."""
         stage_mapping = {
-            "Submitted": "Submitted",
-            "Parsed": "Parsed",
             "Checking Licence": "License Validation",
             "Licence Checked": "License Complete",
             "Downloading": "Downloading Package",

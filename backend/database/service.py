@@ -49,7 +49,7 @@ class DatabaseService:
             self._engine = create_engine(self.database_url, **engine_kwargs)
             self._SessionLocal = sessionmaker(bind=self._engine)
 
-            logger.info(
+            logger.debug(
                 f"Database service initialized with URL: {self._mask_database_url()}"
             )
 
@@ -88,19 +88,6 @@ class DatabaseService:
             raise
         finally:
             session.close()
-
-    def get_session_direct(self) -> Session:
-        """Get a database session that must be manually closed.
-
-        Usage:
-            session = db_service.get_session_direct()
-            try:
-                result = session.query(Model).all()
-                session.commit()
-            finally:
-                session.close()
-        """
-        return self._SessionLocal()
 
     def test_connection(self) -> bool:
         """Test the database connection.

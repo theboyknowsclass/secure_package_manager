@@ -1,14 +1,16 @@
 """Approval Service.
 
-Handles approval workflow for packages. This service is used
-by both the API (for immediate processing) and workers (for background processing).
-
-This service works with entity-based operations structure and focuses purely on business logic.
+Handles approval workflow for packages. This service manages its own database sessions
+and operations, following the service-first architecture pattern.
 """
 
 import logging
 from datetime import datetime
 from typing import Any, Dict, List
+
+from database.operations.package_operations import PackageOperations
+from database.operations.package_status_operations import PackageStatusOperations
+from database.session_helper import SessionHelper
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +18,8 @@ logger = logging.getLogger(__name__)
 class ApprovalService:
     """Service for handling package approval workflow.
 
-    This service handles the business logic of package approval transitions and
-    status management. It works with database operations passed in from the caller
-    (worker or API) to maintain separation of concerns.
+    This service manages its own database sessions and operations,
+    following the service-first architecture pattern.
     """
 
     def __init__(self) -> None:
@@ -26,122 +27,96 @@ class ApprovalService:
         self.logger = logger
 
     def process_security_scanned_packages(
-        self, packages: List[Any], ops: Dict[str, Any]
+        self, max_packages: int = 50
     ) -> Dict[str, Any]:
         """Process packages that are Security Scanned and ready for approval.
 
         Args:
-            packages: List of packages to process
-            ops: Dictionary of database operations instances
+            max_packages: Maximum number of packages to process
 
         Returns:
             Dict with processing results
         """
         try:
-            processed_count = 0
-            for package in packages:
-                if self._transition_to_pending_approval(package, ops):
-                    processed_count += 1
+            with SessionHelper.get_session() as db:
+                # Initialize operations
+                package_ops = PackageOperations(db.session)
+                status_ops = PackageStatusOperations(db.session)
+                
+                # Find packages that need approval transitions
+                security_scanned_packages = package_ops.get_by_status("Security Scanned")
+                
+                # Limit the number of packages processed
+                limited_packages = security_scanned_packages[:max_packages]
 
-            return {
-                "success": True,
-                "processed_count": processed_count,
-                "total_packages": len(packages)
-            }
+                if not limited_packages:
+                    return {
+                        "success": True,
+                        "processed_count": 0,
+                        "total_packages": 0
+                    }
+
+                processed_count = 0
+                for package in limited_packages:
+                    if self._transition_to_pending_approval(package, status_ops):
+                        processed_count += 1
+
+                db.commit()
+
+                return {
+                    "success": True,
+                    "processed_count": processed_count,
+                    "total_packages": len(limited_packages)
+                }
         except Exception as e:
             self.logger.error(f"Error processing security scanned packages: {str(e)}")
             return {
                 "success": False,
                 "error": str(e),
                 "processed_count": 0,
-                "total_packages": len(packages)
+                "total_packages": 0
             }
 
-    def get_stuck_packages(
-        self, stuck_threshold: datetime, ops: Dict[str, Any]
-    ) -> List[Any]:
-        """Get packages that have been stuck in Security Scanned state too long.
-
-        Args:
-            stuck_threshold: DateTime threshold for considering packages stuck
-            ops: Dictionary of database operations instances
-
-        Returns:
-            List of stuck packages
-        """
-        try:
-            # Use operations to get stuck packages
-            stuck_packages = ops.package.get_stuck_packages_in_security_scanned(
-                stuck_threshold
-            )
-            return stuck_packages
-        except Exception as e:
-            self.logger.error(f"Error getting stuck packages: {str(e)}")
-            return []
-
-    def refresh_stuck_packages(
-        self, stuck_packages: List[Any], ops: Dict[str, Any]
-    ) -> None:
-        """Refresh timestamp for stuck packages to avoid constant reprocessing.
-
-        Args:
-            stuck_packages: List of stuck packages to refresh
-            ops: Dictionary of database operations instances
-        """
-        for package in stuck_packages:
-            try:
-                if package.package_status:
-                    ops.package_status.refresh_package_timestamp(package.id)
-                    self.logger.debug(
-                        f"Refreshed timestamp for stuck package {package.name}@{package.version}"
-                    )
-            except Exception as e:
-                self.logger.error(
-                    f"Error refreshing stuck package {package.name}@{package.version}: {str(e)}"
-                )
-
-    def get_approval_statistics(self, ops: Dict[str, Any]) -> Dict[str, Any]:
+    def get_approval_statistics(self) -> Dict[str, Any]:
         """Get current approval statistics.
-
-        Args:
-            ops: Dictionary of database operations instances
 
         Returns:
             Dict with approval statistics
         """
         try:
-            # Get package counts by status
-            security_scanned_count = ops.package.count_packages_by_status("Security Scanned")
-            pending_approval_count = ops.package.count_packages_by_status("Pending Approval")
-            approved_count = ops.package.count_packages_by_status("Approved")
+            with SessionHelper.get_session() as db:
+                package_ops = PackageOperations(db.session)
+                
+                # Get package counts by status
+                security_scanned_count = package_ops.count_packages_by_status("Security Scanned")
+                pending_approval_count = package_ops.count_packages_by_status("Pending Approval")
+                approved_count = package_ops.count_packages_by_status("Approved")
 
-            return {
-                "security_scanned_packages": security_scanned_count,
-                "pending_approval_packages": pending_approval_count,
-                "approved_packages": approved_count,
-                "timestamp": datetime.utcnow().isoformat(),
-            }
+                return {
+                    "security_scanned_packages": security_scanned_count,
+                    "pending_approval_packages": pending_approval_count,
+                    "approved_packages": approved_count,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
         except Exception as e:
             self.logger.error(f"Error getting approval statistics: {str(e)}")
             return {"error": str(e)}
 
     def _transition_to_pending_approval(
-        self, package: Any, ops: Dict[str, Any]
+        self, package: Any, status_ops: PackageStatusOperations
     ) -> bool:
         """Transition a package from Security Scanned to Pending Approval.
 
         Args:
             package: Package to transition
-            ops: Dictionary of database operations instances
+            status_ops: Package status operations instance
 
         Returns:
             True if transition was successful, False otherwise
         """
         try:
             if package.package_status and package.package_status.status == "Security Scanned":
-                ops.package_status.update_status(
-                    package.id, "Pending Approval"
-                )
+                status_ops.go_to_next_stage(package.id)
                 self.logger.debug(
                     f"Transitioned package {package.name}@{package.version} to Pending Approval"
                 )

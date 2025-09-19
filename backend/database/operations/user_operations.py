@@ -75,3 +75,15 @@ class UserOperations(BaseOperations):
             The user if found, None otherwise
         """
         return super().get_by_id(User, user_id)
+
+    def create_user(self, user_data: dict) -> User:
+        """Create a new user.
+
+        Args:
+            user_data: Dictionary containing user data
+
+        Returns:
+            The created user
+        """
+        user = User(**user_data)
+        return super().create(user)

@@ -4,11 +4,22 @@ Handles parsing of package-lock.json files and extracting package
 information. This service is used by both the API (for immediate
 processing) and workers (for background processing).
 
-This service works with entity-based operations structure and focuses purely on business logic.
+This service manages its own database sessions and operations to maintain
+proper separation of concerns.
 """
 
 import logging
+import os
 from typing import Any, Dict, List, Optional, Tuple
+
+from database.session_helper import SessionHelper
+from database.operations import (
+    RequestOperations,
+    RequestPackageOperations,
+    PackageOperations,
+    PackageStatusOperations,
+    AuditLogOperations
+)
 
 logger = logging.getLogger(__name__)
 
@@ -17,23 +28,38 @@ class PackageLockParsingService:
     """Service for parsing package-lock.json files and extracting packages.
 
     This service handles the business logic of parsing package-lock.json
-    files and extracting package information. It works with database
-    operations passed in from the caller (worker or API) to maintain
-    separation of concerns.
+    files and extracting package information. It manages its own database
+    sessions and operations to maintain proper separation of concerns.
     """
+
+    def __init__(self):
+        """Initialize the parsing service."""
+        self._session = None
+        self._request_ops = None
+        self._request_package_ops = None
+        self._package_ops = None
+        self._package_status_ops = None
+        self._audit_log_ops = None
+
+    def _setup_operations(self, session):
+        """Set up operations instances for the current session."""
+        self._session = session
+        self._request_ops = RequestOperations(session)
+        self._request_package_ops = RequestPackageOperations(session)
+        self._package_ops = PackageOperations(session)
+        self._package_status_ops = PackageStatusOperations(session)
+        self._audit_log_ops = AuditLogOperations(session)
 
     def parse_package_lock(
         self,
         request_id: int,
         package_data: Dict[str, Any],
-        ops: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Parse package-lock.json and extract all packages.
 
         Args:
             request_id: ID of the request this package-lock belongs to
             package_data: The parsed JSON data from package-lock.json
-            ops: Dictionary of database operations instances
 
         Returns:
             Dict with processing results
@@ -47,12 +73,22 @@ class PackageLockParsingService:
 
             # Filter and process packages
             packages_to_process, existing_packages = self._filter_new_packages(
-                packages, request_id, ops
+                packages, request_id
             )
 
             # Create database records for new packages
             created_packages = self._create_package_records(
-                packages_to_process, request_id, ops
+                packages_to_process, request_id
+            )
+
+            # Link existing packages to the request
+            linked_packages = self._link_existing_packages(
+                existing_packages, request_id
+            )
+
+            # Log the parsing results
+            self._log_parsing_results(
+                request_id, created_packages, linked_packages
             )
 
             logger.info(
@@ -60,16 +96,127 @@ class PackageLockParsingService:
             )
 
             return {
-                "packages_to_process": len(packages_to_process),
-                "existing_packages": len(existing_packages),
-                "total_packages": len(packages_to_process)
-                + len(existing_packages),
+                "success": True,
+                "packages_to_process": len(created_packages),
+                "existing_packages": len(linked_packages),
+                "total_packages": len(packages),
                 "created_packages": created_packages,
+                "linked_packages": linked_packages,
             }
 
         except Exception as e:
-            logger.error(f"Error parsing package-lock.json: {str(e)}")
-            raise e
+            logger.error(f"Error parsing package-lock for request {request_id}: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "packages_to_process": 0,
+                "existing_packages": 0,
+                "total_packages": 0,
+            }
+
+    def process_requests(self, max_requests_per_cycle: int = 5) -> Dict[str, Any]:
+        """Process requests that need parsing.
+        
+        Args:
+            max_requests_per_cycle: Maximum number of requests to process per cycle
+            
+        Returns:
+            Dict with processing results
+        """
+        try:
+            with SessionHelper.get_session() as db:
+                # Set up operations instances
+                self._setup_operations(db.session)
+                
+                # Process requests that need parsing
+                result = self._process_submitted_requests(max_requests_per_cycle)
+                
+                # Commit the transaction
+                db.commit()
+                
+                return result
+                
+        except Exception as e:
+            logger.error(f"Error in parsing service: {str(e)}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e),
+                "processed_requests": 0,
+                "total_packages": 0,
+            }
+
+
+    def _process_submitted_requests(self, max_requests_per_cycle: int) -> Dict[str, Any]:
+        """Process requests that need package extraction."""
+        try:
+            # Find requests that need parsing
+            requests_to_process = self._request_ops.get_needing_parsing()
+            logger.info(f"Found {len(requests_to_process)} requests needing parsing")
+            if requests_to_process:
+                logger.info(f"Request IDs needing parsing: {[r.id for r in requests_to_process]}")
+
+            # Limit the number of requests processed per cycle
+            requests_to_process = requests_to_process[:max_requests_per_cycle]
+
+            if not requests_to_process:
+                logger.info("ParseWorker heartbeat: No requests found to parse")
+                return {
+                    "success": True,
+                    "processed_requests": 0,
+                    "total_packages": 0,
+                    "message": "No requests to process"
+                }
+
+            logger.info(
+                f"Processing {len(requests_to_process)} requests for package extraction"
+            )
+
+            total_packages = 0
+            processed_requests = 0
+
+            for request in requests_to_process:
+                try:
+                    # Parse the JSON blob
+                    import json
+                    package_data = json.loads(request.raw_request_blob)
+
+                    # Parse the package lock
+                    result = self.parse_package_lock(request.id, package_data)
+                    
+                    if result["success"]:
+                        total_packages += result["total_packages"]
+                        processed_requests += 1
+                        logger.info(
+                            f"Successfully parsed request {request.id}: "
+                            f"Created {result.get('packages_to_process', 0)} new packages, "
+                            f"linked {result.get('existing_packages', 0)} existing packages"
+                        )
+                    else:
+                        logger.error(f"Failed to parse request {request.id}: {result.get('error', 'Unknown error')}")
+
+                except Exception as e:
+                    logger.error(
+                        f"Failed to parse request {request.id}: {str(e)}",
+                        exc_info=True,
+                    )
+
+            return {
+                "success": True,
+                "processed_requests": processed_requests,
+                "total_packages": total_packages,
+                "message": f"Processed {processed_requests} requests with {total_packages} total packages"
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Error processing submitted requests: {str(e)}", exc_info=True
+            )
+            return {
+                "success": False,
+                "error": str(e),
+                "processed_requests": 0,
+                "total_packages": 0,
+            }
 
     def _validate_package_lock_file(
         self, package_data: Dict[str, Any]
@@ -101,7 +248,7 @@ class PackageLockParsingService:
         return dict(packages)
 
     def _filter_new_packages(
-        self, packages: Dict[str, Any], request_id: int, ops: Dict[str, Any]
+        self, packages: Dict[str, Any], request_id: int
     ) -> Tuple[List[Dict[str, Any]], List[Any]]:
         """Filter packages to find new ones that need processing.
 
@@ -121,14 +268,14 @@ class PackageLockParsingService:
             package_info = package_data["info"]
 
             # Check if package already exists in database
-            existing_package = ops.package.get_by_name_version(
+            existing_package = self._package_ops.get_by_name_version(
                 package_name, package_version
             )
 
             if existing_package:
                 # Link existing package to this request if not already linked
                 self._link_existing_package_to_request(
-                    request_id, existing_package, ops
+                    request_id, existing_package
                 )
                 existing_packages.append(existing_package)
             else:
@@ -210,15 +357,15 @@ class PackageLockParsingService:
         return package_name
 
     def _link_existing_package_to_request(
-        self, request_id: int, existing_package: Any, ops: Dict[str, Any]
+        self, request_id: int, existing_package: Any
     ) -> None:
         """Link an existing package to a request if not already linked."""
         # Check if link already exists
-        if not ops.request_package.link_exists(
+        if not self._request_package_ops.link_exists(
             request_id, existing_package.id
         ):
             # Create link between request and existing package
-            ops.request_package.create_link(
+            self._request_package_ops.create_link(
                 request_id, existing_package.id, "existing"
             )
 
@@ -226,7 +373,6 @@ class PackageLockParsingService:
         self,
         packages_to_process: List[Dict[str, Any]],
         request_id: int,
-        ops: Dict[str, Any],
     ) -> List[Any]:
         """Create database records for new packages."""
         created_packages = []
@@ -243,12 +389,12 @@ class PackageLockParsingService:
             }
 
             # Create package with initial status
-            package = ops.package.create_with_status(
-                package_record_data, status="Submitted"
+            package = self._package_ops.create_with_status(
+                package_record_data, status="Checking Licence"
             )
 
             # Create request-package link
-            ops.request_package.create_link(request_id, package.id, "new")
+            self._request_package_ops.create_link(request_id, package.id, "new")
 
             created_packages.append(package)
             logger.info(
@@ -256,3 +402,23 @@ class PackageLockParsingService:
             )
 
         return created_packages
+
+    def _link_existing_packages(
+        self, existing_packages: List[Any], request_id: int
+    ) -> List[Any]:
+        """Link existing packages to a request."""
+        linked_packages = []
+        for existing_package in existing_packages:
+            self._link_existing_package_to_request(request_id, existing_package)
+            linked_packages.append(existing_package)
+        return linked_packages
+
+    def _log_parsing_results(
+        self, request_id: int, created_packages: List[Any], linked_packages: List[Any]
+    ) -> None:
+        """Log the results of parsing a request."""
+        logger.info(
+            f"Request {request_id} parsing complete: "
+            f"{len(created_packages)} new packages, "
+            f"{len(linked_packages)} existing packages"
+        )

@@ -95,7 +95,7 @@ class PackageOperations(BaseOperations):
         return list(self.session.execute(stmt).scalars().all())
 
     def create_with_status(
-        self, package_data: dict, status: str = "Submitted"
+        self, package_data: dict, status: str = "Checking Licence"
     ) -> Package:
         """Create a package with initial status.
 
@@ -121,7 +121,7 @@ class PackageOperations(BaseOperations):
         return package
 
     def batch_create_with_status(
-        self, packages_data: List[dict], status: str = "Submitted"
+        self, packages_data: List[dict], status: str = "Checking Licence"
     ) -> List[Package]:
         """Create multiple packages with initial status.
 
@@ -348,3 +348,100 @@ class PackageOperations(BaseOperations):
             )
         )
         return list(self.session.execute(stmt).scalars().all())
+
+    def get_pending_approval(self) -> List[Package]:
+        """Get packages pending approval.
+
+        Returns:
+            List of packages pending approval
+        """
+        stmt = (
+            select(Package)
+            .join(PackageStatus)
+            .where(PackageStatus.status == "Pending Approval")
+        )
+        return list(self.session.execute(stmt).scalars().all())
+
+    def get_recent_packages(self, limit: int = 10) -> List[Package]:
+        """Get recent packages with status information.
+
+        Args:
+            limit: Maximum number of packages to return
+
+        Returns:
+            List of recent packages with status
+        """
+        stmt = (
+            select(Package)
+            .join(PackageStatus)
+            .where(PackageStatus.updated_at.isnot(None))
+            .order_by(PackageStatus.updated_at.desc())
+            .limit(limit)
+        )
+        return list(self.session.execute(stmt).scalars().all())
+
+    def get_with_security_scan_info(self, package_id: int) -> Optional[Package]:
+        """Get package with security scan information.
+
+        Args:
+            package_id: The ID of the package
+
+        Returns:
+            Package with security scan info if found, None otherwise
+        """
+        from ..models import SecurityScan
+        stmt = (
+            select(Package)
+            .outerjoin(SecurityScan)
+            .where(Package.id == package_id)
+        )
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    def count_by_license(self, license_identifier: str) -> int:
+        """Count packages by license identifier.
+
+        Args:
+            license_identifier: The license identifier to count
+
+        Returns:
+            Number of packages with the specified license
+        """
+        stmt = select(Package).where(Package.license_identifier == license_identifier)
+        return self.session.execute(stmt).scalars().count()
+
+    def get_packages_with_context_and_scans(self, request_id: int) -> List[tuple]:
+        """Get packages with their request context and security scan info.
+
+        Args:
+            request_id: The ID of the request
+
+        Returns:
+            List of tuples containing (Package, RequestPackage, SecurityScan)
+        """
+        from ..models import RequestPackage, SecurityScan
+        
+        # First, get all request_packages for this request
+        request_package_stmt = (
+            select(RequestPackage)
+            .where(RequestPackage.request_id == request_id)
+        )
+        request_packages = self.session.execute(request_package_stmt).scalars().all()
+        
+        results = []
+        for rp in request_packages:
+            # Get the package
+            package = self.get_by_id(rp.package_id)
+            if not package:
+                continue
+                
+            # Get the security scan (if any)
+            scan_stmt = (
+                select(SecurityScan)
+                .where(SecurityScan.package_id == rp.package_id)
+                .order_by(SecurityScan.created_at.desc())
+            )
+            scan = self.session.execute(scan_stmt).scalar_one_or_none()
+            
+            results.append((package, rp, scan))
+        
+        return results

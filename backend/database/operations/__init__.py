@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from .audit_log_operations import AuditLogOperations
 from .base_operations import BaseOperations
-from .composite_operations import CompositeOperations
+# CompositeOperations has been removed - use SessionHelper + individual entity operations instead
 from .package_operations import PackageOperations
 from .package_status_operations import PackageStatusOperations
 from .request_operations import RequestOperations
@@ -59,6 +59,5 @@ __all__ = [
     "AuditLogOperations",
     "SecurityScanOperations",
     "SupportedLicenseOperations",
-    "CompositeOperations",
     "OperationsFactory",
 ]

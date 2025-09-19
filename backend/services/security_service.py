@@ -1,14 +1,16 @@
 """Security Service.
 
-Handles security scanning for packages. This service is used
-by both the API (for immediate processing) and workers (for background processing).
-
-This service works with entity-based operations structure and focuses purely on business logic.
+Handles security scanning for packages. This service manages its own database sessions
+and operations, following the service-first architecture pattern.
 """
 
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+
+from database.operations.package_operations import PackageOperations
+from database.operations.package_status_operations import PackageStatusOperations
+from database.session_helper import SessionHelper
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +18,8 @@ logger = logging.getLogger(__name__)
 class SecurityService:
     """Service for handling package security scanning.
 
-    This service handles the business logic of security scanning and
-    status management. It works with database operations passed in from the caller
-    (worker or API) to maintain separation of concerns.
+    This service manages its own database sessions and operations,
+    following the service-first architecture pattern.
     """
 
     def __init__(self) -> None:
@@ -26,121 +27,101 @@ class SecurityService:
         self.logger = logger
 
     def process_package_batch(
-        self, packages: List[Any], ops
+        self, max_packages: int = 10
     ) -> Dict[str, Any]:
         """Process a batch of packages for security scanning.
 
         Args:
-            packages: List of packages to process
-            ops: Composite operations instance
+            max_packages: Maximum number of packages to process
 
         Returns:
             Dict with processing results
         """
         try:
-            successful_scans = 0
-            failed_scans = 0
+            with SessionHelper.get_session() as db:
+                # Initialize operations
+                package_ops = PackageOperations(db.session)
+                status_ops = PackageStatusOperations(db.session)
+                
+                # Find packages that need security scanning
+                downloaded_packages = package_ops.get_by_status("Downloaded")
+                
+                # Limit the number of packages processed
+                limited_packages = downloaded_packages[:max_packages]
 
-            for package in packages:
-                result = self.scan_single_package(package, ops)
-                if result["success"]:
-                    successful_scans += 1
-                else:
-                    failed_scans += 1
+                if not limited_packages:
+                    return {
+                        "success": True,
+                        "processed_count": 0,
+                        "successful_scans": 0,
+                        "failed_scans": 0,
+                        "total_packages": 0
+                    }
 
-            return {
-                "success": True,
-                "successful_scans": successful_scans,
-                "failed_scans": failed_scans,
-                "total_packages": len(packages)
-            }
+                successful_scans = 0
+                failed_scans = 0
+
+                for package in limited_packages:
+                    result = self.scan_single_package(package, status_ops)
+                    if result["success"]:
+                        successful_scans += 1
+                    else:
+                        failed_scans += 1
+
+                db.commit()
+
+                return {
+                    "success": True,
+                    "processed_count": len(limited_packages),
+                    "successful_scans": successful_scans,
+                    "failed_scans": failed_scans,
+                    "total_packages": len(limited_packages)
+                }
         except Exception as e:
             self.logger.error(f"Error processing security scan batch: {str(e)}")
             return {
                 "success": False,
                 "error": str(e),
+                "processed_count": 0,
                 "successful_scans": 0,
                 "failed_scans": 0,
-                "total_packages": len(packages)
+                "total_packages": 0
             }
 
     def scan_single_package(
-        self, package: Any, ops
+        self, package: Any, status_ops: PackageStatusOperations
     ) -> Dict[str, Any]:
         """Scan a single package for security vulnerabilities.
 
         Args:
             package: Package to scan
-            ops: Composite operations instance
+            status_ops: Package status operations instance
 
         Returns:
             Dict with scan results
         """
         try:
             # Update package status to "Security Scanning"
-            self._update_package_status_to_scanning(package, ops)
+            self._update_package_status_to_scanning(package, status_ops)
 
             # Perform the actual security scan
             scan_result = self._perform_security_scan(package)
 
             # Process scan results
             if scan_result.get("status") == "failed":
-                self._mark_scan_failed(package, ops)
+                self._mark_scan_failed(package, status_ops)
                 return {"success": False, "error": "Security scan failed"}
             else:
-                self._mark_scan_completed(package, scan_result, ops)
+                self._mark_scan_completed(package, scan_result, status_ops)
                 return {"success": True, "scan_result": scan_result}
 
         except Exception as e:
             self.logger.error(
                 f"Error scanning package {package.name}@{package.version}: {str(e)}"
             )
-            self._mark_scan_failed(package, ops)
+            self._mark_scan_failed(package, status_ops)
             return {"success": False, "error": str(e)}
 
-    def get_stuck_packages(
-        self, stuck_threshold: datetime, ops: Dict[str, Any]
-    ) -> List[Any]:
-        """Get packages that have been stuck in Security Scanning state too long.
-
-        Args:
-            stuck_threshold: DateTime threshold for considering packages stuck
-            ops: Dictionary of database operations instances
-
-        Returns:
-            List of stuck packages
-        """
-        try:
-            # Use operations to get stuck packages
-            stuck_packages = ops.package.get_stuck_packages_in_security_scanning(
-                stuck_threshold
-            )
-            return stuck_packages
-        except Exception as e:
-            self.logger.error(f"Error getting stuck packages: {str(e)}")
-            return []
-
-    def reset_stuck_packages(
-        self, stuck_packages: List[Any], ops: Dict[str, Any]
-    ) -> None:
-        """Reset stuck packages to Downloaded status.
-
-        Args:
-            stuck_packages: List of stuck packages to reset
-            ops: Dictionary of database operations instances
-        """
-        for package in stuck_packages:
-            try:
-                ops.package_status.update_status(
-                    package.id, "Downloaded"
-                )
-                self.logger.info(
-                    f"Reset stuck package {package.name}@{package.version} to Downloaded"
-                )
-            except Exception as e:
-                self.logger.error(
-                    f"Error resetting stuck package {package.name}@{package.version}: {str(e)}"
-                )
 
     def _perform_security_scan(self, package: Any) -> Dict[str, Any]:
         """Perform the actual security scan using Trivy service.
@@ -162,57 +143,36 @@ class SecurityService:
             return {"status": "failed", "error": str(e)}
 
     def _update_package_status_to_scanning(
-        self, package: Any, ops: Dict[str, Any]
+        self, package: Any, status_ops: PackageStatusOperations
     ) -> None:
         """Update package status to Security Scanning.
 
         Args:
             package: Package to update
-            ops: Dictionary of database operations instances
+            status_ops: Package status operations instance
         """
         if package.package_status:
-            ops.package_status.update_status(
-                package.id, "Security Scanning"
-            )
-            ops.package_status.update_security_scan_status(
-                package.id, "running"
-            )
+            status_ops.go_to_next_stage(package.id)
 
     def _mark_scan_completed(
-        self, package: Any, scan_result: Dict[str, Any], ops: Dict[str, Any]
+        self, package: Any, scan_result: Dict[str, Any], status_ops: PackageStatusOperations
     ) -> None:
         """Mark package scan as completed.
 
         Args:
             package: Package to update
             scan_result: Results from the security scan
-            ops: Dictionary of database operations instances
+            status_ops: Package status operations instance
         """
         if package.package_status:
-            ops.package_status.update_status(
-                package.id, "Security Scanned"
-            )
-            ops.package_status.update_security_scan_status(
-                package.id, "completed"
-            )
-            
-            # Update security score if available
-            if "security_score" in scan_result:
-                ops.package_status.update_security_score(
-                    package.id, scan_result["security_score"]
-                )
+            status_ops.go_to_next_stage(package.id)
 
-    def _mark_scan_failed(self, package: Any, ops) -> None:
+    def _mark_scan_failed(self, package: Any, status_ops: PackageStatusOperations) -> None:
         """Mark package scan as failed.
 
         Args:
             package: Package to update
-            ops: Dictionary of database operations instances
+            status_ops: Package status operations instance
         """
         if package.package_status:
-            ops.package_status.update_status(
-                package.id, "Security Scanned"
-            )
-            ops.package_status.update_security_scan_status(
-                package.id, "failed"
-            )
+            status_ops.go_to_next_stage(package.id)

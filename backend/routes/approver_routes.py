@@ -1,6 +1,9 @@
 import logging
 
-from database.operations.composite_operations import CompositeOperations
+from database.session_helper import SessionHelper
+from database.operations.package_operations import PackageOperations
+from database.operations.request_package_operations import RequestPackageOperations
+from database.operations.audit_log_operations import AuditLogOperations
 from database.models import (
     AuditLog,
     Package,
@@ -34,10 +37,9 @@ publishing_service = NpmRegistryPublishingService()
 def publish_package(package_id: int) -> ResponseReturnValue:
     """Publish an approved package to the secure repository."""
     try:
-        with CompositeOperations.get_operations() as ops:
-            package = (
-                ops.query(Package).filter(Package.id == package_id).first()
-            )
+        with SessionHelper.get_session() as db:
+            package_ops = PackageOperations(db.session)
+            package = package_ops.get_by_id(package_id)
             if not package:
                 return jsonify({"error": "Package not found"}), 404
 
@@ -67,9 +69,10 @@ def publish_package(package_id: int) -> ResponseReturnValue:
                     f"secure repo"
                 ),
             )
-            with CompositeOperations.get_operations() as ops:
-                ops.add(audit_log)
-                ops.commit()
+            with SessionHelper.get_session() as db:
+                audit_ops = AuditLogOperations(db.session)
+                audit_ops.create(audit_log)
+                db.commit()
 
             return jsonify({"message": "Package published successfully"})
         else:
@@ -122,9 +125,10 @@ def batch_approve_packages() -> ResponseReturnValue:
                 f"{list(package_ids)}. Reason: {reason}"
             ),
         )
-        with CompositeOperations.get_operations() as ops:
-            ops.add(summary_audit_log)
-            ops.commit()
+        with SessionHelper.get_session() as db:
+            audit_ops = AuditLogOperations(db.session)
+            audit_ops.create(summary_audit_log)
+            db.commit()
 
         # Packages are approved immediately and will be published by the
         # background worker
@@ -157,8 +161,8 @@ def batch_approve_packages() -> ResponseReturnValue:
 
     except Exception as e:
         logger.error(f"Batch approve packages error: {str(e)}")
-        with CompositeOperations.get_operations() as ops:
-            ops.rollback()
+        with SessionHelper.get_session() as db:
+            db.rollback()
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -205,9 +209,10 @@ def batch_reject_packages() -> ResponseReturnValue:
                 f"{request.user.username}. Package IDs: {list(package_ids)}. Reason: {reason}"
             ),
         )
-        with CompositeOperations.get_operations() as ops:
-            ops.add(summary_audit_log)
-            ops.commit()
+        with SessionHelper.get_session() as db:
+            audit_ops = AuditLogOperations(db.session)
+            audit_ops.create(summary_audit_log)
+            db.commit()
 
         response_data = {
             "message": "Batch rejection completed",
@@ -224,8 +229,8 @@ def batch_reject_packages() -> ResponseReturnValue:
 
     except Exception as e:
         logger.error(f"Batch reject packages error: {str(e)}")
-        with CompositeOperations.get_operations() as ops:
-            ops.rollback()
+        with SessionHelper.get_session() as db:
+            db.rollback()
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -236,13 +241,9 @@ def batch_reject_packages() -> ResponseReturnValue:
 def get_validated_packages() -> ResponseReturnValue:
     """Get all packages ready for admin review (pending approval)"""
     try:
-        with CompositeOperations.get_operations() as ops:
-            packages = (
-                ops.query(Package)
-                .join(PackageStatus)
-                .filter(PackageStatus.status == "Pending Approval")
-                .all()
-            )
+        with SessionHelper.get_session() as db:
+            package_ops = PackageOperations(db.session)
+            packages = package_ops.get_pending_approval()
 
         # Handle case when no packages exist
         if not packages:
@@ -253,20 +254,16 @@ def get_validated_packages() -> ResponseReturnValue:
         for pkg in packages:
             try:
                 # Get request information for this package
-                with CompositeOperations.get_operations() as ops:
-                    request_package = (
-                        ops.query(RequestPackage)
-                        .filter_by(package_id=pkg.id)
-                        .first()
-                    )
+                with SessionHelper.get_session() as db:
+                    request_package_ops = RequestPackageOperations(db.session)
+                    request_packages = request_package_ops.get_by_package_id(pkg.id)
+                    request_package = request_packages[0] if request_packages else None
                     request_data = None
 
                     if request_package:
-                        request_record = (
-                            ops.query(Request)
-                            .filter(Request.id == request_package.request_id)
-                            .first()
-                        )
+                        from database.operations.request_operations import RequestOperations
+                        request_ops = RequestOperations(db.session)
+                        request_record = request_ops.get_by_id(request_package.request_id)
                     if request_record:
                         request_data = {
                             "id": request_record.id,
@@ -320,10 +317,9 @@ def _process_package_approval(package_id: int, user, reason: str) -> dict:
         dict: {"success": bool, "error": dict or None}
     """
     try:
-        with CompositeOperations.get_operations() as ops:
-            package = (
-                ops.query(Package).filter(Package.id == package_id).first()
-            )
+        with SessionHelper.get_session() as db:
+            package_ops = PackageOperations(db.session)
+            package = package_ops.get_by_id(package_id)
 
         if not package:
             return {
@@ -364,9 +360,10 @@ def _process_package_approval(package_id: int, user, reason: str) -> dict:
                 f"{reason}"
             ),
         )
-        with CompositeOperations.get_operations() as ops:
-            ops.add(audit_log)
-            ops.commit()
+        with SessionHelper.get_session() as db:
+            audit_ops = AuditLogOperations(db.session)
+            audit_ops.create(audit_log)
+            db.commit()
 
         return {"success": True, "error": None}
 
@@ -385,10 +382,9 @@ def _process_package_rejection(package_id: int, user, reason: str) -> dict:
         dict: {"success": bool, "error": dict or None}
     """
     try:
-        with CompositeOperations.get_operations() as ops:
-            package = (
-                ops.query(Package).filter(Package.id == package_id).first()
-            )
+        with SessionHelper.get_session() as db:
+            package_ops = PackageOperations(db.session)
+            package = package_ops.get_by_id(package_id)
 
         if not package:
             return {
@@ -429,9 +425,10 @@ def _process_package_rejection(package_id: int, user, reason: str) -> dict:
                 f"{reason}"
             ),
         )
-        with CompositeOperations.get_operations() as ops:
-            ops.add(audit_log)
-            ops.commit()
+        with SessionHelper.get_session() as db:
+            audit_ops = AuditLogOperations(db.session)
+            audit_ops.create(audit_log)
+            db.commit()
 
         return {"success": True, "error": None}
 

@@ -233,3 +233,47 @@ class PackageStatusOperations(BaseOperations):
         status.security_score = security_score
         status.updated_at = datetime.utcnow()
         return True
+
+    def go_to_next_stage(self, package_id: int, **kwargs) -> bool:
+        """Advance package to the next stage in the workflow.
+
+        This method provides workflow abstraction by automatically determining
+        the next status based on the current status.
+
+        Args:
+            package_id: The ID of the package
+            **kwargs: Additional fields to update along with status
+
+        Returns:
+            True if update was successful, False otherwise
+        """
+        status = self.get_by_package_id(package_id)
+        if not status:
+            return False
+
+        # Define the workflow stages in order
+        workflow_stages = [
+            "Checking Licence",
+            "Licence Checked", 
+            "Downloading",
+            "Downloaded",
+            "Security Scanning",
+            "Security Scanned",
+            "Pending Approval",
+            "Approved",
+            "Published"
+        ]
+
+        current_status = status.status
+        current_index = workflow_stages.index(current_status) if current_status in workflow_stages else -1
+
+        if current_index == -1:
+            # Current status not in workflow - cannot advance
+            return False
+
+        if current_index >= len(workflow_stages) - 1:
+            # Already at final stage - cannot advance further
+            return False
+
+        next_status = workflow_stages[current_index + 1]
+        return self.update_status(package_id, next_status, **kwargs)

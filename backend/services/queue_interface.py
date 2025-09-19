@@ -9,7 +9,8 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from database.operations.composite_operations import CompositeOperations
+from database.session_helper import SessionHelper
+from database.operations.package_status_operations import PackageStatusOperations
 from database.models import PackageStatus
 
 logger = logging.getLogger(__name__)
@@ -20,12 +21,9 @@ class QueueInterface:
 
     def advance_status(self, package_id: int, next_status: str) -> bool:
         try:
-            with CompositeOperations.get_operations() as ops:
-                status: Optional[PackageStatus] = (
-                    ops.query(PackageStatus)
-                    .filter_by(package_id=package_id)
-                    .first()
-                )
+            with SessionHelper.get_session() as db:
+                status_ops = PackageStatusOperations(db.session)
+                status = status_ops.get_by_package_id(package_id)
                 if not status:
                     logger.warning(
                         f"advance_status: no PackageStatus for package_id={package_id}"
@@ -33,19 +31,19 @@ class QueueInterface:
                     return False
 
                 prev_status = status.status
-                status.status = next_status
-                status.updated_at = datetime.utcnow()
-                ops.commit()
-
-                logger.info(
-                    f"Status advanced: package_id={package_id} {prev_status} -> {next_status}"
-                )
-                return True
+                success = status_ops.update_status(package_id, next_status)
+                if success:
+                    db.commit()
+                    logger.info(
+                        f"Status advanced: package_id={package_id} {prev_status} -> {next_status}"
+                    )
+                    return True
+                return False
         except Exception as e:
             logger.error(
                 f"advance_status failed for package_id={package_id}: {str(e)}",
                 exc_info=True,
             )
-            with CompositeOperations.get_operations() as ops:
-                ops.rollback()
+            with SessionHelper.get_session() as db:
+                db.rollback()
             return False

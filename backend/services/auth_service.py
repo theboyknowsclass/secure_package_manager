@@ -3,7 +3,8 @@ from typing import Any, Callable, Dict, Optional
 
 import jwt
 from config.constants import JWT_SECRET, OAUTH_AUDIENCE, OAUTH_ISSUER
-from database.operations.composite_operations import CompositeOperations
+from database.session_helper import SessionHelper
+from database.operations.user_operations import UserOperations
 from database.models import User
 from flask import jsonify, request
 
@@ -109,15 +110,16 @@ class AuthService:
             logger.error("No username found in OAuth2 token payload")
             return None
 
-        with CompositeOperations.get_operations() as ops:
-            user = ops.user.get_by_username(username)
+        with SessionHelper.get_session() as db:
+            user_ops = UserOperations(db.session)
+            user = user_ops.get_by_username(username)
             if not user:
                 user = self._create_user_from_oauth2_payload(
-                    payload, username, ops
+                    payload, username, user_ops
                 )
             else:
                 user = self._update_user_from_oauth2_payload(
-                    user, payload, ops
+                    user, payload, user_ops
                 )
 
         return user
@@ -136,8 +138,9 @@ class AuthService:
             logger.error("No user_id found in legacy token payload")
             return None
 
-        with CompositeOperations.get_operations() as ops:
-            user = ops.user.get_by_id(user_id)
+        with SessionHelper.get_session() as db:
+            user_ops = UserOperations(db.session)
+            user = user_ops.get_by_id(user_id)
             if user:
                 logger.info(
                     f"Found user by ID: {user.username} with role: {user.role}"
@@ -148,7 +151,7 @@ class AuthService:
                 return None
 
     def _create_user_from_oauth2_payload(
-        self, payload: Dict[str, Any], username: str, ops
+        self, payload: Dict[str, Any], username: str, user_ops: UserOperations
     ) -> User:
         """Create new user from OAuth2 token payload."""
         import logging
@@ -164,7 +167,7 @@ class AuthService:
             full_name=payload.get("full_name", username),
             role=payload.get("role", "user"),
         )
-        user = ops.user.create(user)
+        user = user_ops.create(user)
         if user:
             logger.info(
                 f"Created new user: {user.username} with role: {user.role}"
@@ -172,7 +175,7 @@ class AuthService:
         return user
 
     def _update_user_from_oauth2_payload(
-        self, user: User, payload: Dict[str, Any], ops
+        self, user: User, payload: Dict[str, Any], user_ops: UserOperations
     ) -> User:
         """Update existing user with OAuth2 token data."""
         import logging
@@ -187,7 +190,7 @@ class AuthService:
         user.full_name = payload.get("full_name", user.full_name)
         user.role = payload.get("role", user.role)
         
-        user = ops.user.update(user)
+        user = user_ops.update(user)
         logger.info(
             f"Updated existing user: {user.username} with role: {user.role}"
         )

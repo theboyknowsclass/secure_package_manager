@@ -1,9 +1,15 @@
 import json
 import logging
+import os
+import traceback
 from datetime import datetime
 from typing import Any, Dict, Union
 
-from database.operations.composite_operations import CompositeOperations
+from database.session_helper import SessionHelper
+from database.operations.request_operations import RequestOperations
+from database.operations.package_operations import PackageOperations
+from database.operations.request_package_operations import RequestPackageOperations
+from database.operations.audit_log_operations import AuditLogOperations
 from database.models import (
     AuditLog,
     Package,
@@ -21,6 +27,27 @@ logger = logging.getLogger(__name__)
 
 # Create blueprint
 package_bp = Blueprint("packages", __name__, url_prefix="/api/packages")
+
+
+def handle_error(e: Exception, context: str = "") -> ResponseReturnValue:
+    """Handle errors with detailed information in development mode."""
+    logger.error(f"{context} error: {str(e)}")
+    logger.error(f"Traceback: {traceback.format_exc()}")
+    
+    # Check environment variables for development mode
+    flask_env = os.getenv("FLASK_ENV")
+    environment = os.getenv("ENVIRONMENT")
+    flask_debug = os.getenv("FLASK_DEBUG")
+    
+    logger.info(f"Environment check - FLASK_ENV: {flask_env}, ENVIRONMENT: {environment}, FLASK_DEBUG: {flask_debug}")
+    
+    # For now, always return detailed errors to test
+    return jsonify({
+        "error": "Internal server error",
+        "details": str(e),
+        "context": context,
+        "traceback": traceback.format_exc()
+    }), 500
 
 # Initialize services
 auth_service = AuthService()
@@ -43,13 +70,12 @@ def upload_package_lock() -> ResponseReturnValue:
             return package_data
 
         # Create request record with raw blob
-        request_record = _create_request_with_blob(package_data)
+        request_data = _create_request_with_blob(package_data)
 
-        return _create_success_response(request_record, package_data)
+        return _create_success_response(request_data, package_data)
 
     except Exception as e:
-        logger.error(f"Upload error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+        return handle_error(e, "Upload")
 
 
 def _validate_uploaded_file() -> Union[Any, ResponseReturnValue]:
@@ -97,20 +123,22 @@ def _parse_package_lock_file(
     return package_data
 
 
-def _create_request_with_blob(package_data: Dict[str, Any]) -> Request:
+def _create_request_with_blob(package_data: Dict[str, Any]) -> Dict[str, Any]:
     """Create a new request record with raw blob."""
     app_name = package_data.get("name", "Unknown Application")
     app_version = package_data.get("version", "1.0.0")
 
-    request_record = Request(
-        application_name=app_name,
-        version=app_version,
-        requestor_id=request.user.id,
-        raw_request_blob=json.dumps(package_data),  # Store raw JSON blob
-    )
-    with CompositeOperations.get_operations() as ops:
-        ops.add(request_record)
-        ops.commit()
+    with SessionHelper.get_session() as db:
+        request_record = Request(
+            application_name=app_name,
+            version=app_version,
+            requestor_id=request.user.id,
+            raw_request_blob=json.dumps(package_data),  # Store raw JSON blob
+        )
+        
+        request_ops = RequestOperations(db.session)
+        request_ops.create(request_record)
+        db.flush()  # Get the ID without committing
 
         # Log the request creation
         audit_log = AuditLog(
@@ -120,14 +148,23 @@ def _create_request_with_blob(package_data: Dict[str, Any]) -> Request:
             resource_id=request_record.id,
             details=f"Created package request for {app_name}@{app_version}",
         )
-        ops.add(audit_log)
-        ops.commit()
-
-    return request_record
+        audit_ops = AuditLogOperations(db.session)
+        audit_ops.create(audit_log)
+        db.commit()
+        
+        # Return the essential data as a dictionary
+        return {
+            "id": request_record.id,
+            "application_name": request_record.application_name,
+            "version": request_record.version,
+            "requestor_id": request_record.requestor_id,
+            "raw_request_blob": request_record.raw_request_blob,
+            "created_at": request_record.created_at
+        }
 
 
 def _create_success_response(
-    request_record: Request,
+    request_data: Dict[str, Any],
     package_data: Dict[str, Any],
 ) -> ResponseReturnValue:
     """Create success response for package upload."""
@@ -138,7 +175,7 @@ def _create_success_response(
         jsonify(
             {
                 "message": "Package lock file uploaded successfully",
-                "request_id": request_record.id,
+                "request_id": request_data["id"],
                 "application": {
                     "name": app_name,
                     "version": app_version,
@@ -156,70 +193,63 @@ def _create_success_response(
 def get_package_request(request_id: int) -> ResponseReturnValue:
     """Get package request details."""
     try:
-        with CompositeOperations.get_operations() as ops:
-            request_record = (
-                ops.query(Request).filter(Request.id == request_id).first()
-            )
+        with SessionHelper.get_session() as db:
+            request_ops = RequestOperations(db.session)
+            request_record = request_ops.get_by_id(request_id)
             if not request_record:
                 return jsonify({"error": "Request not found"}), 404
 
-        # Check if user has access to this request
-        if (
-            not request.user.is_admin()
-            and request_record.requestor_id != request.user.id
-        ):
-            return jsonify({"error": "Access denied"}), 403
+            # Check if user has access to this request
+            if (
+                not request.user.is_admin()
+                and request_record.requestor_id != request.user.id
+            ):
+                return jsonify({"error": "Access denied"}), 403
 
-        # Get packages for this request with their creation context and scan
-        # results
-        with CompositeOperations.get_operations() as ops:
-            packages_with_context = (
-                ops.query(Package, RequestPackage, SecurityScan)
-                .join(RequestPackage)
-                .outerjoin(
-                    SecurityScan
-                )  # LEFT JOIN - allows null scan results
-                .filter(RequestPackage.request_id == request_id)
-                .all()
+            # Get packages for this request with their creation context and scan
+            # results
+            logger.info(f"About to call get_packages_with_context_and_scans for request_id: {request_id}")
+            package_ops = PackageOperations(db.session)
+            packages_with_context = package_ops.get_packages_with_context_and_scans(request_id)
+            logger.info(f"get_packages_with_context_and_scans completed successfully")
+
+            # Debug: Log what we got back
+            logger.info(f"packages_with_context type: {type(packages_with_context)}")
+            logger.info(f"packages_with_context length: {len(packages_with_context) if packages_with_context else 'None'}")
+            if packages_with_context:
+                logger.info(f"First item type: {type(packages_with_context[0])}")
+                logger.info(f"First item: {packages_with_context[0]}")
+
+            # Get request status from status manager
+            from services.package_request_status_manager import (
+                PackageRequestStatusManager,
             )
 
-        # Get request status from status manager
-        from services.package_request_status_manager import (
-            PackageRequestStatusManager,
-        )
+            status_manager = PackageRequestStatusManager()
+            status_summary = status_manager.get_request_status_summary(request_id)
 
-        status_manager = PackageRequestStatusManager()
-        status_summary = status_manager.get_request_status_summary(request_id)
-
-        return (
-            jsonify(
-                {
-                    "request": {
-                        "id": request_record.id,
-                        "application_name": request_record.application_name,
-                        "version": request_record.version,
-                        "status": status_summary["current_status"],
-                        "total_packages": status_summary["total_packages"],
-                        "completion_percentage": status_summary[
-                            "completion_percentage"
-                        ],
-                        "created_at": request_record.created_at.isoformat(),
-                        "requestor": {
-                            "id": request_record.requestor.id,
-                            "username": request_record.requestor.username,
-                            "full_name": request_record.requestor.full_name,
-                        },
-                        "package_counts": status_summary["package_counts"],
-                    },
-                    "packages": [
-                        {
+            # Build packages list
+            packages_list = []
+            if packages_with_context:
+                for item in packages_with_context:
+                    try:
+                        # Handle both tuple and single object cases
+                        if isinstance(item, tuple) and len(item) >= 3:
+                            pkg, rp, scan = item[0], item[1], item[2]
+                        else:
+                            # Fallback: assume it's just a package
+                            pkg = item
+                            rp = None
+                            scan = None
+                        
+                        packages_list.append({
                             "id": pkg.id,
                             "name": pkg.name,
                             "version": pkg.version,
                             "status": (
                                 pkg.package_status.status
                                 if pkg.package_status
-                                else "Submitted"
+                                else "Checking Licence"
                             ),
                             "security_score": (
                                 pkg.package_status.security_score
@@ -242,7 +272,7 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                                 if pkg.package_status
                                 else None
                             ),
-                            "type": rp.package_type,
+                            "type": rp.package_type if rp else "unknown",
                             "scan_result": (
                                 {
                                     "scan_duration_ms": scan.scan_duration_ms,
@@ -267,17 +297,40 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                                 if scan
                                 else None
                             ),
-                        }
-                        for pkg, rp, scan in packages_with_context
-                    ],
-                }
-            ),
-            200,
-        )
+                        })
+                    except Exception as e:
+                        logger.error(f"Error processing package item: {e}")
+                        logger.error(f"Item type: {type(item)}, Item: {item}")
+                        continue
+
+            return (
+                jsonify(
+                    {
+                        "request": {
+                            "id": request_record.id,
+                            "application_name": request_record.application_name,
+                            "version": request_record.version,
+                            "status": status_summary["current_status"],
+                            "total_packages": status_summary["total_packages"],
+                            "completion_percentage": status_summary[
+                                "completion_percentage"
+                            ],
+                            "created_at": request_record.created_at.isoformat(),
+                            "requestor": {
+                                "id": request_record.requestor.id,
+                                "username": request_record.requestor.username,
+                                "full_name": request_record.requestor.full_name,
+                            },
+                            "package_counts": status_summary["package_counts"],
+                        },
+                        "packages": packages_list,
+                    }
+                ),
+                200,
+            )
 
     except Exception as e:
-        logger.error(f"Get request error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+        return handle_error(e, "Get request")
 
 
 @package_bp.route("/requests", methods=["GET"])  # type: ignore[misc]
@@ -285,52 +338,48 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
 def list_package_requests() -> ResponseReturnValue:
     """List package requests for the user."""
     try:
-        with CompositeOperations.get_operations() as ops:
+        with SessionHelper.get_session() as db:
+            request_ops = RequestOperations(db.session)
             if request.user.is_admin():
-                requests = ops.query(Request).all()
+                requests = request_ops.get_all()
             else:
-                requests = (
-                    ops.query(Request)
-                    .filter_by(requestor_id=request.user.id)
-                    .all()
+                requests = request_ops.get_by_requestor(request.user.id)
+
+            result_requests = []
+            for req in requests:
+                # Get request status from status manager (this already includes
+                # package counts)
+                from services.package_request_status_manager import (
+                    PackageRequestStatusManager,
                 )
 
-        result_requests = []
-        for req in requests:
-            # Get request status from status manager (this already includes
-            # package counts)
-            from services.package_request_status_manager import (
-                PackageRequestStatusManager,
-            )
+                status_manager = PackageRequestStatusManager()
+                status_summary = status_manager.get_request_status_summary(req.id)
 
-            status_manager = PackageRequestStatusManager()
-            status_summary = status_manager.get_request_status_summary(req.id)
-
-            result_requests.append(
-                {
-                    "id": req.id,
-                    "application_name": req.application_name,
-                    "version": req.version,
-                    "status": status_summary["current_status"],
-                    "total_packages": status_summary["total_packages"],
-                    "completion_percentage": status_summary[
-                        "completion_percentage"
-                    ],
-                    "created_at": req.created_at.isoformat(),
-                    "requestor": {
-                        "id": req.requestor.id,
-                        "username": req.requestor.username,
-                        "full_name": req.requestor.full_name,
-                    },
-                    "package_counts": status_summary["package_counts"],
-                }
-            )
+                result_requests.append(
+                    {
+                        "id": req.id,
+                        "application_name": req.application_name,
+                        "version": req.version,
+                        "status": status_summary["current_status"],
+                        "total_packages": status_summary["total_packages"],
+                        "completion_percentage": status_summary[
+                            "completion_percentage"
+                        ],
+                        "created_at": req.created_at.isoformat(),
+                        "requestor": {
+                            "id": req.requestor.id,
+                            "username": req.requestor.username,
+                            "full_name": req.requestor.full_name,
+                        },
+                        "package_counts": status_summary["package_counts"],
+                    }
+                )
 
         return jsonify({"requests": result_requests}), 200
 
     except Exception as e:
-        logger.error(f"List requests error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+        return handle_error(e, "List requests")
 
 
 @package_bp.route(
@@ -340,26 +389,18 @@ def list_package_requests() -> ResponseReturnValue:
 def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
     """Get security scan status for a package."""
     try:
-        with CompositeOperations.get_operations() as ops:
-            package = (
-                ops.query(Package).filter(Package.id == package_id).first()
-            )
+        with SessionHelper.get_session() as db:
+            package_ops = PackageOperations(db.session)
+            package = package_ops.get_by_id(package_id)
             if not package:
                 return jsonify({"error": "Package not found"}), 404
 
         # Check if user has access to this package
         if not request.user.is_admin():
             # Check if user has access through any request
-            with CompositeOperations.get_operations() as ops:
-                has_access = (
-                    ops.query(RequestPackage)
-                    .join(Request)
-                    .filter(
-                        RequestPackage.package_id == package_id,
-                        Request.requestor_id == request.user.id,
-                    )
-                    .first()
-                )
+            with SessionHelper.get_session() as db:
+                request_package_ops = RequestPackageOperations(db.session)
+                has_access = request_package_ops.check_user_access(package_id, request.user.id)
 
             if not has_access:
                 return jsonify({"error": "Access denied"}), 403
@@ -385,8 +426,7 @@ def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
         )
 
     except Exception as e:
-        logger.error(f"Get security scan status error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+        return handle_error(e, "Get security scan status")
 
 
 @package_bp.route(
@@ -396,26 +436,18 @@ def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
 def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
     """Get detailed security scan report for a package."""
     try:
-        with CompositeOperations.get_operations() as ops:
-            package = (
-                ops.query(Package).filter(Package.id == package_id).first()
-            )
+        with SessionHelper.get_session() as db:
+            package_ops = PackageOperations(db.session)
+            package = package_ops.get_by_id(package_id)
             if not package:
                 return jsonify({"error": "Package not found"}), 404
 
         # Check if user has access to this package
         if not request.user.is_admin():
             # Check if user has access through any request
-            with CompositeOperations.get_operations() as ops:
-                has_access = (
-                    ops.query(RequestPackage)
-                    .join(Request)
-                    .filter(
-                        RequestPackage.package_id == package_id,
-                        Request.requestor_id == request.user.id,
-                    )
-                    .first()
-                )
+            with SessionHelper.get_session() as db:
+                request_package_ops = RequestPackageOperations(db.session)
+                has_access = request_package_ops.check_user_access(package_id, request.user.id)
 
             if not has_access:
                 return jsonify({"error": "Access denied"}), 403
@@ -443,8 +475,7 @@ def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
         )
 
     except Exception as e:
-        logger.error(f"Get security scan report error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+        return handle_error(e, "Get security scan report")
 
 
 @package_bp.route(
@@ -454,26 +485,18 @@ def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
 def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
     """Trigger a new security scan for a package."""
     try:
-        with CompositeOperations.get_operations() as ops:
-            package = (
-                ops.query(Package).filter(Package.id == package_id).first()
-            )
+        with SessionHelper.get_session() as db:
+            package_ops = PackageOperations(db.session)
+            package = package_ops.get_by_id(package_id)
             if not package:
                 return jsonify({"error": "Package not found"}), 404
 
         # Check if user has access to this package
         if not request.user.is_admin():
             # Check if user has access through any request
-            with CompositeOperations.get_operations() as ops:
-                has_access = (
-                    ops.query(RequestPackage)
-                    .join(Request)
-                    .filter(
-                        RequestPackage.package_id == package_id,
-                        Request.requestor_id == request.user.id,
-                    )
-                    .first()
-                )
+            with SessionHelper.get_session() as db:
+                request_package_ops = RequestPackageOperations(db.session)
+                has_access = request_package_ops.check_user_access(package_id, request.user.id)
 
             if not has_access:
                 return jsonify({"error": "Access denied"}), 403
@@ -494,8 +517,7 @@ def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
         )
 
     except Exception as e:
-        logger.error(f"Trigger security scan error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+        return handle_error(e, "Trigger security scan")
 
 
 @package_bp.route("/processing/status", methods=["GET"])  # type: ignore[misc]
@@ -506,47 +528,36 @@ def get_processing_status() -> ResponseReturnValue:
         # Count packages by status
         status_counts = {}
         for status in [
-            "Submitted",
-            "Parsed",
             "Checking Licence",
             "Downloading",
             "Security Scanning",
             "Pending Approval",
             "Rejected",
         ]:
-            with CompositeOperations.get_operations() as ops:
-                count = (
-                    ops.query(Package)
-                    .join(PackageStatus)
-                    .filter(PackageStatus.status == status)
-                    .count()
-                )
+            with SessionHelper.get_session() as db:
+                package_ops = PackageOperations(db.session)
+                count = package_ops.count_packages_by_status(status)
             status_counts[status] = count
 
         # Count total requests
-        with CompositeOperations.get_operations() as ops:
-            total_requests = ops.query(Request).count()
+        with SessionHelper.get_session() as db:
+            request_ops = RequestOperations(db.session)
+            total_requests = request_ops.count_total_requests()
 
             # Get recent activity (last 10 packages processed)
-            recent_packages = (
-                ops.query(Package, PackageStatus)
-                .join(PackageStatus)
-                .filter(PackageStatus.updated_at.isnot(None))
-                .order_by(PackageStatus.updated_at.desc())
-                .limit(10)
-                .all()
-            )
+            package_ops = PackageOperations(db.session)
+            recent_packages = package_ops.get_recent_packages(limit=10)
 
         recent_activity = []
-        for package, status in recent_packages:
+        for package in recent_packages:
             recent_activity.append(
                 {
                     "package_name": package.name,
                     "package_version": package.version,
-                    "status": status.status,
+                    "status": package.package_status.status if package.package_status else None,
                     "updated_at": (
-                        status.updated_at.isoformat()
-                        if status.updated_at
+                        package.package_status.updated_at.isoformat()
+                        if package.package_status and package.package_status.updated_at
                         else None
                     ),
                 }
@@ -565,8 +576,7 @@ def get_processing_status() -> ResponseReturnValue:
         )
 
     except Exception as e:
-        logger.error(f"Get processing status error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+        return handle_error(e, "Get processing status")
 
 
 @package_bp.route("/processing/retry", methods=["POST"])  # type: ignore[misc]
@@ -582,19 +592,15 @@ def retry_failed_packages() -> ResponseReturnValue:
             return jsonify({"error": "Admin access required"}), 403
 
         # Build query for failed packages
-        with CompositeOperations.get_operations() as ops:
-            query = (
-                ops.query(Package)
-                .join(PackageStatus)
-                .filter(PackageStatus.status == "Rejected")
-            )
-
-        if request_id:
-            query = query.join(RequestPackage).filter(
-                RequestPackage.request_id == request_id
-            )
-
-        failed_packages = query.all()
+        with SessionHelper.get_session() as db:
+            package_ops = PackageOperations(db.session)
+            failed_packages = package_ops.get_by_status("Rejected")
+            
+            if request_id:
+                # Filter by request if specified
+                failed_packages = [p for p in failed_packages if any(
+                    rp.request_id == request_id for rp in p.request_packages
+                )]
 
         if not failed_packages:
             return (
@@ -605,12 +611,12 @@ def retry_failed_packages() -> ResponseReturnValue:
         retried_count = 0
         for package in failed_packages:
             if package.package_status:
-                package.package_status.status = "Submitted"
+                package.package_status.status = "Checking Licence"
                 package.package_status.updated_at = datetime.utcnow()
                 retried_count += 1
 
-        with CompositeOperations.get_operations() as ops:
-            ops.commit()
+        with SessionHelper.get_session() as db:
+            db.commit()
 
         logger.info(f"Retried {retried_count} failed packages")
         return (
@@ -625,7 +631,6 @@ def retry_failed_packages() -> ResponseReturnValue:
         )
 
     except Exception as e:
-        logger.error(f"Retry failed packages error: {str(e)}")
-        with CompositeOperations.get_operations() as ops:
-            ops.rollback()
-        return jsonify({"error": "Internal server error"}), 500
+        with SessionHelper.get_session() as db:
+            db.rollback()
+        return handle_error(e, "Retry failed packages")

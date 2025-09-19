@@ -1,14 +1,15 @@
 """Download Processing Service.
 
-Handles download processing for packages. This service is used
-by both the API (for immediate processing) and workers (for background processing).
-
-This service works with entity-based operations structure and focuses purely on business logic.
+Handles download processing for packages. This service manages its own database sessions
+and operations, following the service-first architecture pattern.
 """
 
 import logging
-from datetime import datetime
 from typing import Any, Dict, List
+
+from database.operations.package_operations import PackageOperations
+from database.operations.package_status_operations import PackageStatusOperations
+from database.session_helper import SessionHelper
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +17,8 @@ logger = logging.getLogger(__name__)
 class DownloadProcessingService:
     """Service for handling package download processing.
 
-    This service handles the business logic of package downloading and
-    status management. It works with database operations passed in from the caller
-    (worker or API) to maintain separation of concerns.
+    This service manages its own database sessions and operations,
+    following the service-first architecture pattern.
     """
 
     def __init__(self) -> None:
@@ -26,52 +26,75 @@ class DownloadProcessingService:
         self.logger = logger
 
     def process_package_batch(
-        self, packages: List[Any], ops: Dict[str, Any]
+        self, max_packages: int = 10
     ) -> Dict[str, Any]:
         """Process a batch of packages for downloading.
 
         Args:
-            packages: List of packages to process
-            ops: Dictionary of database operations instances
+            max_packages: Maximum number of packages to process
 
         Returns:
             Dict with processing results
         """
         try:
-            successful_downloads = 0
-            failed_downloads = 0
+            with SessionHelper.get_session() as db:
+                # Initialize operations
+                package_ops = PackageOperations(db.session)
+                status_ops = PackageStatusOperations(db.session)
+                
+                # Find packages that need downloading
+                ready_packages = package_ops.get_by_status("Licence Checked")
+                
+                # Limit the number of packages processed
+                limited_packages = ready_packages[:max_packages]
 
-            for package in packages:
-                result = self.process_single_package(package, ops)
-                if result["success"]:
-                    successful_downloads += 1
-                else:
-                    failed_downloads += 1
+                if not limited_packages:
+                    return {
+                        "success": True,
+                        "processed_count": 0,
+                        "successful_downloads": 0,
+                        "failed_downloads": 0,
+                        "total_packages": 0
+                    }
 
-            return {
-                "success": True,
-                "successful_downloads": successful_downloads,
-                "failed_downloads": failed_downloads,
-                "total_packages": len(packages)
-            }
+                successful_downloads = 0
+                failed_downloads = 0
+
+                for package in limited_packages:
+                    result = self.process_single_package(package, status_ops)
+                    if result["success"]:
+                        successful_downloads += 1
+                    else:
+                        failed_downloads += 1
+
+                db.commit()
+
+                return {
+                    "success": True,
+                    "processed_count": len(limited_packages),
+                    "successful_downloads": successful_downloads,
+                    "failed_downloads": failed_downloads,
+                    "total_packages": len(limited_packages)
+                }
         except Exception as e:
             self.logger.error(f"Error processing download batch: {str(e)}")
             return {
                 "success": False,
                 "error": str(e),
+                "processed_count": 0,
                 "successful_downloads": 0,
                 "failed_downloads": 0,
-                "total_packages": len(packages)
+                "total_packages": 0
             }
 
     def process_single_package(
-        self, package: Any, ops: Dict[str, Any]
+        self, package: Any, status_ops: PackageStatusOperations
     ) -> Dict[str, Any]:
         """Process a single package for downloading.
 
         Args:
             package: Package to process
-            ops: Dictionary of database operations instances
+            status_ops: Package status operations instance
 
         Returns:
             Dict with processing results
@@ -79,72 +102,28 @@ class DownloadProcessingService:
         try:
             # Check if package is already downloaded
             if self._is_package_already_downloaded(package):
-                self._mark_package_downloaded(package, ops)
+                self._mark_package_downloaded(package, status_ops)
                 return {"success": True, "message": "Already downloaded"}
 
             # Mark package as downloading
-            self._mark_package_downloading(package, ops)
+            self._mark_package_downloading(package, status_ops)
 
             # Perform the actual download
             download_success = self._perform_download(package)
 
             if download_success:
-                self._mark_package_downloaded(package, ops)
+                self._mark_package_downloaded(package, status_ops)
                 return {"success": True, "message": "Download completed"}
             else:
-                self._mark_package_rejected(package, ops)
+                self._mark_package_rejected(package, status_ops)
                 return {"success": False, "error": "Download failed"}
 
         except Exception as e:
             self.logger.error(
                 f"Error processing package {package.name}@{package.version}: {str(e)}"
             )
-            self._mark_package_rejected(package, ops)
+            self._mark_package_rejected(package, status_ops)
             return {"success": False, "error": str(e)}
-
-    def get_stuck_packages(
-        self, stuck_threshold: datetime, ops: Dict[str, Any]
-    ) -> List[Any]:
-        """Get packages that have been stuck in Downloading state too long.
-
-        Args:
-            stuck_threshold: DateTime threshold for considering packages stuck
-            ops: Dictionary of database operations instances
-
-        Returns:
-            List of stuck packages
-        """
-        try:
-            # Use operations to get stuck packages
-            stuck_packages = ops.package.get_stuck_packages_in_downloading(
-                stuck_threshold
-            )
-            return stuck_packages
-        except Exception as e:
-            self.logger.error(f"Error getting stuck packages: {str(e)}")
-            return []
-
-    def reset_stuck_packages(
-        self, stuck_packages: List[Any], ops: Dict[str, Any]
-    ) -> None:
-        """Reset stuck packages to Licence Checked status.
-
-        Args:
-            stuck_packages: List of stuck packages to reset
-            ops: Dictionary of database operations instances
-        """
-        for package in stuck_packages:
-            try:
-                ops.package_status.update_status(
-                    package.id, "Licence Checked"
-                )
-                self.logger.info(
-                    f"Reset stuck package {package.name}@{package.version} to Licence Checked"
-                )
-            except Exception as e:
-                self.logger.error(
-                    f"Error resetting stuck package {package.name}@{package.version}: {str(e)}"
-                )
 
     def _is_package_already_downloaded(self, package: Any) -> bool:
         """Check if package is already downloaded.
@@ -184,38 +163,32 @@ class DownloadProcessingService:
             self.logger.error(f"Error performing download: {str(e)}")
             return False
 
-    def _mark_package_downloading(self, package: Any, ops: Dict[str, Any]) -> None:
+    def _mark_package_downloading(self, package: Any, status_ops: PackageStatusOperations) -> None:
         """Mark package as downloading.
 
         Args:
             package: Package to update
-            ops: Dictionary of database operations instances
+            status_ops: Package status operations instance
         """
         if package.package_status:
-            ops.package_status.update_status(
-                package.id, "Downloading"
-            )
+            status_ops.go_to_next_stage(package.id)
 
-    def _mark_package_downloaded(self, package: Any, ops: Dict[str, Any]) -> None:
+    def _mark_package_downloaded(self, package: Any, status_ops: PackageStatusOperations) -> None:
         """Mark package as downloaded.
 
         Args:
             package: Package to update
-            ops: Dictionary of database operations instances
+            status_ops: Package status operations instance
         """
         if package.package_status:
-            ops.package_status.update_status(
-                package.id, "Downloaded"
-            )
+            status_ops.go_to_next_stage(package.id)
 
-    def _mark_package_rejected(self, package: Any, ops: Dict[str, Any]) -> None:
+    def _mark_package_rejected(self, package: Any, status_ops: PackageStatusOperations) -> None:
         """Mark package as rejected.
 
         Args:
             package: Package to update
-            ops: Dictionary of database operations instances
+            status_ops: Package status operations instance
         """
         if package.package_status:
-            ops.package_status.update_status(
-                package.id, "Rejected"
-            )
+            status_ops.update_status(package.id, "Rejected")

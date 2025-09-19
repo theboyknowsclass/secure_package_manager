@@ -10,7 +10,9 @@ from config.constants import (
     TRIVY_TIMEOUT,
     TRIVY_URL,
 )
-from database.operations.composite_operations import CompositeOperations
+from database.session_helper import SessionHelper
+from database.operations.security_scan_operations import SecurityScanOperations
+from database.operations.package_status_operations import PackageStatusOperations
 from database.models import Package, SecurityScan
 
 logger = logging.getLogger(__name__)
@@ -32,20 +34,20 @@ class TrivyService:
             Dict containing scan results and status
         """
         try:
-            with CompositeOperations.get_operations() as ops:
+            with SessionHelper.get_session() as db:
                 # Create security scan record
                 security_scan = SecurityScan(
                     package_id=package.id, scan_type="trivy"
                 )
-                ops.add(security_scan)
-                ops.commit()
-
+                security_scan_ops = SecurityScanOperations(db.session)
+                security_scan_ops.create(security_scan)
+                
                 # Update package security scan status
                 if package.package_status:
-                    package.package_status.status = "Security Scanning"
-                    package.package_status.security_scan_status = "running"
-                    package.package_status.updated_at = datetime.utcnow()
-                    ops.commit()
+                    status_ops = PackageStatusOperations(db.session)
+                    status_ops.go_to_next_stage(package.id, security_scan_status="running")
+                
+                db.commit()
 
             logger.info(
                 f"Starting Trivy scan for package {package.name}@{package.version}"
@@ -436,8 +438,8 @@ class TrivyService:
                 )
                 package.package_status.updated_at = datetime.utcnow()
 
-            with CompositeOperations.get_operations() as ops:
-                ops.commit()
+            with SessionHelper.get_session() as db:
+                db.commit()
 
             total_vulnerabilities = security_scan.get_total_vulnerabilities()
             logger.info(
@@ -527,8 +529,8 @@ class TrivyService:
                 package.package_status.security_scan_status = "failed"
                 package.package_status.updated_at = datetime.utcnow()
 
-            with CompositeOperations.get_operations() as ops:
-                ops.commit()
+            with SessionHelper.get_session() as db:
+                db.commit()
 
             logger.error(
                 f"Trivy scan failed for {package.name}@{package.version}: {error_message}"

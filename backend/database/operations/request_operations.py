@@ -70,3 +70,30 @@ class RequestOperations(BaseOperations):
             The request if found, None otherwise
         """
         return super().get_by_id(Request, request_id)
+
+    def count_total_requests(self) -> int:
+        """Count total number of requests.
+
+        Returns:
+            Total number of requests
+        """
+        stmt = select(Request)
+        return self.session.execute(stmt).scalars().count()
+
+    def get_with_packages_and_status(self, request_id: int) -> Optional[Request]:
+        """Get request with all associated packages and their statuses.
+
+        Args:
+            request_id: The ID of the request
+
+        Returns:
+            The request with packages and statuses if found, None otherwise
+        """
+        from ..models import PackageStatus
+        stmt = (
+            select(Request)
+            .join(RequestPackage)
+            .join(PackageStatus)
+            .where(Request.id == request_id)
+        )
+        return self.session.execute(stmt).scalar_one_or_none()
