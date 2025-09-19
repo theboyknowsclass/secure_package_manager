@@ -50,30 +50,14 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "mypy type checking passed!" -ForegroundColor Green
 }
 
-# Check for multi-line f-string issues (custom check)
-Write-Host "Checking for multi-line f-string issues..." -ForegroundColor Yellow
-$fstringIssues = Get-ChildItem -Path . -Recurse -Include "*.py" | ForEach-Object {
-    $content = Get-Content $_.FullName -Raw
-    # Comprehensive pattern: Any f-string with curly braces split across lines
-    if ($content -match 'f"[^"]*\{[^}]*\s*\n[^"]*\}') {
-        Write-Host "Found multi-line f-string issue in: $($_.FullName)" -ForegroundColor Red
-        $_.FullName
-    }
-}
-
-if ($fstringIssues) {
-    Write-Host "Multi-line f-string issues found!" -ForegroundColor Red
-    $fstringFailed = $true
-} else {
-    Write-Host "No multi-line f-string issues found!" -ForegroundColor Green
-}
+# Multi-line f-string check removed - was giving false positives
 
 # Return to original directory
 Set-Location -Path ".."
 
 # Summary
 Write-Host "`nLinting Summary:" -ForegroundColor Cyan
-if ($flake8Failed -or $blackFailed -or $isortFailed -or $mypyFailed -or $fstringFailed) {
+if ($flake8Failed -or $blackFailed -or $isortFailed -or $mypyFailed) {
     Write-Host "❌ Some linting checks failed!" -ForegroundColor Red
     Write-Host "Run 'scripts/fix.ps1' to automatically fix formatting issues." -ForegroundColor Yellow
     exit 1
