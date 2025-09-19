@@ -1,11 +1,10 @@
-"""Package Parsing Service - Refactored.
+"""Package Parsing Service.
 
 Handles parsing of package-lock.json files and extracting package
 information. This service is used by both the API (for immediate
 processing) and workers (for background processing).
 
-This refactored version works with the new entity-based operations
-structure and focuses purely on business logic.
+This service works with entity-based operations structure and focuses purely on business logic.
 """
 
 import logging

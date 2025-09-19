@@ -1,4 +1,4 @@
-"""Tests for LicenseService - Refactored.
+"""Tests for LicenseService.
 
 Tests the business logic of license validation and management.
 """
@@ -7,7 +7,7 @@ import unittest
 from datetime import datetime
 from unittest.mock import MagicMock, Mock
 
-from services.license_service_refactored import LicenseService
+from services.license_service import LicenseService
 
 
 class TestLicenseService(unittest.TestCase):

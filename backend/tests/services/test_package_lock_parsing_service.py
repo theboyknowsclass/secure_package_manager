@@ -12,7 +12,7 @@ import unittest
 from typing import Any, Dict
 from unittest.mock import MagicMock, Mock
 
-from services.package_lock_parsing_service_refactored import (
+from services.package_lock_parsing_service import (
     PackageLockParsingService,
 )
 

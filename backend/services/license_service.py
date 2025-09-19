@@ -1,32 +1,44 @@
+"""License Service.
+
+Handles license validation and management for packages. This service is used
+by both the API (for immediate processing) and workers (for background processing).
+
+This service works with entity-based operations structure and focuses purely on business logic.
+"""
+
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-
-from database.flask_utils import get_db_operations
-from database.models import PackageStatus, SupportedLicense
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 class LicenseService:
-    """Service for license validation and management."""
+    """Service for license validation and management.
+
+    This service handles the business logic of license validation and
+    scoring. It works with database operations passed in from the caller
+    (worker or API) to maintain separation of concerns.
+    """
 
     def __init__(self) -> None:
+        """Initialize the license service."""
         self.logger = logger
         # Cache for license lookups to avoid repeated database queries
-        self._license_cache: Dict[str, Optional[SupportedLicense]] = {}
+        self._license_cache: Dict[str, Optional[Any]] = {}
         self._cache_loaded = False
 
     def validate_package_license(
-        self, package_data: Dict[str, Any]
+        self, package_data: Dict[str, Any], ops: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Validate a package's license against 4-tier status system.
 
         Args:
-            package_data (dict): Package data including license information
+            package_data: Package data including license information
+            ops: Dictionary of database operations instances
 
         Returns:
-            dict: Validation result with score and errors
+            Dict: Validation result with score and errors
         """
         try:
             # Parse license information from package data
@@ -40,942 +52,407 @@ class LicenseService:
             # Check if this is a complex license expression
             if self._is_complex_license_expression(license_identifier):
                 return self._validate_complex_license_expression(
-                    license_identifier, package_name
+                    license_identifier, package_name, ops
                 )
 
             # Look up license in database
-            license = self._lookup_license_in_db(license_identifier)
+            license = self._lookup_license_in_db(license_identifier, ops)
             if not license:
                 return self._create_unknown_license_result(license_identifier)
 
-            # Validate based on license status
-            return self._validate_license_status(
-                license, license_identifier, package_name
-            )
+            # Calculate score based on license tier
+            score = self._calculate_license_score(license)
 
-        except Exception as e:
-            self.logger.error(
-                f"License validation error for {package_data.get('name', 'Unknown')}: {str(e)}"
-            )
             return {
-                "score": 0,
-                "errors": [f"License validation failed: {str(e)}"],
-                "warnings": [],
+                "valid": True,
+                "score": score,
+                "license_identifier": license_identifier,
+                "license_tier": license.tier,
+                "license_name": license.name,
+                "errors": [],
             }
 
-    def update_package_license_status(
-        self,
-        package_id: int,
-        license_score: int,
-        errors: List[str] | None = None,
-        warnings: List[str] | None = None,
-    ) -> None:
-        """Update package status with license validation results.
+        except Exception as e:
+            self.logger.error(f"Error validating package license: {str(e)}")
+            return {
+                "valid": False,
+                "score": 0,
+                "license_identifier": (
+                    license_identifier
+                    if "license_identifier" in locals()
+                    else "Unknown"
+                ),
+                "license_tier": "Unknown",
+                "license_name": "Unknown",
+                "errors": [str(e)],
+            }
+
+    def process_license_group(
+        self, license_string: str, packages: List[Any], ops: Dict[str, Any]
+    ) -> Tuple[List[Any], List[Any]]:
+        """Process a group of packages with the same license.
 
         Args:
-            package_id: The package ID to update
-            license_score: The calculated license score
-            errors: List of validation errors
-            warnings: List of validation warnings
-        """
-        try:
-            with get_db_operations() as ops:
-                package_status = (
-                    ops.query(PackageStatus)
-                    .filter_by(package_id=package_id)
-                    .first()
-                )
-                if package_status:
-                    package_status.license_score = license_score
-                    package_status.status = "Licence Checked"
-                    package_status.updated_at = datetime.utcnow()
-                    ops.commit()
+            license_string: The license identifier for this group
+            packages: List of packages to process
+            ops: Dictionary of database operations instances
 
-                    self.logger.info(
-                        (
-                            f"Updated package {package_id} license status: "
-                            f"score={license_score}, status={package_status.status}"
-                        )
+        Returns:
+            Tuple of (successful_packages, failed_packages)
+        """
+        successful_packages = []
+        failed_packages = []
+
+        try:
+            # Validate the license for this group
+            license_validation = self._validate_license_string(
+                license_string, ops
+            )
+
+            if not license_validation.get("valid", False):
+                # All packages in this group fail
+                for package in packages:
+                    failed_packages.append(
+                        {
+                            "package": package,
+                            "error": f"License validation failed: {', '.join(license_validation.get('errors', []))}",
+                        }
                     )
-                else:
-                    self.logger.warning(
-                        f"Package status not found for package {package_id}"
+                return successful_packages, failed_packages
+
+            # Process each package in the group
+            for package in packages:
+                try:
+                    result = self._process_single_package(
+                        package, license_validation, ops
+                    )
+                    if result["success"]:
+                        successful_packages.append(result)
+                    else:
+                        failed_packages.append(
+                            {
+                                "package": package,
+                                "error": result.get("error", "Unknown error"),
+                            }
+                        )
+                except Exception as e:
+                    failed_packages.append(
+                        {
+                            "package": package,
+                            "error": f"Error processing package: {str(e)}",
+                        }
                     )
 
         except Exception as e:
             self.logger.error(
-                f"Error updating package license status: {str(e)}"
+                f"Error processing license group {license_string}: {str(e)}"
             )
-            with get_db_operations() as ops:
-                ops.rollback()
+            # Mark all packages as failed
+            for package in packages:
+                failed_packages.append(
+                    {
+                        "package": package,
+                        "error": f"License group processing failed: {str(e)}",
+                    }
+                )
+
+        return successful_packages, failed_packages
+
+    def process_package_batch(
+        self, packages: List[Any], ops: Dict[str, Any]
+    ) -> Tuple[List[Any], List[Any]]:
+        """Process a batch of packages individually.
+
+        Args:
+            packages: List of packages to process
+            ops: Dictionary of database operations instances
+
+        Returns:
+            Tuple of (successful_packages, failed_packages)
+        """
+        successful_packages = []
+        failed_packages = []
+
+        for package in packages:
+            try:
+                result = self._process_single_package_individual(package, ops)
+                if result["success"]:
+                    successful_packages.append(result)
+                else:
+                    failed_packages.append(
+                        {
+                            "package": package,
+                            "error": result.get("error", "Unknown error"),
+                        }
+                    )
+            except Exception as e:
+                failed_packages.append(
+                    {
+                        "package": package,
+                        "error": f"Error processing package {package.name}@{package.version}: {str(e)}",
+                    }
+                )
+
+        return successful_packages, failed_packages
 
     def _parse_license_info(
         self, package_data: Dict[str, Any]
     ) -> Optional[str]:
-        """Parse and normalize license information from package data."""
-        license_identifier = package_data.get("license")
+        """Parse license information from package data."""
+        # Check for license field
+        license_info = package_data.get("license")
+        if license_info:
+            if isinstance(license_info, str):
+                return license_info
+            elif isinstance(license_info, dict):
+                return license_info.get("type", license_info.get("name"))
 
-        if not license_identifier:
-            return None
+        # Check for licenses field (array)
+        licenses = package_data.get("licenses")
+        if licenses and isinstance(licenses, list) and len(licenses) > 0:
+            first_license = licenses[0]
+            if isinstance(first_license, str):
+                return first_license
+            elif isinstance(first_license, dict):
+                return first_license.get("type", first_license.get("name"))
 
-        # Handle multiple licenses (array format)
-        if isinstance(license_identifier, list):
-            if len(license_identifier) == 0:
-                return None
-            # Use the first license for validation
-            license_identifier = license_identifier[0]
+        return None
 
-        # Handle license objects (e.g., {"type": "MIT", "url": "..."})
-        if isinstance(license_identifier, dict):
-            license_identifier = license_identifier.get("type", "")
+    def _is_complex_license_expression(self, license_identifier: str) -> bool:
+        """Check if the license identifier is a complex expression."""
+        complex_indicators = [
+            " OR ",
+            " AND ",
+            "(",
+            ")",
+            "MIT OR",
+            "Apache-2.0 OR",
+        ]
+        return any(
+            indicator in license_identifier for indicator in complex_indicators
+        )
 
-        # Clean up license identifier
-        license_identifier = str(license_identifier).strip()
+    def _validate_complex_license_expression(
+        self, license_identifier: str, package_name: str, ops: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Validate complex license expressions."""
+        # For complex expressions, we'll use a conservative approach
+        # and score them based on the most restrictive license found
 
-        return license_identifier if license_identifier else None
+        # Extract individual licenses from the expression
+        individual_licenses = self._extract_individual_licenses(
+            license_identifier
+        )
 
-    def _create_no_license_result(self) -> Dict[str, Any]:
-        """Create result for packages with no license information."""
-        return {
-            "score": 0,
-            "license_status": None,
-            "errors": ["No license information found"],
-            "warnings": ["Package has no license specified"],
-        }
+        if not individual_licenses:
+            return self._create_unknown_license_result(license_identifier)
+
+        # Find the most restrictive license
+        min_score = float("inf")
+        best_license = None
+
+        for license_name in individual_licenses:
+            license_obj = self._lookup_license_in_db(license_name.strip(), ops)
+            if license_obj:
+                score = self._calculate_license_score(license_obj)
+                if score < min_score:
+                    min_score = score
+                    best_license = license_obj
+
+        if best_license:
+            return {
+                "valid": True,
+                "score": min_score,
+                "license_identifier": license_identifier,
+                "license_tier": best_license.tier,
+                "license_name": best_license.name,
+                "errors": [],
+            }
+        else:
+            return self._create_unknown_license_result(license_identifier)
+
+    def _extract_individual_licenses(
+        self, license_expression: str
+    ) -> List[str]:
+        """Extract individual license names from a complex expression."""
+        # Simple extraction - split on common operators
+        import re
+
+        # Remove parentheses and split on OR/AND
+        cleaned = re.sub(r"[()]", "", license_expression)
+        licenses = re.split(r"\s+(?:OR|AND)\s+", cleaned, flags=re.IGNORECASE)
+
+        # Clean up each license name
+        return [license.strip() for license in licenses if license.strip()]
 
     def _lookup_license_in_db(
-        self, license_identifier: str
-    ) -> Optional[SupportedLicense]:
-        """Look up license in database, including variations."""
-        # Find the license in the database
-        license: Optional[SupportedLicense] = SupportedLicense.query.filter_by(
-            identifier=license_identifier
-        ).first()
+        self, license_identifier: str, ops: Dict[str, Any]
+    ) -> Optional[Any]:
+        """Look up a license in the database."""
+        # Load cache if not already loaded
+        if not self._cache_loaded:
+            self._load_license_cache(ops)
+            self._cache_loaded = True
 
-        if not license:
-            # Check for common variations
-            license = self._find_license_variation(license_identifier)
+        # Check cache first
+        if license_identifier in self._license_cache:
+            return self._license_cache[license_identifier]
 
-        return license
+        # Look up in database
+        license_obj = ops["supported_license"].get_by_name(license_identifier)
+        self._license_cache[license_identifier] = license_obj
+        return license_obj
+
+    def _load_license_cache(self, ops: Dict[str, Any]) -> None:
+        """Load all supported licenses into cache."""
+        try:
+            licenses = ops["supported_license"].get_all()
+            for license_obj in licenses:
+                self._license_cache[license_obj.name] = license_obj
+        except Exception as e:
+            self.logger.error(f"Error loading license cache: {str(e)}")
+
+    def _calculate_license_score(self, license_obj: Any) -> int:
+        """Calculate score based on license tier."""
+        tier_scores = {
+            "Approved": 100,
+            "Conditional": 75,
+            "Restricted": 25,
+            "Prohibited": 0,
+        }
+        return tier_scores.get(license_obj.tier, 0)
+
+    def _create_no_license_result(self) -> Dict[str, Any]:
+        """Create result for packages with no license."""
+        return {
+            "valid": False,
+            "score": 0,
+            "license_identifier": "No License",
+            "license_tier": "Prohibited",
+            "license_name": "No License",
+            "errors": ["Package has no license information"],
+        }
 
     def _create_unknown_license_result(
         self, license_identifier: str
     ) -> Dict[str, Any]:
         """Create result for unknown licenses."""
         return {
-            "score": 50,
-            "license_status": None,
-            "errors": [f'License "{license_identifier}" is not recognized'],
-            "warnings": [
-                f'License "{license_identifier}" is not in the license database'
-            ],
-        }
-
-    def _validate_license_status(
-        self,
-        license: SupportedLicense,
-        license_identifier: str,
-        package_name: str,
-    ) -> Dict[str, Any]:
-        """Validate license based on its status."""
-        if license.status == "blocked":
-            return self._create_blocked_license_result(license_identifier)
-        elif license.status == "avoid":
-            return self._create_avoid_license_result(license_identifier)
-        elif license.status == "allowed":
-            return self._create_allowed_license_result(
-                license, license_identifier, package_name
-            )
-        elif license.status == "always_allowed":
-            return self._create_always_allowed_license_result(
-                license, license_identifier, package_name
-            )
-        else:
-            return self._create_unknown_status_result(license_identifier)
-
-    def _create_blocked_license_result(
-        self, license_identifier: str
-    ) -> Dict[str, Any]:
-        """Create result for blocked licenses."""
-        return {
+            "valid": False,
             "score": 0,
-            "license_status": "blocked",
-            "errors": [f'License "{license_identifier}" is blocked by policy'],
-            "warnings": [
-                f'License "{license_identifier}" is explicitly prohibited'
-            ],
+            "license_identifier": license_identifier,
+            "license_tier": "Unknown",
+            "license_name": "Unknown",
+            "errors": [f"Unknown license: {license_identifier}"],
         }
 
-    def _create_avoid_license_result(
-        self, license_identifier: str
+    def _validate_license_string(
+        self, license_string: str, ops: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Create result for avoided licenses."""
+        """Validate a license string."""
+        if not license_string or license_string == "No License":
+            return self._create_no_license_result()
+
+        if self._is_complex_license_expression(license_string):
+            return self._validate_complex_license_expression(
+                license_string, "Unknown", ops
+            )
+
+        license_obj = self._lookup_license_in_db(license_string, ops)
+        if not license_obj:
+            return self._create_unknown_license_result(license_string)
+
         return {
-            "score": 30,
-            "license_status": "avoid",
+            "valid": True,
+            "score": self._calculate_license_score(license_obj),
+            "license_identifier": license_string,
+            "license_tier": license_obj.tier,
+            "license_name": license_obj.name,
             "errors": [],
-            "warnings": [
-                f'License "{license_identifier}" is discouraged and may have restrictions'
-            ],
         }
 
-    def _create_allowed_license_result(
+    def _process_single_package(
         self,
-        license: SupportedLicense,
-        license_identifier: str,
-        package_name: str,
+        package: Any,
+        license_validation: Dict[str, Any],
+        ops: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """Create result for allowed licenses."""
-        score = self._calculate_license_score(license)
-        result = {
-            "score": score,
-            "license_status": license.status,
-            "errors": [],
-            "warnings": [],
-        }
-
-        self.logger.info(
-            (
-                f"License validation for {package_name}: {license_identifier} - "
-                f"Score: {score} (Allowed)"
-            )
-        )
-        return result
-
-    def _create_always_allowed_license_result(
-        self,
-        license: SupportedLicense,
-        license_identifier: str,
-        package_name: str,
-    ) -> Dict[str, Any]:
-        """Create result for always allowed licenses."""
-        score = self._calculate_license_score(license)
-        result = {
-            "score": score,
-            "license_status": license.status,
-            "errors": [],
-            "warnings": [],
-        }
-
-        self.logger.info(
-            (
-                f"License validation for {package_name}: {license_identifier} - "
-                f"Score: {score} (Always Allowed)"
-            )
-        )
-        return result
-
-    def _create_unknown_status_result(
-        self, license_identifier: str
-    ) -> Dict[str, Any]:
-        """Create result for licenses with unknown status."""
-        return {
-            "score": 0,
-            "license_status": None,
-            "errors": [f'License "{license_identifier}" has unknown status'],
-            "warnings": [],
-        }
-
-    def _find_license_variation(
-        self, license_identifier: str
-    ) -> Optional[SupportedLicense]:
-        """Find license by common variations."""
-        variations = [
-            license_identifier.lower(),
-            license_identifier.upper(),
-            license_identifier.replace("-", " "),
-            license_identifier.replace(" ", "-"),
-            license_identifier.replace("_", "-"),
-            license_identifier.replace("_", " "),
-        ]
-
-        for variation in variations:
-            license: Optional[SupportedLicense] = (
-                SupportedLicense.query.filter_by(identifier=variation).first()
-            )
-            if license:
-                return license
-
-        # Try partial matches
-        licenses: List[SupportedLicense] = SupportedLicense.query.filter(
-            SupportedLicense.identifier.ilike(f"%{license_identifier}%")
-        ).all()
-
-        if licenses:
-            return licenses[0]  # Return first match
-
-        return None
-
-    def _calculate_license_score(
-        self, supported_license: SupportedLicense
-    ) -> int:
-        """Calculate license compliance score based on status."""
-        if supported_license.status == "always_allowed":
-            return 100
-        elif supported_license.status == "allowed":
-            return 80
-        elif supported_license.status == "avoid":
-            return 30
-        elif supported_license.status == "blocked":
-            return 0
-        else:
-            return 0
-
-    def get_supported_licenses(
-        self, status: Optional[str] = None
-    ) -> List[SupportedLicense]:
-        """Get all supported licenses, optionally filtered by status."""
+        """Process a single package with pre-validated license."""
         try:
-            query = SupportedLicense.query
-            if status:
-                query = query.filter_by(status=status)
-            return list(query.all())
-        except Exception as e:
-            self.logger.error(f"Error getting supported licenses: {str(e)}")
-            return []
-
-    def is_license_allowed(self, license_identifier: str) -> bool:
-        """Check if a license is allowed (not blocked)"""
-        try:
-            license = SupportedLicense.query.filter_by(
-                identifier=license_identifier
-            ).first()
-
-            if not license:
-                return False
-
-            return license.status in ["always_allowed", "allowed", "avoid"]
-        except Exception as e:
-            self.logger.error(f"Error checking license support: {str(e)}")
-            return False
-
-    def _is_complex_license_expression(self, license_identifier: str) -> bool:
-        """Check if the license identifier is a complex expression with OR/AND
-        operators."""
-        if not license_identifier:
-            return False
-
-        # Check for common complex expression patterns
-        complex_patterns = [" OR ", " AND ", "(", ")", "|", "&"]
-
-        return any(
-            pattern in license_identifier.upper()
-            for pattern in complex_patterns
-        )
-
-    def _validate_complex_license_expression(
-        self, license_expression: str, package_name: str
-    ) -> Dict[str, Any]:
-        """Validate complex license expressions like (MIT OR CC0-1.0)"""
-        try:
-            # Parse the license expression to extract individual licenses
-            individual_licenses = self._parse_license_expression(
-                license_expression
+            # Update package status
+            ops["package_status"].update_package_status(
+                package.id,
+                "Licence Checked",
+                ops["package_status"].PackageStatus,
             )
 
-            if not individual_licenses:
-                return self._create_unknown_license_result(license_expression)
+            # Update package with license information
+            package.license = license_validation["license_identifier"]
+            package.license_score = license_validation["score"]
+            package.license_tier = license_validation["license_tier"]
+            package.updated_at = datetime.utcnow()
 
-            # For OR expressions, use the best (highest scoring) license
-            # For AND expressions, use the worst (lowest scoring) license
-            if (
-                " OR " in license_expression.upper()
-                or "|" in license_expression
-            ):
-                return self._validate_or_expression(
-                    individual_licenses, license_expression, package_name
-                )
-            elif (
-                " AND " in license_expression.upper()
-                or "&" in license_expression
-            ):
-                return self._validate_and_expression(
-                    individual_licenses, license_expression, package_name
-                )
-            else:
-                # Default to OR behavior for complex expressions
-                return self._validate_or_expression(
-                    individual_licenses, license_expression, package_name
-                )
-
-        except Exception as e:
-            self.logger.error(
-                f"Error validating complex license expression '{license_expression}': {str(e)}"
-            )
             return {
-                "score": 0,
-                "errors": [
-                    f"Failed to parse license expression: {license_expression}"
-                ],
-                "warnings": [],
+                "success": True,
+                "package": package,
+                "score": license_validation["score"],
+                "license_tier": license_validation["license_tier"],
             }
 
-    def _parse_license_expression(self, license_expression: str) -> List[str]:
-        """Parse a license expression to extract individual license identifiers
-        with improved boolean logic."""
-        if not license_expression:
-            return []
+        except Exception as e:
+            return {
+                "success": False,
+                "package": package,
+                "error": str(e),
+            }
 
-        # Normalize the expression
-        expression = license_expression.strip()
-
-        # Handle nested parentheses and complex expressions
-        licenses = self._parse_complex_expression(expression)
-
-        # Clean up each license identifier
-        cleaned_licenses = []
-        for license in licenses:
-            cleaned_license = license.strip().strip('"').strip("'")
-            if cleaned_license and cleaned_license not in [
-                "OR",
-                "AND",
-                "|",
-                "&",
-                "(",
-                ")",
-            ]:
-                cleaned_licenses.append(cleaned_license)
-
-        return cleaned_licenses
-
-    def _parse_complex_expression(self, expression: str) -> List[str]:
-        """Parse complex license expressions with proper handling of
-        parentheses and operators."""
-        licenses = []
-        current_license = ""
-        paren_depth = 0
-        i = 0
-
-        while i < len(expression):
-            char = expression[i]
-
-            if char == "(":
-                paren_depth += 1
-                if paren_depth == 1 and current_license.strip():
-                    # We're entering a nested expression, save current license
-                    licenses.append(current_license.strip())
-                    current_license = ""
-            elif char == ")":
-                paren_depth -= 1
-                if paren_depth == 0 and current_license.strip():
-                    # We're exiting a nested expression, save current license
-                    licenses.append(current_license.strip())
-                    current_license = ""
-            elif paren_depth == 0:
-                # We're at the top level, check for operators
-                if self._is_operator_at_position(expression, i):
-                    if current_license.strip():
-                        licenses.append(current_license.strip())
-                        current_license = ""
-                    # Skip the operator and any following whitespace
-                    i = self._skip_operator_and_whitespace(expression, i)
-                    continue
-                else:
-                    current_license += char
-            else:
-                # We're inside parentheses, just collect characters
-                current_license += char
-
-            i += 1
-
-        # Add the last license if there is one
-        if current_license.strip():
-            licenses.append(current_license.strip())
-
-        return licenses
-
-    def _is_operator_at_position(self, expression: str, position: int) -> bool:
-        """Check if there's an operator at the given position."""
-        operators = [" OR ", " AND ", "|", "&"]
-
-        for operator in operators:
-            if (
-                expression[position : position + len(operator)].upper()
-                == operator.upper()
-            ):
-                return True
-
-        return False
-
-    def _skip_operator_and_whitespace(
-        self, expression: str, position: int
-    ) -> int:
-        """Skip the operator and any following whitespace, return new
-        position."""
-        operators = [" OR ", " AND ", "|", "&"]
-
-        for operator in operators:
-            if (
-                expression[position : position + len(operator)].upper()
-                == operator.upper()
-            ):
-                return position + len(operator)
-
-        # Single character operators
-        if expression[position] in ["|", "&"]:
-            return position + 1
-
-        return position
-
-    def _validate_or_expression(
-        self,
-        individual_licenses: List[str],
-        original_expression: str,
-        package_name: str,
+    def _process_single_package_individual(
+        self, package: Any, ops: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Validate OR expression - use the best (highest scoring) license with improved edge case handling"""
-        if not individual_licenses:
-            return {
-                "score": 0,
-                "license_status": None,
-                "errors": ["Empty OR expression"],
-                "warnings": [],
-            }
-
-        best_score = -1  # Start with -1 to handle score 0 licenses
-        best_result = None
-        all_errors = []
-        all_warnings = []
-        valid_licenses = []
-        invalid_licenses = []
-
-        for license_id in individual_licenses:
-            if not license_id or not license_id.strip():
-                continue
-
-            # Look up each license
-            license = self._lookup_license_in_db(license_id.strip())
-            if license:
-                result = self._validate_license_status(
-                    license, license_id.strip(), package_name
-                )
-                valid_licenses.append((license_id.strip(), result))
-
-                if result["score"] > best_score:
-                    best_score = result["score"]
-                    best_result = result
-            else:
-                invalid_licenses.append(license_id.strip())
-                all_errors.append(
-                    f'License "{license_id.strip()}" is not recognized'
-                )
-                all_warnings.append(
-                    f'License "{license_id.strip()}" is not in the license database'
-                )
-
-        if best_result:
-            # Add information about the OR expression and other valid licenses
-            if len(valid_licenses) > 1:
-                other_licenses = [
-                    lid
-                    for lid, _ in valid_licenses
-                    if lid != best_result.get("license_identifier", "")
-                ]
-                if other_licenses:
-                    best_result["warnings"].append(
-                        f"OR expression contains {len(valid_licenses)} valid licenses, using best: {best_result.get('license_identifier', 'Unknown')}"
-                    )
-                    best_result["warnings"].append(
-                        f"Other valid licenses in expression: {', '.join(other_licenses)}"
-                    )
-
-            if invalid_licenses:
-                best_result["warnings"].append(
-                    f"Some licenses in OR expression were not recognized: {', '.join(invalid_licenses)}"
-                )
-
-            return best_result
-        else:
-            # No valid licenses found
-            return {
-                "score": 0,
-                "license_status": None,
-                "errors": all_errors
-                + ["No valid licenses found in OR expression"],
-                "warnings": all_warnings
-                + [
-                    f"OR expression '{original_expression}' contains no recognized licenses"
-                ],
-            }
-
-    def validate_packages_batch(
-        self, packages_data: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
-        """Validate multiple packages' licenses in batch for improved
-        performance.
-
-        Args:
-            packages_data: List of package data dictionaries
-
-        Returns:
-            List of validation results in the same order as input
-        """
+        """Process a single package individually (fallback method)."""
         try:
-            # Load license cache if not already loaded
-            if not self._cache_loaded:
-                self._load_license_cache()
+            # Get package data for validation
+            package_data = {
+                "name": package.name,
+                "version": package.version,
+                "license": package.license,
+            }
 
-            # Extract unique license identifiers from all packages
-            unique_licenses = set()
-            for package_data in packages_data:
-                license_identifier = self._parse_license_info(package_data)
-                if license_identifier:
-                    unique_licenses.add(license_identifier)
-
-            # Batch lookup all unique licenses
-            self._batch_lookup_licenses(list(unique_licenses))
-
-            # Process each package using cached license data
-            results = []
-            for package_data in packages_data:
-                result = self._validate_package_license_cached(package_data)
-                results.append(result)
-
-            self.logger.debug(
-                f"Batch validated {len(packages_data)} packages with {len(unique_licenses)} unique licenses"
+            # Validate license
+            license_validation = self.validate_package_license(
+                package_data, ops
             )
-            return results
+
+            if not license_validation.get("valid", False):
+                return {
+                    "success": False,
+                    "package": package,
+                    "error": f"License validation failed: {', '.join(license_validation.get('errors', []))}",
+                }
+
+            # Update package status
+            ops["package_status"].update_package_status(
+                package.id,
+                "Licence Checked",
+                ops["package_status"].PackageStatus,
+            )
+
+            # Update package with license information
+            package.license = license_validation["license_identifier"]
+            package.license_score = license_validation["score"]
+            package.license_tier = license_validation["license_tier"]
+            package.updated_at = datetime.utcnow()
+
+            return {
+                "success": True,
+                "package": package,
+                "score": license_validation["score"],
+                "license_tier": license_validation["license_tier"],
+            }
 
         except Exception as e:
-            self.logger.error(f"Error in batch license validation: {str(e)}")
-            # Fallback to individual validation
-            return [
-                self.validate_package_license(package_data)
-                for package_data in packages_data
-            ]
-
-    def _load_license_cache(self) -> None:
-        """Load all supported licenses into cache for faster lookups."""
-        try:
-            licenses = SupportedLicense.query.all()
-            for license in licenses:
-                self._license_cache[license.identifier] = license
-                # Also cache common variations
-                variations = self._generate_license_variations(
-                    license.identifier
-                )
-                for variation in variations:
-                    if variation not in self._license_cache:
-                        self._license_cache[variation] = license
-
-            self._cache_loaded = True
-            self.logger.info(
-                f"Loaded {len(licenses)} licenses into cache with {len(self._license_cache)} total entries"
-            )
-
-        except Exception as e:
-            self.logger.error(f"Error loading license cache: {str(e)}")
-            self._cache_loaded = False
-
-    def _generate_license_variations(
-        self, license_identifier: str
-    ) -> List[str]:
-        """Generate common variations of a license identifier for caching."""
-        variations = [
-            license_identifier.lower(),
-            license_identifier.upper(),
-            license_identifier.replace("-", " "),
-            license_identifier.replace(" ", "-"),
-            license_identifier.replace("_", "-"),
-            license_identifier.replace("_", " "),
-        ]
-        return [v for v in variations if v != license_identifier]
-
-    def _batch_lookup_licenses(self, license_identifiers: List[str]) -> None:
-        """Batch lookup licenses that aren't already in cache."""
-        try:
-            # Find licenses not in cache
-            missing_licenses = [
-                lid
-                for lid in license_identifiers
-                if lid not in self._license_cache
-            ]
-
-            if not missing_licenses:
-                return
-
-            # Batch query for missing licenses
-            licenses = SupportedLicense.query.filter(
-                SupportedLicense.identifier.in_(missing_licenses)
-            ).all()
-
-            # Add to cache
-            for license in licenses:
-                self._license_cache[license.identifier] = license
-                # Cache variations
-                variations = self._generate_license_variations(
-                    license.identifier
-                )
-                for variation in variations:
-                    if variation not in self._license_cache:
-                        self._license_cache[variation] = license
-
-            # Mark missing licenses as None in cache
-            found_identifiers = {license.identifier for license in licenses}
-            for missing_license in missing_licenses:
-                if missing_license not in found_identifiers:
-                    self._license_cache[missing_license] = None
-
-            self.logger.debug(
-                f"Batch looked up {len(missing_licenses)} licenses, found {len(licenses)}"
-            )
-
-        except Exception as e:
-            self.logger.error(f"Error in batch license lookup: {str(e)}")
-
-    def _validate_package_license_cached(
-        self, package_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Validate package license using cached license data."""
-        try:
-            # Parse license information from package data
-            license_identifier = self._parse_license_info(package_data)
-            package_name = package_data.get("name", "Unknown")
-
-            # Handle missing license
-            if not license_identifier:
-                return self._create_no_license_result()
-
-            # Check if this is a complex license expression
-            if self._is_complex_license_expression(license_identifier):
-                return self._validate_complex_license_expression_cached(
-                    license_identifier, package_name
-                )
-
-            # Look up license in cache
-            license = self._license_cache.get(license_identifier)
-            if not license:
-                return self._create_unknown_license_result(license_identifier)
-
-            # Validate based on license status
-            return self._validate_license_status(
-                license, license_identifier, package_name
-            )
-
-        except Exception as e:
-            self.logger.error(
-                f"License validation error for {package_data.get('name', 'Unknown')}: {str(e)}"
-            )
             return {
-                "score": 0,
-                "errors": [f"License validation failed: {str(e)}"],
-                "warnings": [],
-            }
-
-    def _validate_complex_license_expression_cached(
-        self, license_expression: str, package_name: str
-    ) -> Dict[str, Any]:
-        """Validate complex license expressions using cached data."""
-        try:
-            # Parse the license expression to extract individual licenses
-            individual_licenses = self._parse_license_expression(
-                license_expression
-            )
-
-            if not individual_licenses:
-                return self._create_unknown_license_result(license_expression)
-
-            # For OR expressions, use the best (highest scoring) license
-            # For AND expressions, use the worst (lowest scoring) license
-            if (
-                " OR " in license_expression.upper()
-                or "|" in license_expression
-            ):
-                return self._validate_or_expression_cached(
-                    individual_licenses, license_expression, package_name
-                )
-            elif (
-                " AND " in license_expression.upper()
-                or "&" in license_expression
-            ):
-                return self._validate_and_expression_cached(
-                    individual_licenses, license_expression, package_name
-                )
-            else:
-                # Default to OR behavior for complex expressions
-                return self._validate_or_expression_cached(
-                    individual_licenses, license_expression, package_name
-                )
-
-        except Exception as e:
-            self.logger.error(
-                f"Error validating complex license expression '{license_expression}': {str(e)}"
-            )
-            return {
-                "score": 0,
-                "errors": [
-                    f"Failed to parse license expression: {license_expression}"
-                ],
-                "warnings": [],
-            }
-
-    def _validate_or_expression_cached(
-        self,
-        individual_licenses: List[str],
-        original_expression: str,
-        package_name: str,
-    ) -> Dict[str, Any]:
-        """Validate OR expression using cached license data."""
-        best_score = 0
-        best_result = None
-        all_errors = []
-        all_warnings = []
-
-        for license_id in individual_licenses:
-            # Look up each license in cache
-            license = self._license_cache.get(license_id)
-            if license:
-                result = self._validate_license_status(
-                    license, license_id, package_name
-                )
-                if result["score"] > best_score:
-                    best_score = result["score"]
-                    best_result = result
-            else:
-                all_errors.append(f'License "{license_id}" is not recognized')
-                all_warnings.append(
-                    f'License "{license_id}" is not in the license database'
-                )
-
-        if best_result:
-            # Add information about the OR expression
-            best_result["warnings"].append(
-                f"Using best license from OR expression: {original_expression}"
-            )
-            return best_result
-        else:
-            return {
-                "score": 0,
-                "license_status": None,
-                "errors": all_errors,
-                "warnings": all_warnings,
-            }
-
-    def _validate_and_expression_cached(
-        self,
-        individual_licenses: List[str],
-        original_expression: str,
-        package_name: str,
-    ) -> Dict[str, Any]:
-        """Validate AND expression using cached license data."""
-        worst_score = 100
-        worst_result = None
-        all_errors = []
-        all_warnings = []
-        valid_licenses = []
-
-        for license_id in individual_licenses:
-            # Look up each license in cache
-            license = self._license_cache.get(license_id)
-            if license:
-                result = self._validate_license_status(
-                    license, license_id, package_name
-                )
-                valid_licenses.append(result)
-                if result["score"] < worst_score:
-                    worst_score = result["score"]
-                    worst_result = result
-            else:
-                all_errors.append(f'License "{license_id}" is not recognized')
-                all_warnings.append(
-                    f'License "{license_id}" is not in the license database'
-                )
-
-        if worst_result:
-            # Add information about the AND expression
-            worst_result["warnings"].append(
-                f"Using worst license from AND expression: {original_expression}"
-            )
-            return worst_result
-        else:
-            return {
-                "score": 0,
-                "license_status": None,
-                "errors": all_errors,
-                "warnings": all_warnings,
-            }
-
-    def _validate_and_expression(
-        self,
-        individual_licenses: List[str],
-        original_expression: str,
-        package_name: str,
-    ) -> Dict[str, Any]:
-        """Validate AND expression - use the worst (lowest scoring) license with improved edge case handling"""
-        if not individual_licenses:
-            return {
-                "score": 0,
-                "license_status": None,
-                "errors": ["Empty AND expression"],
-                "warnings": [],
-            }
-
-        worst_score = 101  # Start with 101 to handle score 100 licenses
-        worst_result = None
-        all_errors = []
-        all_warnings = []
-        valid_licenses = []
-        invalid_licenses = []
-
-        for license_id in individual_licenses:
-            if not license_id or not license_id.strip():
-                continue
-
-            # Look up each license
-            license = self._lookup_license_in_db(license_id.strip())
-            if license:
-                result = self._validate_license_status(
-                    license, license_id.strip(), package_name
-                )
-                valid_licenses.append((license_id.strip(), result))
-
-                if result["score"] < worst_score:
-                    worst_score = result["score"]
-                    worst_result = result
-            else:
-                invalid_licenses.append(license_id.strip())
-                all_errors.append(
-                    f'License "{license_id.strip()}" is not recognized'
-                )
-                all_warnings.append(
-                    f'License "{license_id.strip()}" is not in the license database'
-                )
-
-        if worst_result:
-            # Add information about the AND expression and all licenses
-            if len(valid_licenses) > 1:
-                all_license_scores = [
-                    f"{lid}({result['score']})"
-                    for lid, result in valid_licenses
-                ]
-                worst_result["warnings"].append(
-                    f"AND expression contains {len(valid_licenses)} licenses, using worst: {worst_result.get('license_identifier', 'Unknown')}"
-                )
-                worst_result["warnings"].append(
-                    f"All license scores in expression: {', '.join(all_license_scores)}"
-                )
-
-            if invalid_licenses:
-                worst_result["warnings"].append(
-                    f"Some licenses in AND expression were not recognized: {', '.join(invalid_licenses)}"
-                )
-                # For AND expressions, any unrecognized license should fail the
-                # entire expression
-                worst_result["score"] = 0
-                worst_result["errors"].append(
-                    "AND expression contains unrecognized licenses"
-                )
-
-            return worst_result
-        else:
-            # No valid licenses found
-            return {
-                "score": 0,
-                "license_status": None,
-                "errors": all_errors
-                + ["No valid licenses found in AND expression"],
-                "warnings": all_warnings
-                + [
-                    f"AND expression '{original_expression}' contains no recognized licenses"
-                ],
+                "success": False,
+                "package": package,
+                "error": str(e),
             }
