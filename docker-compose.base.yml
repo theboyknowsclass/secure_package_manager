@@ -185,7 +185,7 @@ services:
       # Download-specific environment variables
       - SOURCE_REPOSITORY_URL=${SOURCE_REPOSITORY_URL}
       - WORKER_SLEEP_INTERVAL=10
-      - WORKER_MAX_PACKAGES_PER_CYCLE=10
+      - WORKER_MAX_PACKAGES_PER_CYCLE=20
     volumes:
       - package_cache:/app/package_cache
       - worker_logs:/app/logs

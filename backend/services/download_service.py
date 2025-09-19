@@ -75,21 +75,33 @@ class DownloadService:
 
                 successful_downloads = 0
                 failed_downloads = 0
+                already_cached = 0
 
                 for package in limited_packages:
                     result = self.process_single_package(package)
                     if result["success"]:
-                        successful_downloads += 1
+                        if result["message"] == "Already downloaded":
+                            already_cached += 1
+                        else:
+                            successful_downloads += 1
                     else:
                         failed_downloads += 1
 
                 db.commit()
+
+                # Log batch summary
+                if successful_downloads > 0 or failed_downloads > 0 or already_cached > 0:
+                    self.logger.info(
+                        f"Download batch complete: {successful_downloads} downloaded, "
+                        f"{already_cached} already cached, {failed_downloads} failed"
+                    )
 
                 return {
                     "success": True,
                     "processed_count": len(limited_packages),
                     "successful_downloads": successful_downloads,
                     "failed_downloads": failed_downloads,
+                    "already_cached": already_cached,
                     "total_packages": len(limited_packages)
                 }
         except Exception as e:
@@ -271,8 +283,13 @@ class DownloadService:
         Args:
             package: Package to update
         """
-        if package.package_status:
-            self._status_ops.go_to_next_stage(package.id)
+        try:
+            if package.package_status:
+                self._status_ops.go_to_next_stage(package.id)
+            else:
+                self.logger.warning(f"Package {package.name}@{package.version} has no package_status")
+        except Exception as e:
+            self.logger.error(f"Error updating status for package {package.name}@{package.version}: {str(e)}")
 
     def _mark_package_download_failed(self, package: Any) -> None:
         """Mark package as download failed.

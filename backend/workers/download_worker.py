@@ -49,17 +49,7 @@ class DownloadWorker(BaseWorker):
                     self.max_packages_per_cycle
                 )
 
-                if result["success"]:
-                    if result["processed_count"] > 0:
-                        logger.info(
-                            f"Download complete: {result['successful_downloads']} successful, "
-                            f"{result['failed_downloads']} failed"
-                        )
-                    else:
-                        logger.info(
-                            "DownloadWorker heartbeat: No packages found for downloading"
-                        )
-                else:
+                if not result["success"]:
                     logger.error(
                         f"Error in download batch: {result['error']}"
                     )

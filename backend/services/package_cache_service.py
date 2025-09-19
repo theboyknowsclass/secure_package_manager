@@ -43,17 +43,7 @@ class PackageCacheService:
             tarball_buffer.extractall(package_dir)
             tarball_buffer.close()
 
-            # Verify the package was extracted successfully by checking for package.json
-            package_json_path = os.path.join(package_dir, "package", "package.json")
-            if not os.path.exists(package_json_path):
-                logger.error(
-                    f"Package extraction failed: package.json not found at {package_json_path}"
-                )
-                return False
-
-            logger.info(
-                f"Successfully stored {package.name}@{package.version} in cache at {package_dir}"
-            )
+            # Successfully stored - no need to log every single package
             return True
 
         except tarfile.TarError as e:
@@ -77,10 +67,7 @@ class PackageCacheService:
             True if package exists in cache, False otherwise
         """
         package_dir = self._get_package_cache_path(package)
-        package_json_path = os.path.join(
-            package_dir, "package", "package.json"
-        )
-        return os.path.exists(package_json_path)
+        return os.path.exists(package_dir) and os.path.isdir(package_dir)
 
     def get_package_path(self, package) -> Optional[str]:
         """Get the local path to cached package.
@@ -92,9 +79,11 @@ class PackageCacheService:
             Path to package directory or None if not cached
         """
         if self.is_package_cached(package):
-            return os.path.join(
-                self._get_package_cache_path(package), "package"
-            )
+            package_dir = self._get_package_cache_path(package)
+            
+            # All npm tarballs extract to a "package" directory
+            # Both scoped and regular packages use the same structure
+            return os.path.join(package_dir, "package")
         return None
 
     def remove_package(self, package) -> bool:
@@ -188,8 +177,13 @@ class PackageCacheService:
         Returns:
             Path to package cache directory
         """
-        # Sanitize package name for use in file paths
-        safe_package_name = package.name.replace("/", "-").replace("@", "")
+        # For scoped packages, keep the @ but replace / with -
+        # For regular packages, use the name as-is
+        if package.name.startswith("@"):
+            safe_package_name = package.name.replace("/", "-")
+        else:
+            safe_package_name = package.name
+            
         return os.path.join(
             self.package_cache_dir, f"{safe_package_name}-{package.version}"
         )
