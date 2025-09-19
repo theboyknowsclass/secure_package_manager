@@ -1,10 +1,7 @@
 import logging
 import os
-import tempfile
 from datetime import datetime
 from typing import Any, Dict, Optional
-
-import requests
 from config.constants import (
     TRIVY_MAX_RETRIES,
     TRIVY_TIMEOUT,
@@ -86,7 +83,7 @@ class TrivyService:
         self, package: Package
     ) -> Optional[str]:
         """Get package path for scanning (package should already be downloaded
-        by PackageWorker)
+        by DownloadWorker)
 
         Args:
             package: Package object
@@ -96,10 +93,10 @@ class TrivyService:
         """
         try:
             # Import here to avoid circular imports
-            from .download_service import DownloadService
+            from .package_cache_service import PackageCacheService
 
-            download_service = DownloadService()
-            package_path = download_service.get_package_path(package)
+            cache_service = PackageCacheService()
+            package_path = cache_service.get_package_path(package)
 
             if package_path and os.path.exists(package_path):
                 logger.info(
@@ -107,71 +104,16 @@ class TrivyService:
                 )
                 return package_path
             else:
-                logger.warning(
-                    (
-                        f"Package {package.name}@{package.version} not found in cache, "
-                        f"downloading for scan"
-                    )
+                logger.error(
+                    f"Package {package.name}@{package.version} not found in cache. "
+                    f"Download worker should have completed download before security scanning."
                 )
-                # Fallback: download to temp directory for scanning
-                return self._download_to_temp_for_scanning(package)
+                return None
 
         except Exception as e:
             logger.error(f"Error getting package path for scanning: {str(e)}")
             return None
 
-    def _download_to_temp_for_scanning(
-        self, package: Package
-    ) -> Optional[str]:
-        """Download package to temporary directory for scanning (fallback
-        method)
-
-        Args:
-            package: Package object
-
-        Returns:
-            Path to temporary package directory or None if failed
-        """
-        try:
-            # Create temporary directory for package
-            safe_package_name = package.name.replace("/", "-").replace("@", "")
-            temp_dir = tempfile.mkdtemp(
-                prefix=f"trivy_scan_{safe_package_name}_{package.version}_"
-            )
-
-            if not package.npm_url:
-                logger.error(
-                    f"No npm_url available for package {package.name}@{package.version}"
-                )
-                return None
-
-            logger.info(
-                f"Downloading package tarball for scanning: {package.npm_url}"
-            )
-            response = requests.get(package.npm_url, timeout=60)
-
-            if response.status_code != 200:
-                logger.error(
-                    f"Failed to download tarball: HTTP {response.status_code}"
-                )
-                return None
-
-            # Extract tarball to temp directory
-            import io
-            import tarfile
-
-            tarball_buffer = io.BytesIO(response.content)
-            with tarfile.open(fileobj=tarball_buffer, mode="r:gz") as tar:
-                tar.extractall(temp_dir)
-
-            # Return path to the extracted package directory
-            package_path = os.path.join(temp_dir, "package")
-            logger.info(f"Downloaded package for scanning to: {package_path}")
-            return package_path
-
-        except Exception as e:
-            logger.error(f"Error downloading package for scanning: {str(e)}")
-            return None
 
     def _perform_trivy_scan(
         self, package_path: str, package: Package
@@ -430,6 +372,7 @@ class TrivyService:
                 "low": 0,
                 "info": 0,
             }
+
 
     def _get_trivy_version(self) -> str:
         """Get Trivy version from the binary.

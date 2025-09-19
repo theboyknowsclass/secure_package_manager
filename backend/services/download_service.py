@@ -1,50 +1,211 @@
 """Download Service.
 
-Handles downloading packages from npm registry to the package cache.
+Handles downloading packages from external npm registries and managing their local cache.
+This service manages its own database sessions and operations, following the service-first architecture pattern.
 """
 
-import io
 import logging
 import os
-import tarfile
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 import requests
+
+from database.operations.package_operations import PackageOperations
+from database.operations.package_status_operations import PackageStatusOperations
+from database.session_helper import SessionHelper
 
 logger = logging.getLogger(__name__)
 
 
 class DownloadService:
-    """Service for downloading packages from npm registry."""
+    """Service for downloading packages from external npm registries and managing local cache.
 
-    def __init__(self):
-        self.package_cache_dir = os.getenv(
-            "PACKAGE_CACHE_DIR", "/app/package_cache"
-        )
+    This service manages its own database sessions and operations,
+    following the service-first architecture pattern.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the download service."""
+        self.logger = logger
+        # Operations instances (set up in _setup_operations)
+        self._session = None
+        self._package_ops = None
+        self._status_ops = None
+        
+        # Download configuration
         self.download_timeout = int(os.getenv("DOWNLOAD_TIMEOUT", "60"))
         self.source_repository_url = os.getenv("SOURCE_REPOSITORY_URL", "https://registry.npmjs.org")
 
-        # Ensure package cache directory exists
-        os.makedirs(self.package_cache_dir, exist_ok=True)
+    def _setup_operations(self, session):
+        """Set up operations instances for the current session."""
+        self._session = session
+        self._package_ops = PackageOperations(session)
+        self._status_ops = PackageStatusOperations(session)
 
-    def download_package(self, package) -> bool:
-        """Download package from npm registry to package cache.
+    def process_package_batch(
+        self, max_packages: int = 5
+    ) -> Dict[str, Any]:
+        """Process a batch of packages for downloading.
 
         Args:
-            package: Package object with name, version
+            max_packages: Maximum number of packages to process (reduced for better performance)
+
+        Returns:
+            Dict with processing results
+        """
+        try:
+            with SessionHelper.get_session() as db:
+                # Set up operations
+                self._setup_operations(db.session)
+                
+                # Find packages that need downloading
+                ready_packages = self._package_ops.get_by_status("Licence Checked")
+                
+                # Limit the number of packages processed (smaller batches)
+                limited_packages = ready_packages[:max_packages]
+
+                if not limited_packages:
+                    return {
+                        "success": True,
+                        "processed_count": 0,
+                        "successful_downloads": 0,
+                        "failed_downloads": 0,
+                        "total_packages": 0
+                    }
+
+                successful_downloads = 0
+                failed_downloads = 0
+
+                for package in limited_packages:
+                    result = self.process_single_package(package)
+                    if result["success"]:
+                        successful_downloads += 1
+                    else:
+                        failed_downloads += 1
+
+                db.commit()
+
+                return {
+                    "success": True,
+                    "processed_count": len(limited_packages),
+                    "successful_downloads": successful_downloads,
+                    "failed_downloads": failed_downloads,
+                    "total_packages": len(limited_packages)
+                }
+        except Exception as e:
+            self.logger.error(f"Error processing download batch: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "processed_count": 0,
+                "successful_downloads": 0,
+                "failed_downloads": 0,
+                "total_packages": 0
+            }
+
+    def process_single_package(self, package: Any) -> Dict[str, Any]:
+        """Process a single package for downloading.
+
+        Args:
+            package: Package to process
+
+        Returns:
+            Dict with processing results
+        """
+        try:
+            # Check if package is already downloaded
+            if self._is_package_already_downloaded(package):
+                self._mark_package_downloaded(package)
+                return {"success": True, "message": "Already downloaded"}
+
+            # Mark package as downloading
+            self._mark_package_downloading(package)
+
+            # Perform the actual download
+            download_success = self._perform_download(package)
+
+            if download_success:
+                # Double-check that the package is actually in the cache before marking as downloaded
+                if self._is_package_already_downloaded(package):
+                    self._mark_package_downloaded(package)
+                    return {"success": True, "message": "Download completed"}
+                else:
+                    self.logger.error(
+                        f"Download reported success but package not found in cache: {package.name}@{package.version}"
+                    )
+                    self._mark_package_download_failed(package)
+                    return {"success": False, "error": "Download completed but file not found in cache"}
+            else:
+                self._mark_package_download_failed(package)
+                return {"success": False, "error": "Download failed"}
+
+        except Exception as e:
+            self.logger.error(
+                f"Error processing package {package.name}@{package.version}: {str(e)}"
+            )
+            self._mark_package_download_failed(package)
+            return {"success": False, "error": str(e)}
+
+    def _is_package_already_downloaded(self, package: Any) -> bool:
+        """Check if package is already downloaded.
+
+        Args:
+            package: Package to check
+
+        Returns:
+            True if already downloaded, False otherwise
+        """
+        try:
+            # Import here to avoid circular imports
+            from services.package_cache_service import PackageCacheService
+            
+            cache_service = PackageCacheService()
+            return cache_service.is_package_cached(package)
+        except Exception as e:
+            self.logger.error(f"Error checking if package is downloaded: {str(e)}")
+            return False
+
+    def _perform_download(self, package: Any) -> bool:
+        """Perform the actual download from external registry and store in cache.
+
+        Args:
+            package: Package to download
 
         Returns:
             True if download successful, False otherwise
         """
         try:
+            # Import here to avoid circular imports
+            from services.package_cache_service import PackageCacheService
+            
+            # Download tarball from external registry
+            tarball_content = self._download_package_tarball(package)
+            
+            if tarball_content is None:
+                return False
+            
+            # Store tarball in local cache
+            cache_service = PackageCacheService()
+            return cache_service.store_package_from_tarball(package, tarball_content)
+            
+        except Exception as e:
+            self.logger.error(f"Error performing download: {str(e)}")
+            return False
+
+    def _download_package_tarball(self, package: Any) -> Optional[bytes]:
+        """Download package tarball from npm registry.
+
+        Args:
+            package: Package object with name, version
+
+        Returns:
+            Tarball content as bytes if successful, None otherwise
+        """
+        try:
             # Construct download URL using SOURCE_REPOSITORY_URL
             download_url = self._construct_download_url(package)
             
-            logger.info(f"Downloading package {package.name}@{package.version} from {download_url}")
-
-            # Create package cache directory
-            package_dir = self._get_package_cache_path(package)
-            os.makedirs(package_dir, exist_ok=True)
+            self.logger.info(f"Downloading package {package.name}@{package.version} from {download_url}")
 
             # Download tarball
             response = requests.get(
@@ -52,90 +213,28 @@ class DownloadService:
             )
 
             if response.status_code != 200:
-                logger.error(
+                self.logger.error(
                     f"Failed to download package tarball: HTTP {response.status_code}"
                 )
-                return False
+                return None
 
-            # Extract tarball to package cache directory
-            tarball_buffer = io.BytesIO(response.content)
-            with tarfile.open(fileobj=tarball_buffer, mode="r:gz") as tar:
-                tar.extractall(package_dir)
-
-            logger.info(
-                f"Successfully downloaded and extracted {package.name}@{package.version} to {package_dir}"
+            self.logger.info(
+                f"Successfully downloaded tarball for {package.name}@{package.version}"
             )
-            return True
+            return response.content
 
         except requests.exceptions.RequestException as e:
-            logger.error(
-                (
-                    f"Network error downloading package "
-                    f"{package.name}@{package.version}: {str(e)}"
-                )
+            self.logger.error(
+                f"Network error downloading package {package.name}@{package.version}: {str(e)}"
             )
-            return False
-        except tarfile.TarError as e:
-            logger.error(
-                (
-                    f"Error extracting tarball for "
-                    f"{package.name}@{package.version}: {str(e)}"
-                )
-            )
-            return False
+            return None
         except Exception as e:
-            logger.error(
-                f"Unexpected error downloading package "
-                f"{package.name}@{package.version}: {str(e)}"
+            self.logger.error(
+                f"Unexpected error downloading package {package.name}@{package.version}: {str(e)}"
             )
-            return False
+            return None
 
-    def is_package_downloaded(self, package) -> bool:
-        """Check if package is already downloaded in cache.
-
-        Args:
-            package: Package object
-
-        Returns:
-            True if package exists in cache, False otherwise
-        """
-        package_dir = self._get_package_cache_path(package)
-        package_json_path = os.path.join(
-            package_dir, "package", "package.json"
-        )
-        return os.path.exists(package_json_path)
-
-    def get_package_path(self, package) -> Optional[str]:
-        """Get the local path to downloaded package.
-
-        Args:
-            package: Package object
-
-        Returns:
-            Path to package directory or None if not downloaded
-        """
-        if self.is_package_downloaded(package):
-            return os.path.join(
-                self._get_package_cache_path(package), "package"
-            )
-        return None
-
-    def _get_package_cache_path(self, package) -> str:
-        """Get the cache directory path for a package.
-
-        Args:
-            package: Package object
-
-        Returns:
-            Path to package cache directory
-        """
-        # Sanitize package name for use in file paths
-        safe_package_name = package.name.replace("/", "-").replace("@", "")
-        return os.path.join(
-            self.package_cache_dir, f"{safe_package_name}-{package.version}"
-        )
-
-    def _construct_download_url(self, package) -> str:
+    def _construct_download_url(self, package: Any) -> str:
         """Construct download URL using SOURCE_REPOSITORY_URL.
         
         Args:
@@ -156,3 +255,30 @@ class DownloadService:
         else:
             # For regular packages: package -> package
             return f"{self.source_repository_url}/{package.name}/-/{package.name}-{package.version}.tgz"
+
+    def _mark_package_downloading(self, package: Any) -> None:
+        """Mark package as downloading.
+
+        Args:
+            package: Package to update
+        """
+        if package.package_status:
+            self._status_ops.go_to_next_stage(package.id)
+
+    def _mark_package_downloaded(self, package: Any) -> None:
+        """Mark package as downloaded.
+
+        Args:
+            package: Package to update
+        """
+        if package.package_status:
+            self._status_ops.go_to_next_stage(package.id)
+
+    def _mark_package_download_failed(self, package: Any) -> None:
+        """Mark package as download failed.
+
+        Args:
+            package: Package to update
+        """
+        if package.package_status:
+            self._status_ops.update_status(package.id, "Download Failed")

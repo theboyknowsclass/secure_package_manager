@@ -8,7 +8,7 @@ import logging
 from typing import List
 
 from database.session_helper import SessionHelper
-from services.download_processing_service import DownloadProcessingService
+from services.download_service import DownloadService
 from workers.base_worker import BaseWorker
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ class DownloadWorker(BaseWorker):
     """Background worker for downloading packages.
 
     This worker coordinates the download process by:
-    1. Delegating download logic to DownloadProcessingService
+    1. Delegating download logic to DownloadService
     2. Handling results and logging progress
     """
 
@@ -37,7 +37,7 @@ class DownloadWorker(BaseWorker):
     def initialize(self) -> None:
         """Initialize services."""
         logger.info("Initializing DownloadWorker services...")
-        self.download_service = DownloadProcessingService()
+        self.download_service = DownloadService()
         logger.info("DownloadWorker services initialized")
 
     def process_cycle(self) -> None:

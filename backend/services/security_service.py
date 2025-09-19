@@ -25,28 +25,37 @@ class SecurityService:
     def __init__(self) -> None:
         """Initialize the security service."""
         self.logger = logger
+        # Operations instances (set up in _setup_operations)
+        self._session = None
+        self._package_ops = None
+        self._status_ops = None
+
+    def _setup_operations(self, session):
+        """Set up operations instances for the current session."""
+        self._session = session
+        self._package_ops = PackageOperations(session)
+        self._status_ops = PackageStatusOperations(session)
 
     def process_package_batch(
-        self, max_packages: int = 10
+        self, max_packages: int = 5
     ) -> Dict[str, Any]:
         """Process a batch of packages for security scanning.
 
         Args:
-            max_packages: Maximum number of packages to process
+            max_packages: Maximum number of packages to process (reduced for better performance)
 
         Returns:
             Dict with processing results
         """
         try:
             with SessionHelper.get_session() as db:
-                # Initialize operations
-                package_ops = PackageOperations(db.session)
-                status_ops = PackageStatusOperations(db.session)
+                # Set up operations
+                self._setup_operations(db.session)
                 
                 # Find packages that need security scanning
-                downloaded_packages = package_ops.get_by_status("Downloaded")
+                downloaded_packages = self._package_ops.get_by_status("Downloaded")
                 
-                # Limit the number of packages processed
+                # Limit the number of packages processed (smaller batches)
                 limited_packages = downloaded_packages[:max_packages]
 
                 if not limited_packages:
@@ -62,7 +71,7 @@ class SecurityService:
                 failed_scans = 0
 
                 for package in limited_packages:
-                    result = self.scan_single_package(package, status_ops)
+                    result = self.scan_single_package(package)
                     if result["success"]:
                         successful_scans += 1
                     else:
@@ -88,38 +97,35 @@ class SecurityService:
                 "total_packages": 0
             }
 
-    def scan_single_package(
-        self, package: Any, status_ops: PackageStatusOperations
-    ) -> Dict[str, Any]:
+    def scan_single_package(self, package: Any) -> Dict[str, Any]:
         """Scan a single package for security vulnerabilities.
 
         Args:
             package: Package to scan
-            status_ops: Package status operations instance
 
         Returns:
             Dict with scan results
         """
         try:
             # Update package status to "Security Scanning"
-            self._update_package_status_to_scanning(package, status_ops)
+            self._update_package_status_to_scanning(package)
 
             # Perform the actual security scan
             scan_result = self._perform_security_scan(package)
 
             # Process scan results
             if scan_result.get("status") == "failed":
-                self._mark_scan_failed(package, status_ops)
+                self._mark_scan_failed(package)
                 return {"success": False, "error": "Security scan failed"}
             else:
-                self._mark_scan_completed(package, scan_result, status_ops)
+                self._mark_scan_completed(package, scan_result)
                 return {"success": True, "scan_result": scan_result}
 
         except Exception as e:
             self.logger.error(
                 f"Error scanning package {package.name}@{package.version}: {str(e)}"
             )
-            self._mark_scan_failed(package, status_ops)
+            self._mark_scan_failed(package)
             return {"success": False, "error": str(e)}
 
 
@@ -142,37 +148,30 @@ class SecurityService:
             self.logger.error(f"Error performing security scan: {str(e)}")
             return {"status": "failed", "error": str(e)}
 
-    def _update_package_status_to_scanning(
-        self, package: Any, status_ops: PackageStatusOperations
-    ) -> None:
+    def _update_package_status_to_scanning(self, package: Any) -> None:
         """Update package status to Security Scanning.
 
         Args:
             package: Package to update
-            status_ops: Package status operations instance
         """
         if package.package_status:
-            status_ops.go_to_next_stage(package.id)
+            self._status_ops.go_to_next_stage(package.id)
 
-    def _mark_scan_completed(
-        self, package: Any, scan_result: Dict[str, Any], status_ops: PackageStatusOperations
-    ) -> None:
+    def _mark_scan_completed(self, package: Any, scan_result: Dict[str, Any]) -> None:
         """Mark package scan as completed.
 
         Args:
             package: Package to update
             scan_result: Results from the security scan
-            status_ops: Package status operations instance
         """
         if package.package_status:
-            status_ops.go_to_next_stage(package.id)
+            self._status_ops.go_to_next_stage(package.id)
 
-    def _mark_scan_failed(self, package: Any, status_ops: PackageStatusOperations) -> None:
+    def _mark_scan_failed(self, package: Any) -> None:
         """Mark package scan as failed.
 
         Args:
             package: Package to update
-            status_ops: Package status operations instance
         """
         if package.package_status:
-            status_ops.go_to_next_stage(package.id)
+            self._status_ops.update_status(package.id, "Security Scan Failed")
