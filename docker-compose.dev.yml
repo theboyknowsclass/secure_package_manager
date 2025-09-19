@@ -1,4 +1,4 @@
-# Development-specific overrides and additions
+﻿# Development-specific overrides and additions
 # Use with: docker compose -f docker-compose.base.yml -f docker-compose.dev.yml up
 
 services:

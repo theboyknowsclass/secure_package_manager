@@ -1,4 +1,4 @@
-# Production complete reset script for Windows PowerShell
+﻿# Production complete reset script for Windows PowerShell
 # Removes everything including database - USE WITH CAUTION!
 
 Write-Host "⚠️  WARNING: This will completely reset the production environment!" -ForegroundColor Red

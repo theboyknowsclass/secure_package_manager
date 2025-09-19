@@ -1,4 +1,4 @@
-# Mock Identity Provider (IDP)
+﻿# Mock Identity Provider (IDP)
 
 A mock OAuth 2.0 / OpenID Connect identity provider for development and testing of the Secure Package Manager.
 

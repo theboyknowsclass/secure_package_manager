@@ -1,4 +1,4 @@
-# Background Worker Service Implementation
+﻿# Background Worker Service Implementation
 
 ## Overview
 

@@ -1,3 +1,1 @@
-"""
-Test data package for backend tests
-"""
+"""Test data package for backend tests."""

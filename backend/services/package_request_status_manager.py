@@ -1,8 +1,7 @@
-"""
-Package Request Status Manager
+"""Package Request Status Manager.
 
-Handles the complex logic for determining and updating package request statuses
-based on the states of individual packages within the request.
+Handles the complex logic for determining and updating package request
+statuses based on the states of individual packages within the request.
 """
 
 import logging
@@ -15,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class PackageRequestStatusManager:
-    """Manages package request status updates based on package states"""
+    """Manages package request status updates based on package states."""
 
     def __init__(self, db_session: Any = None) -> None:
         self.db = db_session
@@ -32,7 +31,9 @@ class PackageRequestStatusManager:
             The new status if updated, None if no change needed
         """
         with get_db_operations() as ops:
-            request = ops.query(Request).filter(Request.id == request_id).first()
+            request = (
+                ops.query(Request).filter(Request.id == request_id).first()
+            )
         if not request:
             logger.warning(f"Request {request_id} not found")
             return None
@@ -44,9 +45,11 @@ class PackageRequestStatusManager:
         logger.info(f"Request {request_id} status: {new_status}")
         return new_status
 
-    def _determine_request_status(self, request_id: int, request: Request) -> str:
-        """
-        Determine the appropriate status for a package request based on package states
+    def _determine_request_status(
+        self, request_id: int, request: Request
+    ) -> str:
+        """Determine the appropriate status for a package request based on
+        package states.
 
         Args:
             request_id: The ID of the package request
@@ -65,7 +68,8 @@ class PackageRequestStatusManager:
         if counts["Submitted"] > 0 or counts["Parsed"] > 0:
             return "processing"
 
-        # Rule 3: If all packages are pending approval, request is ready for approval
+        # Rule 3: If all packages are pending approval, request is ready for
+        # approval
         if counts["Pending Approval"] == total_packages:
             return "pending_approval"
 
@@ -91,8 +95,7 @@ class PackageRequestStatusManager:
         return "processing"
 
     def _get_package_counts_by_status(self, request_id: int) -> Dict[str, int]:
-        """
-        Get counts of packages by status for a request
+        """Get counts of packages by status for a request.
 
         Args:
             request_id: The ID of the package request
@@ -100,9 +103,15 @@ class PackageRequestStatusManager:
         Returns:
             Dictionary with status counts
         """
-        # Get all packages for this request through the many-to-many relationship
+        # Get all packages for this request through the many-to-many
+        # relationship
         with get_db_operations() as ops:
-            packages = ops.query(Package).join(RequestPackage).filter(RequestPackage.request_id == request_id).all()
+            packages = (
+                ops.query(Package)
+                .join(RequestPackage)
+                .filter(RequestPackage.request_id == request_id)
+                .all()
+            )
 
         counts = {
             "total": len(packages),
@@ -134,8 +143,7 @@ class PackageRequestStatusManager:
         return counts
 
     def get_request_status_summary(self, request_id: int) -> Dict[str, Any]:
-        """
-        Get a summary of the request status and package counts
+        """Get a summary of the request status and package counts.
 
         Args:
             request_id: The ID of the package request
@@ -144,7 +152,9 @@ class PackageRequestStatusManager:
             Dictionary with status summary information
         """
         with get_db_operations() as ops:
-            request = ops.query(Request).filter(Request.id == request_id).first()
+            request = (
+                ops.query(Request).filter(Request.id == request_id).first()
+            )
         if not request:
             return {"error": f"Request {request_id} not found"}
 
@@ -156,12 +166,15 @@ class PackageRequestStatusManager:
             "current_status": current_status,
             "total_packages": counts["total"],
             "package_counts": counts,
-            "completion_percentage": self._calculate_completion_percentage(counts, counts["total"]),
+            "completion_percentage": self._calculate_completion_percentage(
+                counts, counts["total"]
+            ),
         }
 
-    def _calculate_completion_percentage(self, counts: Dict[str, int], total_packages: int) -> float:
-        """
-        Calculate the completion percentage of a request
+    def _calculate_completion_percentage(
+        self, counts: Dict[str, int], total_packages: int
+    ) -> float:
+        """Calculate the completion percentage of a request.
 
         Args:
             counts: Package counts by status
@@ -174,14 +187,18 @@ class PackageRequestStatusManager:
             return 0.0
 
         completed_packages = (
-            counts["Security Scanned"] + counts["Pending Approval"] + counts["Approved"] + counts["Rejected"]
+            counts["Security Scanned"]
+            + counts["Pending Approval"]
+            + counts["Approved"]
+            + counts["Rejected"]
         )
 
         return (completed_packages / total_packages) * 100.0
 
-    def get_packages_by_status(self, request_id: int, status: str) -> List[Package]:
-        """
-        Get all packages for a request with a specific status
+    def get_packages_by_status(
+        self, request_id: int, status: str
+    ) -> List[Package]:
+        """Get all packages for a request with a specific status.
 
         Args:
             request_id: The ID of the package request
@@ -195,15 +212,17 @@ class PackageRequestStatusManager:
                 ops.query(Package)
                 .join(RequestPackage)
                 .join(PackageStatus)
-                .filter(RequestPackage.request_id == request_id, PackageStatus.status == status)
+                .filter(
+                    RequestPackage.request_id == request_id,
+                    PackageStatus.status == status,
+                )
                 .all()
             )
 
         return packages
 
     def get_packages_needing_approval(self, request_id: int) -> List[Package]:
-        """
-        Get all packages for a request that are pending approval
+        """Get all packages for a request that are pending approval.
 
         Args:
             request_id: The ID of the package request
@@ -213,9 +232,10 @@ class PackageRequestStatusManager:
         """
         return self.get_packages_by_status(request_id, "Pending Approval")
 
-    def get_packages_by_security_scan_status(self, request_id: int, scan_status: str) -> List[Package]:
-        """
-        Get all packages for a request with a specific security scan status
+    def get_packages_by_security_scan_status(
+        self, request_id: int, scan_status: str
+    ) -> List[Package]:
+        """Get all packages for a request with a specific security scan status.
 
         Args:
             request_id: The ID of the package request

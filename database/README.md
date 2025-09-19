@@ -1,4 +1,4 @@
-# Database Documentation
+﻿# Database Documentation
 
 This directory contains the database schema and initialization scripts for the Secure Package Manager application.
 

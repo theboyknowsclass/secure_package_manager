@@ -1,4 +1,4 @@
-# Complete cleanup script for Windows PowerShell
+﻿# Complete cleanup script for Windows PowerShell
 # Removes all project-related Docker resources
 
 Write-Host "🧹 Complete Docker cleanup for Secure Package Manager..." -ForegroundColor Yellow

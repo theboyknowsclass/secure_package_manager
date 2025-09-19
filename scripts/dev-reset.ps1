@@ -1,4 +1,4 @@
-# Development complete reset script for Windows PowerShell
+﻿# Development complete reset script for Windows PowerShell
 # Removes everything including database
 
 Write-Host "🔄 Completely resetting development environment..." -ForegroundColor Yellow

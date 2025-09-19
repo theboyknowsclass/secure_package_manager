@@ -1,4 +1,4 @@
-# Production tear-down script for Windows PowerShell
+﻿# Production tear-down script for Windows PowerShell
 
 Write-Host "🛑 Stopping production environment..." -ForegroundColor Yellow
 

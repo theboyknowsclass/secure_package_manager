@@ -1,4 +1,4 @@
-# Mock NPM Registry
+﻿# Mock NPM Registry
 
 A mock NPM registry server for development and testing of the Secure Package Manager.
 

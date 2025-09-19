@@ -1,4 +1,4 @@
--- Initialize the secure package manager database
+﻿-- Initialize the secure package manager database
 -- Production schema - simplified and streamlined
 
 -- Create users table

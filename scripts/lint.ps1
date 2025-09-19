@@ -1,4 +1,4 @@
-# Lint script for Secure Package Manager
+﻿# Lint script for Secure Package Manager
 # This script runs all linting tools to ensure PEP 8 compliance
 
 param(
@@ -22,7 +22,7 @@ if (-not $env:VIRTUAL_ENV) {
 
 # Install linting tools if not already installed
 Write-Host "📦 Installing/updating linting tools..." -ForegroundColor Cyan
-pip install -q flake8 black isort mypy
+pip install -q flake8 black isort mypy autopep8 docformatter
 
 if ($Fix) {
     Write-Host "🔧 Fixing code formatting issues..." -ForegroundColor Green
@@ -34,6 +34,22 @@ if ($Fix) {
     # Run black to fix code formatting
     Write-Host "🎨 Fixing code formatting with black..." -ForegroundColor Cyan
     black backend/ tests/
+    
+    # Run autopep8 to fix remaining PEP 8 violations
+    Write-Host "🔧 Fixing PEP 8 violations with autopep8..." -ForegroundColor Cyan
+    autopep8 --in-place --recursive --aggressive --aggressive backend/ tests/
+    
+    # Run docformatter to fix docstring formatting
+    Write-Host "📝 Fixing docstring formatting with docformatter..." -ForegroundColor Cyan
+    docformatter --in-place --recursive backend/ tests/
+    
+    # Convert line endings from CRLF to LF
+    Write-Host "🔄 Converting line endings from CRLF to LF..." -ForegroundColor Cyan
+    Get-ChildItem -Path "backend", "tests" -Recurse -Include "*.py" | ForEach-Object {
+        $content = Get-Content $_.FullName -Raw
+        $content = $content -replace "`r`n", "`n"
+        Set-Content -Path $_.FullName -Value $content -NoNewline
+    }
     
     Write-Host "✅ Code formatting fixes applied!" -ForegroundColor Green
 } else {

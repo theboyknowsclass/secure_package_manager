@@ -13,7 +13,7 @@ class AuthService:
         self.secret_key = JWT_SECRET or ""
 
     def generate_token(self, user: User) -> str:
-        """Generate JWT token for user"""
+        """Generate JWT token for user."""
         payload = {
             "user_id": user.id,
             "username": user.username,
@@ -25,7 +25,7 @@ class AuthService:
         return str(jwt.encode(payload, self.secret_key, algorithm="HS256"))
 
     def verify_token(self, token: str) -> Optional[User]:
-        """Verify JWT token and return user"""
+        """Verify JWT token and return user."""
         import logging
 
         logger = logging.getLogger(__name__)
@@ -52,14 +52,16 @@ class AuthService:
             logger.error(f"Invalid token: {str(e)}")
             return None
         except Exception as e:
-            logger.error(f"Unexpected error during token verification: {str(e)}")
+            logger.error(
+                f"Unexpected error during token verification: {str(e)}"
+            )
             return None
 
         logger.error("Token verification failed - no valid user found")
         return None
 
     def _decode_jwt_token(self, token: str) -> Optional[Dict[str, Any]]:
-        """Decode and validate JWT token"""
+        """Decode and validate JWT token."""
         import logging
 
         logger = logging.getLogger(__name__)
@@ -81,17 +83,20 @@ class AuthService:
 
         logger = logging.getLogger(__name__)
 
-        # Check if this is an OAuth2 token (has 'sub' field) or legacy token (has 'user_id')
+        # Check if this is an OAuth2 token (has 'sub' field) or legacy token
+        # (has 'user_id')
         if "sub" in payload:
             return self._handle_oauth2_token(payload)
         elif "user_id" in payload:
             return self._handle_legacy_token(payload)
         else:
-            logger.error("Token payload contains neither 'sub' nor 'user_id' field")
+            logger.error(
+                "Token payload contains neither 'sub' nor 'user_id' field"
+            )
             return None
 
     def _handle_oauth2_token(self, payload: Dict[str, Any]) -> Optional[User]:
-        """Handle OAuth2 token and return user"""
+        """Handle OAuth2 token and return user."""
         import logging
 
         logger = logging.getLogger(__name__)
@@ -107,14 +112,18 @@ class AuthService:
         with get_db_operations() as ops:
             user = ops.get_user_by_username(username, User)
             if not user:
-                user = self._create_user_from_oauth2_payload(payload, username, ops)
+                user = self._create_user_from_oauth2_payload(
+                    payload, username, ops
+                )
             else:
-                user = self._update_user_from_oauth2_payload(user, payload, ops)
+                user = self._update_user_from_oauth2_payload(
+                    user, payload, ops
+                )
 
         return user
 
     def _handle_legacy_token(self, payload: Dict[str, Any]) -> Optional[User]:
-        """Handle legacy token and return user"""
+        """Handle legacy token and return user."""
         import logging
 
         logger = logging.getLogger(__name__)
@@ -130,19 +139,25 @@ class AuthService:
         with get_db_operations() as ops:
             user = ops.get_user_by_id(user_id, User)
             if user:
-                logger.info(f"Found user by ID: {user.username} with role: {user.role}")
+                logger.info(
+                    f"Found user by ID: {user.username} with role: {user.role}"
+                )
                 return user
             else:
                 logger.error(f"No user found with ID: {user_id}")
                 return None
 
-    def _create_user_from_oauth2_payload(self, payload: Dict[str, Any], username: str, ops) -> User:
-        """Create new user from OAuth2 token payload"""
+    def _create_user_from_oauth2_payload(
+        self, payload: Dict[str, Any], username: str, ops
+    ) -> User:
+        """Create new user from OAuth2 token payload."""
         import logging
 
         logger = logging.getLogger(__name__)
 
-        logger.info(f"User {username} not found in database, creating new user")
+        logger.info(
+            f"User {username} not found in database, creating new user"
+        )
         user_data = {
             "username": username,
             "email": payload.get("email", f"{username}@example.com"),
@@ -151,16 +166,22 @@ class AuthService:
         }
         user = ops.create_user(user_data, User)
         if user:
-            logger.info(f"Created new user: {user.username} with role: {user.role}")
+            logger.info(
+                f"Created new user: {user.username} with role: {user.role}"
+            )
         return user
 
-    def _update_user_from_oauth2_payload(self, user: User, payload: Dict[str, Any], ops) -> User:
-        """Update existing user with OAuth2 token data"""
+    def _update_user_from_oauth2_payload(
+        self, user: User, payload: Dict[str, Any], ops
+    ) -> User:
+        """Update existing user with OAuth2 token data."""
         import logging
 
         logger = logging.getLogger(__name__)
 
-        logger.info(f"Found existing user: {user.username} with role: {user.role}")
+        logger.info(
+            f"Found existing user: {user.username} with role: {user.role}"
+        )
         # Update existing user with fresh OAuth2 token data
         update_data = {
             "email": payload.get("email", user.email),
@@ -168,11 +189,15 @@ class AuthService:
             "role": payload.get("role", user.role),
         }
         if ops.update_user(user, update_data):
-            logger.info(f"Updated existing user: {user.username} with role: {user.role}")
+            logger.info(
+                f"Updated existing user: {
+                    user.username} with role: {
+                    user.role}"
+            )
         return user
 
     def require_auth(self, f: Callable[..., Any]) -> Callable[..., Any]:
-        """Decorator to require authentication"""
+        """Decorator to require authentication."""
 
         @wraps(f)
         def decorated_function(*args: Any, **kwargs: Any) -> Any:
@@ -180,7 +205,9 @@ class AuthService:
 
             logger = logging.getLogger(__name__)
 
-            logger.info(f"=== AUTH DEBUG: require_auth called for {f.__name__} ===")
+            logger.info(
+                f"=== AUTH DEBUG: require_auth called for {f.__name__} ==="
+            )
             logger.info(f"Request URL: {request.url}")
             logger.info(f"Request method: {request.method}")
             logger.info(f"Request headers: {dict(request.headers)}")
@@ -190,12 +217,16 @@ class AuthService:
             # Get token from header
             if "Authorization" in request.headers:
                 auth_header = request.headers["Authorization"]
-                logger.info(f"Authorization header found: {auth_header[:50]}...")
+                logger.info(
+                    f"Authorization header found: {auth_header[:50]}..."
+                )
                 try:
                     token = auth_header.split(" ")[1]
                     logger.info(f"Extracted token: {token[:50]}...")
                 except IndexError:
-                    logger.error("Invalid token format - missing space separator")
+                    logger.error(
+                        "Invalid token format - missing space separator"
+                    )
                     return jsonify({"error": "Invalid token format"}), 401
             else:
                 logger.warning("No Authorization header found")
@@ -208,10 +239,17 @@ class AuthService:
             logger.info("Verifying token...")
             user = self.verify_token(token)
             if not user:
-                logger.error("Token verification failed - invalid or expired token")
+                logger.error(
+                    "Token verification failed - invalid or expired token"
+                )
                 return jsonify({"error": "Invalid or expired token"}), 401
 
-            logger.info(f"Token verified successfully for user: {user.username} (ID: {user.id}, Role: {user.role})")
+            logger.info(
+                f"Token verified successfully for user: {
+                    user.username} (ID: {
+                    user.id}, Role: {
+                    user.role})"
+            )
 
             # Add user to request context
             request.user = user
@@ -228,7 +266,7 @@ class AuthService:
         return decorated_function
 
     def require_admin(self, f: Callable[..., Any]) -> Callable[..., Any]:
-        """Decorator to require admin privileges"""
+        """Decorator to require admin privileges."""
 
         @wraps(f)
         def decorated_function(*args: Any, **kwargs: Any) -> Any:
@@ -249,7 +287,7 @@ class AuthService:
         return decorated_function
 
     def require_approver(self, f: Callable[..., Any]) -> Callable[..., Any]:
-        """Decorator to require approver or admin privileges"""
+        """Decorator to require approver or admin privileges."""
 
         @wraps(f)
         def decorated_function(*args: Any, **kwargs: Any) -> Any:
@@ -263,14 +301,19 @@ class AuthService:
 
             # Check if user is approver or admin
             if not (request.user.role in ["approver", "admin"]):
-                return jsonify({"error": "Approver or Admin privileges required"}), 403
+                return (
+                    jsonify(
+                        {"error": "Approver or Admin privileges required"}
+                    ),
+                    403,
+                )
 
             return f(*args, **kwargs)
 
         return decorated_function
 
     def require_permission(self, permission: str) -> Callable[..., Any]:
-        """Decorator factory to require specific permission"""
+        """Decorator factory to require specific permission."""
 
         def decorator(f: Callable[..., Any]) -> Callable[..., Any]:
             @wraps(f)
@@ -285,7 +328,12 @@ class AuthService:
 
                 # Check if user has permission
                 if not request.user.has_permission(permission):
-                    return jsonify({"error": f"Permission required: {permission}"}), 403
+                    return (
+                        jsonify(
+                            {"error": f"Permission required: {permission}"}
+                        ),
+                        403,
+                    )
 
                 return f(*args, **kwargs)
 

@@ -1,4 +1,4 @@
-# Production startup script for Windows PowerShell
+﻿# Production startup script for Windows PowerShell
 
 Write-Host "🚀 Starting production environment..." -ForegroundColor Green
 

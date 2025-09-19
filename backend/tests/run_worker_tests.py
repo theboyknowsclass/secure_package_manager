@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""
-Test runner for worker module unit tests.
+"""Test runner for worker module unit tests.
+
 Runs all unit tests in the workers test package.
 """
 
@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 def run_worker_tests():
-    """Run all worker unit tests"""
+    """Run all worker unit tests."""
     print("🚀 Starting Worker Unit Tests...")
     print("=" * 50)
 
@@ -31,7 +31,9 @@ def run_worker_tests():
         print("🎉 All worker unit tests passed!")
         return True
     else:
-        print(f"❌ {len(result.failures)} test(s) failed, {len(result.errors)} error(s)")
+        print(
+            f"❌ {len(result.failures)} test(s) failed, {len(result.errors)} error(s)"
+        )
         return False
 
 

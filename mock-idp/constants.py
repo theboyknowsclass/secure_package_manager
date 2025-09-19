@@ -1,4 +1,4 @@
-"""
+﻿"""
 Configuration constants for the Mock IDP service.
 All hardcoded values should be defined here and imported where needed.
 

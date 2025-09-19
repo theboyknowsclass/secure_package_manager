@@ -1,8 +1,8 @@
-"""
-Database Models Package
+"""Database Models Package.
 
-This package contains all the SQLAlchemy models for the secure package manager.
-Each model is in its own file for better organization and maintainability.
+This package contains all the SQLAlchemy models for the secure package
+manager. Each model is in its own file for better organization and
+maintainability.
 """
 
 from .audit_log import AuditLog

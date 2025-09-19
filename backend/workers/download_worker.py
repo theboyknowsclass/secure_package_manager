@@ -1,7 +1,7 @@
-"""
-Download Worker
+"""Download Worker.
 
-Transitions packages from Licence Checked to Downloaded (via Downloading).
+Transitions packages from Licence Checked to Downloaded (via
+Downloading).
 """
 
 import logging
@@ -19,12 +19,14 @@ logger = logging.getLogger(__name__)
 
 
 class DownloadWorker(BaseWorker):
-    """Background worker for downloading packages"""
+    """Background worker for downloading packages."""
 
     WORKER_TYPE = "download_worker"
 
     # Extend base environment variables with download-specific ones
-    required_env_vars = BaseWorker.required_env_vars + ["SOURCE_REPOSITORY_URL"]
+    required_env_vars = BaseWorker.required_env_vars + [
+        "SOURCE_REPOSITORY_URL"
+    ]
 
     def __init__(self, sleep_interval: int = 10):
         super().__init__("DownloadWorker", sleep_interval)
@@ -59,26 +61,39 @@ class DownloadWorker(BaseWorker):
         try:
             stuck_threshold = datetime.utcnow() - self.stuck_package_timeout
             stuck_statuses = ["Downloading"]
-            stuck_packages = self.ops.get_packages_by_statuses(stuck_statuses, Package, PackageStatus)
+            stuck_packages = self.ops.get_packages_by_statuses(
+                stuck_statuses, Package, PackageStatus
+            )
             stuck_packages = [
-                p for p in stuck_packages if p.package_status and p.package_status.updated_at < stuck_threshold
+                p
+                for p in stuck_packages
+                if p.package_status
+                and p.package_status.updated_at < stuck_threshold
             ]
 
             if not stuck_packages:
                 return
-            logger.warning(f"Found {len(stuck_packages)} stuck downloads; resetting to Licence Checked")
+            logger.warning(
+                f"Found {
+                    len(stuck_packages)} stuck downloads; resetting to Licence Checked")
             for package in stuck_packages:
                 if package.package_status:
-                    self.ops.update_package_status(package.id, "Licence Checked", PackageStatus)
+                    self.ops.update_package_status(
+                        package.id, "Licence Checked", PackageStatus
+                    )
         except Exception:
             logger.exception("Error handling stuck downloads")
 
     def _process_ready_packages(self) -> None:
-        packages = self.ops.get_packages_by_status("Licence Checked", Package, PackageStatus)
+        packages = self.ops.get_packages_by_status(
+            "Licence Checked", Package, PackageStatus
+        )
         packages = packages[: self.max_packages_per_cycle]
 
         if not packages:
-            logger.info("DownloadWorker heartbeat: No packages found for downloading")
+            logger.info(
+                "DownloadWorker heartbeat: No packages found for downloading"
+            )
             return
 
         logger.info(f"Downloading {len(packages)} packages")
@@ -98,11 +113,15 @@ class DownloadWorker(BaseWorker):
 
         # Already downloaded
         if self.download_service.is_package_downloaded(package):
-            self.ops.update_package_status(package.id, "Downloaded", PackageStatus)
+            self.ops.update_package_status(
+                package.id, "Downloaded", PackageStatus
+            )
             return
 
         # Mark downloading
-        self.ops.update_package_status(package.id, "Downloading", PackageStatus)
+        self.ops.update_package_status(
+            package.id, "Downloading", PackageStatus
+        )
 
         if not self.download_service.download_package(package):
             raise RuntimeError("download failed")
@@ -112,6 +131,10 @@ class DownloadWorker(BaseWorker):
     def _mark_failed(self, package: Package) -> None:
         try:
             if package.package_status:
-                self.ops.update_package_status(package.id, "Rejected", PackageStatus)
+                self.ops.update_package_status(
+                    package.id, "Rejected", PackageStatus
+                )
         except Exception:
-            logger.exception("Error marking package as rejected in DownloadWorker")
+            logger.exception(
+                "Error marking package as rejected in DownloadWorker"
+            )

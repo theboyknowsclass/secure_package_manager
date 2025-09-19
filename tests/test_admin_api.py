@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""
-Test suite for admin API endpoints.
+"""Test suite for admin API endpoints.
+
 This helps prevent regressions in the admin dashboard.
 """
 
@@ -22,7 +22,7 @@ class AdminAPITester:
         self.session = requests.Session()
 
     def test_login(self) -> bool:
-        """Test admin login and return token"""
+        """Test admin login and return token."""
         print("Testing admin login...")
         try:
             response = self.session.post(
@@ -42,23 +42,31 @@ class AdminAPITester:
                     print("❌ Login response missing token")
                     return False
             else:
-                print(f"❌ Login failed: {response.status_code} - {response.text}")
+                print(
+                    f"❌ Login failed: {response.status_code} - {response.text}"
+                )
                 return False
         except Exception as e:
             print(f"❌ Login error: {str(e)}")
             return False
 
     def test_validated_packages(self) -> bool:
-        """Test validated packages endpoint"""
+        """Test validated packages endpoint."""
         print("\nTesting validated packages endpoint...")
         try:
             headers = {"Authorization": f"Bearer {self.token}"}
-            response = self.session.get(f"{BASE_URL}/api/admin/packages/validated", headers=headers, timeout=10)
+            response = self.session.get(
+                f"{BASE_URL}/api/admin/packages/validated",
+                headers=headers,
+                timeout=10,
+            )
 
             if response.status_code == 200:
                 data = response.json()
                 packages = data.get("packages", [])
-                print(f"✅ Validated packages endpoint working - found {len(packages)} packages")
+                print(
+                    f"✅ Validated packages endpoint working - found {len(packages)} packages"
+                )
 
                 # Check if response has expected structure
                 if packages:
@@ -71,92 +79,128 @@ class AdminAPITester:
                         "license_score",
                         "license_identifier",
                     ]
-                    missing_fields = [field for field in required_fields if field not in first_pkg]
+                    missing_fields = [
+                        field
+                        for field in required_fields
+                        if field not in first_pkg
+                    ]
                     if missing_fields:
-                        print(f"⚠️  Missing fields in package data: {missing_fields}")
+                        print(
+                            f"⚠️  Missing fields in package data: {missing_fields}")
                         return False
                     else:
                         print("✅ Package data structure is correct")
                 else:
-                    print("ℹ️  No packages found (this is expected for empty database)")
+                    print(
+                        "ℹ️  No packages found (this is expected for empty database)"
+                    )
 
                 return True
             else:
-                print(f"❌ Validated packages endpoint failed: {response.status_code} - {response.text}")
+                print(
+                    f"❌ Validated packages endpoint failed: {response.status_code} - {response.text}"
+                )
                 return False
         except Exception as e:
             print(f"❌ Validated packages error: {str(e)}")
             return False
 
     def test_config(self) -> bool:
-        """Test config endpoint"""
+        """Test config endpoint."""
         print("\nTesting config endpoint...")
         try:
             headers = {"Authorization": f"Bearer {self.token}"}
-            response = self.session.get(f"{BASE_URL}/api/admin/config", headers=headers, timeout=10)
+            response = self.session.get(
+                f"{BASE_URL}/api/admin/config", headers=headers, timeout=10
+            )
 
             if response.status_code == 200:
                 data = response.json()
                 config = data.get("config", {})
                 status = data.get("status", {})
-                print(f"✅ Config endpoint working - config sections: {list(config.keys())}")
+                print(
+                    f"✅ Config endpoint working - config sections: {list(config.keys())}"
+                )
 
                 # Check if we have the expected config sections
-                expected_sections = {"repository", "services", "security", "trivy", "environment"}
+                expected_sections = {
+                    "repository",
+                    "services",
+                    "security",
+                    "trivy",
+                    "environment",
+                }
                 actual_sections = set(config.keys())
                 if expected_sections.issubset(actual_sections):
                     print("✅ Config has expected sections")
                 else:
                     print(
-                        f"⚠️  Missing expected config sections. Expected: {expected_sections}, Found: {actual_sections}"
+                        (
+                            f"⚠️  Missing expected config sections. Expected: {expected_sections}, "
+                            f"Found: {actual_sections}"
+                        )
                     )
 
                 # Check status information
                 is_complete = status.get("is_complete", False)
                 missing_keys = status.get("missing_keys", [])
-                print(f"✅ Config status - complete: {is_complete}, missing: {missing_keys}")
+                print(
+                    f"✅ Config status - complete: {is_complete}, missing: {missing_keys}")
 
                 return True
             else:
-                print(f"❌ Repository config endpoint failed: {response.status_code} - {response.text}")
+                print(
+                    f"❌ Repository config endpoint failed: {response.status_code} - {response.text}"
+                )
                 return False
         except Exception as e:
             print(f"❌ Repository config error: {str(e)}")
             return False
 
     def test_licenses(self) -> bool:
-        """Test licenses endpoint"""
+        """Test licenses endpoint."""
         print("\nTesting licenses endpoint...")
         try:
             headers = {"Authorization": f"Bearer {self.token}"}
-            response = self.session.get(f"{BASE_URL}/api/admin/licenses", headers=headers, timeout=10)
+            response = self.session.get(
+                f"{BASE_URL}/api/admin/licenses", headers=headers, timeout=10
+            )
 
             if response.status_code == 200:
                 data = response.json()
                 licenses = data.get("licenses", [])
-                print(f"✅ Licenses endpoint working - found {len(licenses)} licenses")
+                print(
+                    f"✅ Licenses endpoint working - found {len(licenses)} licenses"
+                )
 
                 # Check if we have some expected licenses
                 if licenses:
                     expected_identifiers = {"MIT", "Apache-2.0", "GPL"}
-                    actual_identifiers = {license.get("identifier") for license in licenses}
+                    actual_identifiers = {
+                        license.get("identifier") for license in licenses
+                    }
                     if expected_identifiers.intersection(actual_identifiers):
                         print("✅ Licenses contain expected identifiers")
                     else:
                         print(
-                            f"⚠️  Missing expected license identifiers. Expected: {expected_identifiers}, Found: {actual_identifiers}"
+                            (
+                                f"⚠️  Missing expected license identifiers. Expected: {expected_identifiers}, "
+                                f"Found: {actual_identifiers}"
+                            )
                         )
 
                 return True
             else:
-                print(f"❌ Licenses endpoint failed: {response.status_code} - {response.text}")
+                print(
+                    f"❌ Licenses endpoint failed: {response.status_code} - {response.text}"
+                )
                 return False
         except Exception as e:
             print(f"❌ Licenses error: {str(e)}")
             return False
 
     def run_all_tests(self) -> bool:
-        """Run all tests and return success status"""
+        """Run all tests and return success status."""
         print("🧪 Running Admin API Tests")
         print("=" * 50)
 
@@ -191,7 +235,7 @@ class AdminAPITester:
 
 
 def main():
-    """Main test runner"""
+    """Main test runner."""
     tester = AdminAPITester()
     success = tester.run_all_tests()
     sys.exit(0 if success else 1)

@@ -1,4 +1,4 @@
-# Secure Package Manager - Backend
+﻿# Secure Package Manager - Backend
 
 A Flask-based backend service for secure package management with background workers for processing package requests through a multi-stage pipeline.
 

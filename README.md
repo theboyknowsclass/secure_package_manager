@@ -1,4 +1,4 @@
-# Secure Package Manager
+﻿# Secure Package Manager
 
 A secure package management system that processes package-lock.json files, validates packages, and manages approval workflows before publishing to secure repositories.
 

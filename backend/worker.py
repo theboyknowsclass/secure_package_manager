@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""
-Background Worker Entry Point
+"""Background Worker Entry Point.
 
-This is the main entry point for the background worker service.
-It can run different types of workers based on the WORKER_TYPE environment variable.
+This is the main entry point for the background worker service. It can
+run different types of workers based on the WORKER_TYPE environment
+variable.
 """
 
 import logging
@@ -49,31 +49,37 @@ def _get_worker_registry():
 
 
 def get_worker_class_by_type(worker_type: str):
-    """Get worker class by type using class attributes"""
+    """Get worker class by type using class attributes."""
     registry = _get_worker_registry()
     return registry.get(worker_type)
 
 
 def get_available_worker_types():
-    """Get list of all available worker types"""
+    """Get list of all available worker types."""
     registry = _get_worker_registry()
     return list(registry.keys())
 
 
 def main():
-    """Main entry point for the worker"""
+    """Main entry point for the worker."""
     # Get worker type from environment
     worker_type = os.getenv("WORKER_TYPE", "parse_worker")
     sleep_interval = int(os.getenv("WORKER_SLEEP_INTERVAL", "10"))
-    max_packages_per_cycle = int(os.getenv("WORKER_MAX_PACKAGES_PER_CYCLE", "5"))
-    max_license_groups_per_cycle = int(os.getenv("WORKER_MAX_LICENSE_GROUPS_PER_CYCLE", "20"))
+    max_packages_per_cycle = int(
+        os.getenv("WORKER_MAX_PACKAGES_PER_CYCLE", "5")
+    )
+    max_license_groups_per_cycle = int(
+        os.getenv("WORKER_MAX_LICENSE_GROUPS_PER_CYCLE", "20")
+    )
 
     logger.info(f"Starting {worker_type} worker...")
     logger.info("Worker configuration:")
     logger.info(f"  - Type: {worker_type}")
     logger.info(f"  - Sleep interval: {sleep_interval} seconds")
     logger.info(f"  - Max packages per cycle: {max_packages_per_cycle}")
-    logger.info(f"  - Max license groups per cycle: {max_license_groups_per_cycle}")
+    logger.info(
+        f"  - Max license groups per cycle: {max_license_groups_per_cycle}"
+    )
 
     try:
         # Get the worker class by type
@@ -82,7 +88,9 @@ def main():
             available_types = get_available_worker_types()
 
             logger.error(f"Unknown worker type: {worker_type}")
-            logger.error(f"Supported worker types: {', '.join(available_types)}")
+            logger.error(
+                f"Supported worker types: {', '.join(available_types)}"
+            )
             sys.exit(1)
 
         # Create the worker instance

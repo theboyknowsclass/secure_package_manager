@@ -1,6 +1,4 @@
-"""
-User model for managing application users
-"""
+"""User model for managing application users."""
 
 from datetime import datetime
 from typing import Any
@@ -18,14 +16,20 @@ class User(Base):
     username = Column(String(255), unique=True, nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     full_name = Column(String(255), nullable=False)
-    role = Column(String(20), default="user", nullable=False)  # "user", "approver", "admin"
+    role = Column(
+        String(20), default="user", nullable=False
+    )  # "user", "approver", "admin"
     created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     # Relationships
     requests = relationship("Request", backref="requestor", lazy=True)
     audit_logs = relationship("AuditLog", backref="user", lazy=True)
-    supported_licenses = relationship("SupportedLicense", backref="creator", lazy=True)
+    supported_licenses = relationship(
+        "SupportedLicense", backref="creator", lazy=True
+    )
 
     # Role helper methods
     def is_user(self) -> bool:
@@ -38,7 +42,7 @@ class User(Base):
         return str(self.role) == "admin"
 
     def has_permission(self, permission: str) -> bool:
-        """Check if user has specific permission based on role hierarchy"""
+        """Check if user has specific permission based on role hierarchy."""
         role_hierarchy = {
             "user": ["view_packages", "request_packages"],
             "approver": [
@@ -66,6 +70,10 @@ class User(Base):
             "email": self.email,
             "full_name": self.full_name,
             "role": self.role,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_at": (
+                self.created_at.isoformat() if self.created_at else None
+            ),
+            "updated_at": (
+                self.updated_at.isoformat() if self.updated_at else None
+            ),
         }

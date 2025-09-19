@@ -1,6 +1,4 @@
-"""
-Package model for managing npm packages
-"""
+"""Package model for managing npm packages."""
 
 from datetime import datetime
 from typing import Any
@@ -25,8 +23,12 @@ class Package(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    request_packages = relationship("RequestPackage", backref="package", lazy=True)
-    package_status = relationship("PackageStatus", backref="package", uselist=False, lazy=True)
+    request_packages = relationship(
+        "RequestPackage", backref="package", lazy=True
+    )
+    package_status = relationship(
+        "PackageStatus", backref="package", uselist=False, lazy=True
+    )
     security_scans = relationship("SecurityScan", backref="package", lazy=True)
 
     def to_dict(self) -> dict[str, Any]:
@@ -39,5 +41,7 @@ class Package(Base):
             "integrity": self.integrity,
             "license_identifier": self.license_identifier,
             "license_text": self.license_text,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": (
+                self.created_at.isoformat() if self.created_at else None
+            ),
         }

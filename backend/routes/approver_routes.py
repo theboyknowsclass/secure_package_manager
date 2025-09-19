@@ -1,11 +1,19 @@
 import logging
 
 from database.flask_utils import get_db_operations
-from database.models import AuditLog, Package, PackageStatus, Request, RequestPackage
+from database.models import (
+    AuditLog,
+    Package,
+    PackageStatus,
+    Request,
+    RequestPackage,
+)
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from services.auth_service import AuthService
-from services.npm_registry_publishing_service import NpmRegistryPublishingService
+from services.npm_registry_publishing_service import (
+    NpmRegistryPublishingService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,13 +27,17 @@ publishing_service = NpmRegistryPublishingService()
 
 
 # Package Approval Routes - Batch Operations Only
-@approver_bp.route("/packages/publish/<int:package_id>", methods=["POST"])  # type: ignore[misc]
+@approver_bp.route(
+    "/packages/publish/<int:package_id>", methods=["POST"]
+)  # type: ignore[misc]
 @auth_service.require_admin
 def publish_package(package_id: int) -> ResponseReturnValue:
-    """Publish an approved package to the secure repository"""
+    """Publish an approved package to the secure repository."""
     try:
         with get_db_operations() as ops:
-            package = ops.query(Package).filter(Package.id == package_id).first()
+            package = (
+                ops.query(Package).filter(Package.id == package_id).first()
+            )
             if not package:
                 return jsonify({"error": "Package not found"}), 404
 
@@ -33,7 +45,12 @@ def publish_package(package_id: int) -> ResponseReturnValue:
             return jsonify({"error": "Package status not found"}), 404
 
         if package.package_status.status != "Approved":
-            return jsonify({"error": "Package must be approved before publishing"}), 400
+            return (
+                jsonify(
+                    {"error": "Package must be approved before publishing"}
+                ),
+                400,
+            )
 
         # Publish to secure repository
         success = publishing_service.publish_to_secure_repo(package)
@@ -45,7 +62,10 @@ def publish_package(package_id: int) -> ResponseReturnValue:
                 action="publish_package",
                 resource_type="package",
                 resource_id=package.id,
-                details=f"Package {package.name}@{package.version} published to secure repo",
+                details=(
+                    f"Package {package.name}@{package.version} published to "
+                    f"secure repo"
+                ),
             )
             with get_db_operations() as ops:
                 ops.add(audit_log)
@@ -60,10 +80,12 @@ def publish_package(package_id: int) -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
-@approver_bp.route("/packages/batch-approve", methods=["POST"])  # type: ignore[misc]
+@approver_bp.route(
+    "/packages/batch-approve", methods=["POST"]
+)  # type: ignore[misc]
 @auth_service.require_admin
 def batch_approve_packages() -> ResponseReturnValue:
-    """Approve multiple packages at once"""
+    """Approve multiple packages at once."""
     try:
         data = request.get_json() or {}
         package_ids = data.get("package_ids", [])
@@ -79,40 +101,13 @@ def batch_approve_packages() -> ResponseReturnValue:
         failed_packages = []
 
         for package_id in package_ids:
-            try:
-                with get_db_operations() as ops:
-                    package = ops.query(Package).filter(Package.id == package_id).first()
-                if not package:
-                    failed_packages.append({"id": package_id, "error": "Package not found"})
-                    continue
-
-                if not package.package_status:
-                    failed_packages.append({"id": package_id, "error": "Package status not found"})
-                    continue
-
-                if package.package_status.status != "Pending Approval":
-                    failed_packages.append({"id": package_id, "error": "Package must be pending approval"})
-                    continue
-
-                # Approve the package
-                package.package_status.status = "Approved"
-                package.package_status.approver_id = request.user.id
+            result = _process_package_approval(
+                package_id, request.user, reason
+            )
+            if result["success"]:
                 approved_count += 1
-
-                # Log the approval (publishing will be done in batch later)
-                audit_log = AuditLog(
-                    user_id=request.user.id,
-                    action="batch_approve_package",
-                    resource_type="package",
-                    resource_id=package.id,
-                    details=f"Package {package.name}@{package.version} approved: {reason}",
-                )
-                with get_db_operations() as ops:
-                    ops.add(audit_log)
-
-            except Exception as pkg_error:
-                logger.error(f"Error approving package {package_id}: {str(pkg_error)}")
-                failed_packages.append({"id": package_id, "error": str(pkg_error)})
+            else:
+                failed_packages.append(result["error"])
 
         # Create a summary audit log for the batch operation
         summary_audit_log = AuditLog(
@@ -120,25 +115,39 @@ def batch_approve_packages() -> ResponseReturnValue:
             action="batch_approve_packages",
             resource_type="batch_operation",
             resource_id=None,  # No single resource ID for batch operations
-            details=f"Batch approval: {approved_count}/{len(package_ids)} packages approved by {request.user.username}. Package IDs: {list(package_ids)}. Reason: {reason}",
+            details=(
+                f"Batch approval: {approved_count}/{
+                    len(package_ids)} packages "
+                f"approved by {request.user.username}. Package IDs: "
+                f"{list(package_ids)}. Reason: {reason}"
+            ),
         )
         with get_db_operations() as ops:
             ops.add(summary_audit_log)
             ops.commit()
 
-        # Note: Publishing is handled by the PublishWorker for better performance
-        # Packages are approved immediately and will be published by the background worker
+        # Packages are approved immediately and will be published by the
+        # background worker
         logger.info(
-            f"Batch approval completed: {approved_count} packages approved, will be published by background worker"
+            (
+                f"Batch approval completed: {approved_count} packages approved"
+                f", will be published by background worker"
+            )
         )
 
         response_data = {
-            "message": f"Batch approval completed - {approved_count} packages approved",
+            "message": (
+                f"Batch approval completed - {approved_count} packages "
+                f"approved"
+            ),
             "approved_count": approved_count,
             "total_requested": len(package_ids),
             "package_ids": list(package_ids),
             "approved_by": request.user.username,
-            "note": "Packages are approved and ready for publishing. Publishing can be done separately for better performance.",
+            "note": (
+                "Packages are approved and ready for publishing. Publishing "
+                "can be done separately for better performance."
+            ),
         }
 
         if failed_packages:
@@ -153,10 +162,12 @@ def batch_approve_packages() -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
-@approver_bp.route("/packages/batch-reject", methods=["POST"])  # type: ignore[misc]
+@approver_bp.route(
+    "/packages/batch-reject", methods=["POST"]
+)  # type: ignore[misc]
 @auth_service.require_admin
 def batch_reject_packages() -> ResponseReturnValue:
-    """Reject multiple packages at once"""
+    """Reject multiple packages at once."""
     try:
         data = request.get_json() or {}
         package_ids = data.get("package_ids", [])
@@ -175,45 +186,13 @@ def batch_reject_packages() -> ResponseReturnValue:
         failed_packages = []
 
         for package_id in package_ids:
-            try:
-                with get_db_operations() as ops:
-                    package = ops.query(Package).filter(Package.id == package_id).first()
-                if not package:
-                    failed_packages.append({"id": package_id, "error": "Package not found"})
-                    continue
-
-                if not package.package_status:
-                    failed_packages.append({"id": package_id, "error": "Package status not found"})
-                    continue
-
-                if package.package_status.status in ["Approved"]:
-                    failed_packages.append(
-                        {
-                            "id": package_id,
-                            "error": "Cannot reject an already approved package",
-                        }
-                    )
-                    continue
-
-                # Reject the package
-                package.package_status.status = "Rejected"
-                package.package_status.rejector_id = request.user.id
+            result = _process_package_rejection(
+                package_id, request.user, reason
+            )
+            if result["success"]:
                 rejected_count += 1
-
-                # Log the rejection
-                audit_log = AuditLog(
-                    user_id=request.user.id,
-                    action="batch_reject_package",
-                    resource_type="package",
-                    resource_id=package.id,
-                    details=f"Package {package.name}@{package.version} rejected: {reason}",
-                )
-                with get_db_operations() as ops:
-                    ops.add(audit_log)
-
-            except Exception as pkg_error:
-                logger.error(f"Error rejecting package {package_id}: {str(pkg_error)}")
-                failed_packages.append({"id": package_id, "error": str(pkg_error)})
+            else:
+                failed_packages.append(result["error"])
 
         # Create a summary audit log for the batch operation
         summary_audit_log = AuditLog(
@@ -221,7 +200,10 @@ def batch_reject_packages() -> ResponseReturnValue:
             action="batch_reject_packages",
             resource_type="batch_operation",
             resource_id=None,  # No single resource ID for batch operations
-            details=f"Batch rejection: {rejected_count}/{len(package_ids)} packages rejected by {request.user.username}. Package IDs: {list(package_ids)}. Reason: {reason}",
+            details=f"Batch rejection: {rejected_count}/{
+                len(package_ids)} packages rejected by {
+                request.user.username}. Package IDs: {
+                list(package_ids)}. Reason: {reason}",
         )
         with get_db_operations() as ops:
             ops.add(summary_audit_log)
@@ -247,13 +229,20 @@ def batch_reject_packages() -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
-@approver_bp.route("/packages/validated", methods=["GET"])  # type: ignore[misc]
+@approver_bp.route(
+    "/packages/validated", methods=["GET"]
+)  # type: ignore[misc]
 @auth_service.require_admin
 def get_validated_packages() -> ResponseReturnValue:
     """Get all packages ready for admin review (pending approval)"""
     try:
         with get_db_operations() as ops:
-            packages = ops.query(Package).join(PackageStatus).filter(PackageStatus.status == "Pending Approval").all()
+            packages = (
+                ops.query(Package)
+                .join(PackageStatus)
+                .filter(PackageStatus.status == "Pending Approval")
+                .all()
+            )
 
         # Handle case when no packages exist
         if not packages:
@@ -265,11 +254,19 @@ def get_validated_packages() -> ResponseReturnValue:
             try:
                 # Get request information for this package
                 with get_db_operations() as ops:
-                    request_package = ops.query(RequestPackage).filter_by(package_id=pkg.id).first()
+                    request_package = (
+                        ops.query(RequestPackage)
+                        .filter_by(package_id=pkg.id)
+                        .first()
+                    )
                     request_data = None
 
                     if request_package:
-                        request_record = ops.query(Request).filter(Request.id == request_package.request_id).first()
+                        request_record = (
+                            ops.query(Request)
+                            .filter(Request.id == request_package.request_id)
+                            .first()
+                        )
                     if request_record:
                         request_data = {
                             "id": request_record.id,
@@ -278,7 +275,9 @@ def get_validated_packages() -> ResponseReturnValue:
                         }
 
                 # Get package type from RequestPackage
-                package_type = request_package.package_type if request_package else "new"
+                package_type = (
+                    request_package.package_type if request_package else "new"
+                )
 
                 package_list.append(
                     {
@@ -291,16 +290,16 @@ def get_validated_packages() -> ResponseReturnValue:
                         "license_status": pkg.package_status.license_status,
                         "security_scan_status": pkg.package_status.security_scan_status,
                         "type": package_type,
-                        "request": request_data
-                        or {
+                        "request": request_data or {
                             "id": 0,
                             "application_name": "Unknown",
                             "version": "Unknown",
                         },
-                    }
-                )
+                    })
             except Exception as pkg_error:
-                logger.warning(f"Error processing package {pkg.id}: {str(pkg_error)}")
+                logger.warning(
+                    f"Error processing package {pkg.id}: {str(pkg_error)}"
+                )
                 # Skip this package but continue with others
                 continue
 
@@ -308,3 +307,129 @@ def get_validated_packages() -> ResponseReturnValue:
     except Exception as e:
         logger.error(f"Get validated packages error: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
+
+
+def _process_package_approval(package_id: int, user, reason: str) -> dict:
+    """Process approval of a single package.
+    
+    Returns:
+        dict: {"success": bool, "error": dict or None}
+    """
+    try:
+        with get_db_operations() as ops:
+            package = (
+                ops.query(Package)
+                .filter(Package.id == package_id)
+                .first()
+            )
+        
+        if not package:
+            return {
+                "success": False,
+                "error": {"id": package_id, "error": "Package not found"}
+            }
+
+        if not package.package_status:
+            return {
+                "success": False,
+                "error": {"id": package_id, "error": "Package status not found"}
+            }
+
+        if package.package_status.status != "Pending Approval":
+            return {
+                "success": False,
+                "error": {
+                    "id": package_id,
+                    "error": "Package must be pending approval"
+                }
+            }
+
+        # Approve the package
+        package.package_status.status = "Approved"
+        package.package_status.approver_id = user.id
+
+        # Log the approval
+        audit_log = AuditLog(
+            user_id=user.id,
+            action="batch_approve_package",
+            resource_type="package",
+            resource_id=package.id,
+            details=(
+                f"Package {package.name}@{package.version} approved: "
+                f"{reason}"
+            ),
+        )
+        with get_db_operations() as ops:
+            ops.add(audit_log)
+
+        return {"success": True, "error": None}
+
+    except Exception as pkg_error:
+        logger.error(f"Error approving package {package_id}: {str(pkg_error)}")
+        return {
+            "success": False,
+            "error": {"id": package_id, "error": str(pkg_error)}
+        }
+
+
+def _process_package_rejection(package_id: int, user, reason: str) -> dict:
+    """Process rejection of a single package.
+    
+    Returns:
+        dict: {"success": bool, "error": dict or None}
+    """
+    try:
+        with get_db_operations() as ops:
+            package = (
+                ops.query(Package)
+                .filter(Package.id == package_id)
+                .first()
+            )
+        
+        if not package:
+            return {
+                "success": False,
+                "error": {"id": package_id, "error": "Package not found"}
+            }
+
+        if not package.package_status:
+            return {
+                "success": False,
+                "error": {"id": package_id, "error": "Package status not found"}
+            }
+
+        if package.package_status.status in ["Approved"]:
+            return {
+                "success": False,
+                "error": {
+                    "id": package_id,
+                    "error": "Cannot reject an already approved package"
+                }
+            }
+
+        # Reject the package
+        package.package_status.status = "Rejected"
+        package.package_status.rejector_id = user.id
+
+        # Log the rejection
+        audit_log = AuditLog(
+            user_id=user.id,
+            action="batch_reject_package",
+            resource_type="package",
+            resource_id=package.id,
+            details=(
+                f"Package {package.name}@{package.version} rejected: "
+                f"{reason}"
+            ),
+        )
+        with get_db_operations() as ops:
+            ops.add(audit_log)
+
+        return {"success": True, "error": None}
+
+    except Exception as pkg_error:
+        logger.error(f"Error rejecting package {package_id}: {str(pkg_error)}")
+        return {
+            "success": False,
+            "error": {"id": package_id, "error": str(pkg_error)}
+        }

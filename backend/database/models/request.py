@@ -1,6 +1,4 @@
-"""
-Request model for managing package requests
-"""
+"""Request model for managing package requests."""
 
 from datetime import datetime
 from typing import Any
@@ -22,7 +20,9 @@ class Request(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    request_packages = relationship("RequestPackage", backref="request", lazy=True)
+    request_packages = relationship(
+        "RequestPackage", backref="request", lazy=True
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -30,5 +30,7 @@ class Request(Base):
             "application_name": self.application_name,
             "version": self.version,
             "requestor_id": self.requestor_id,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": (
+                self.created_at.isoformat() if self.created_at else None
+            ),
         }

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""
-Test runner for backend license service tests.
+"""Test runner for backend license service tests.
+
 Run this to verify license validation functionality.
 """
 
@@ -11,7 +11,7 @@ import unittest
 
 
 def run_license_tests():
-    """Run the license service tests"""
+    """Run the license service tests."""
     print("🚀 Starting License Service Tests...")
     print("=" * 50)
 
@@ -33,12 +33,14 @@ def run_license_tests():
         print("🎉 All license tests passed!")
         return True
     else:
-        print(f"❌ {len(result.failures)} test(s) failed, {len(result.errors)} error(s)")
+        print(
+            f"❌ {len(result.failures)} test(s) failed, {len(result.errors)} error(s)"
+        )
         return False
 
 
 def run_specific_test(test_file):
-    """Run a specific test file"""
+    """Run a specific test file."""
     print(f"🚀 Running {test_file}...")
     print("=" * 50)
 
@@ -51,7 +53,9 @@ def run_specific_test(test_file):
         return False
 
     # Run the specific test
-    result = subprocess.run([sys.executable, test_path], capture_output=False, text=True)
+    result = subprocess.run(
+        [sys.executable, test_path], capture_output=False, text=True
+    )
 
     if result.returncode == 0:
         print(f"\n🎉 {test_file} passed!")

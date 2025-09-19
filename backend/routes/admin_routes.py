@@ -17,25 +17,24 @@ auth_service = AuthService()
 config_service = ConfigurationService()
 
 
-# Package Management Routes (moved to approver_routes.py)
-# Package approval, rejection, publishing, and validation routes have been moved
-# to /api/approver/ endpoints for better separation of concerns
-
-
 # License Management Routes
 @admin_bp.route("/licenses", methods=["GET"])  # type: ignore[misc]
 @auth_service.require_auth
 def get_supported_licenses() -> ResponseReturnValue:
-    """Get all supported licenses"""
+    """Get all supported licenses."""
     try:
-        status = request.args.get("status")  # 'always_allowed', 'allowed', 'avoid', 'blocked'
+        status = request.args.get(
+            "status"
+        )  # 'always_allowed', 'allowed', 'avoid', 'blocked'
         query = SupportedLicense.query
 
         if status:
             query = query.filter_by(status=status)
 
         licenses = query.all()
-        return jsonify({"licenses": [license.to_dict() for license in licenses]})
+        return jsonify(
+            {"licenses": [license.to_dict() for license in licenses]}
+        )
     except Exception as e:
         logger.error(f"Get supported licenses error: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
@@ -44,7 +43,7 @@ def get_supported_licenses() -> ResponseReturnValue:
 @admin_bp.route("/licenses", methods=["POST"])  # type: ignore[misc]
 @auth_service.require_auth
 def create_supported_license() -> ResponseReturnValue:
-    """Create a new supported license"""
+    """Create a new supported license."""
     try:
         if not request.user.is_admin():
             return jsonify({"error": "Admin access required"}), 403
@@ -57,7 +56,11 @@ def create_supported_license() -> ResponseReturnValue:
 
         # Check if identifier already exists
         with get_db_operations() as ops:
-            existing = ops.query(SupportedLicense).filter_by(identifier=data["identifier"]).first()
+            existing = (
+                ops.query(SupportedLicense)
+                .filter_by(identifier=data["identifier"])
+                .first()
+            )
         if existing:
             return jsonify({"error": "License identifier already exists"}), 400
 
@@ -79,7 +82,9 @@ def create_supported_license() -> ResponseReturnValue:
                 action="create_license",
                 resource_type="license",
                 resource_id=license.id,
-                details=f"Created license: {license.name} ({license.identifier})",
+                details=f"Created license: {
+                    license.name} ({
+                    license.identifier})",
             )
             ops.add(audit_log)
             ops.commit()
@@ -101,16 +106,22 @@ def create_supported_license() -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
-@admin_bp.route("/licenses/<int:license_id>", methods=["PUT"])  # type: ignore[misc]
+@admin_bp.route(
+    "/licenses/<int:license_id>", methods=["PUT"]
+)  # type: ignore[misc]
 @auth_service.require_auth
 def update_supported_license(license_id: int) -> ResponseReturnValue:
-    """Update a supported license"""
+    """Update a supported license."""
     try:
         if not request.user.is_admin():
             return jsonify({"error": "Admin access required"}), 403
 
         with get_db_operations() as ops:
-            license = ops.query(SupportedLicense).filter(SupportedLicense.id == license_id).first()
+            license = (
+                ops.query(SupportedLicense)
+                .filter(SupportedLicense.id == license_id)
+                .first()
+            )
             if not license:
                 return jsonify({"error": "License not found"}), 404
         data = request.get_json()
@@ -130,12 +141,19 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
                 action="update_license",
                 resource_type="license",
                 resource_id=license.id,
-                details=f"Updated license: {license.name} ({license.identifier})",
+                details=f"Updated license: {
+                    license.name} ({
+                    license.identifier})",
             )
             ops.add(audit_log)
             ops.commit()
 
-        return jsonify({"message": "License updated successfully", "license": license.to_dict()})
+        return jsonify(
+            {
+                "message": "License updated successfully",
+                "license": license.to_dict(),
+            }
+        )
     except Exception as e:
         logger.error(f"Update license error: {str(e)}")
         with get_db_operations() as ops:
@@ -143,26 +161,41 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
-@admin_bp.route("/licenses/<int:license_id>", methods=["DELETE"])  # type: ignore[misc]
+@admin_bp.route(
+    "/licenses/<int:license_id>", methods=["DELETE"]
+)  # type: ignore[misc]
 @auth_service.require_auth
 def delete_supported_license(license_id: int) -> ResponseReturnValue:
-    """Delete a supported license"""
+    """Delete a supported license."""
     try:
         if not request.user.is_admin():
             return jsonify({"error": "Admin access required"}), 403
 
         with get_db_operations() as ops:
-            license = ops.query(SupportedLicense).filter(SupportedLicense.id == license_id).first()
+            license = (
+                ops.query(SupportedLicense)
+                .filter(SupportedLicense.id == license_id)
+                .first()
+            )
             if not license:
                 return jsonify({"error": "License not found"}), 404
 
         # Check if license is being used by any packages
         with get_db_operations() as ops:
-            package_count = ops.query(Package).filter_by(license_identifier=license.identifier).count()
+            package_count = (
+                ops.query(Package)
+                .filter_by(license_identifier=license.identifier)
+                .count()
+            )
         if package_count > 0:
             return (
                 jsonify(
-                    {"error": f"Cannot delete license. It is used by {package_count} package(s). Disable it instead."}
+                    {
+                        "error": (
+                            f"Cannot delete license. It is used by "
+                            f"{package_count} package(s). Disable it instead."
+                        )
+                    }
                 ),
                 400,
             )
@@ -177,7 +210,9 @@ def delete_supported_license(license_id: int) -> ResponseReturnValue:
                 action="delete_license",
                 resource_type="license",
                 resource_id=license_id,
-                details=f"Deleted license: {license.name} ({license.identifier})",
+                details=f"Deleted license: {
+                    license.name} ({
+                    license.identifier})",
             )
             ops.add(audit_log)
             ops.commit()
@@ -194,7 +229,7 @@ def delete_supported_license(license_id: int) -> ResponseReturnValue:
 @admin_bp.route("/config", methods=["GET"])  # type: ignore[misc]
 @auth_service.require_auth
 def get_config() -> ResponseReturnValue:
-    """Get system configuration including status and environment variables"""
+    """Get system configuration including status and environment variables."""
     try:
         import os
 
@@ -228,7 +263,9 @@ def get_config() -> ResponseReturnValue:
             "security": {
                 "jwt_secret_configured": bool(os.getenv("JWT_SECRET")),
                 "flask_secret_configured": bool(os.getenv("FLASK_SECRET_KEY")),
-                "oauth_audience": os.getenv("OAUTH_AUDIENCE", "Not configured"),
+                "oauth_audience": os.getenv(
+                    "OAUTH_AUDIENCE", "Not configured"
+                ),
                 "oauth_issuer": os.getenv("OAUTH_ISSUER", "Not configured"),
             },
             "trivy": {
@@ -238,7 +275,9 @@ def get_config() -> ResponseReturnValue:
             "environment": {
                 "flask_env": os.getenv("FLASK_ENV", "development"),
                 "flask_debug": os.getenv("FLASK_DEBUG", "0"),
-                "max_content_length": os.getenv("MAX_CONTENT_LENGTH", "16777216"),
+                "max_content_length": os.getenv(
+                    "MAX_CONTENT_LENGTH", "16777216"
+                ),
             },
         }
 
@@ -249,7 +288,10 @@ def get_config() -> ResponseReturnValue:
                     "is_complete": is_complete,
                     "missing_keys": missing_keys,
                     "requires_admin_setup": not is_complete,
-                    "note": "Repository configuration is now managed via environment variables",
+                    "note": (
+                        "Repository configuration is now managed via "
+                        "environment variables"
+                    ),
                 },
             }
         )
@@ -260,7 +302,7 @@ def get_config() -> ResponseReturnValue:
 
 
 def _mask_url(url: str) -> str:
-    """Mask sensitive parts of URLs for display"""
+    """Mask sensitive parts of URLs for display."""
     if not url:
         return "Not configured"
 

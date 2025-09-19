@@ -1,4 +1,4 @@
--- Development database initialization
+﻿-- Development database initialization
 -- Includes schema + development users + license data
 
 -- Include the base schema

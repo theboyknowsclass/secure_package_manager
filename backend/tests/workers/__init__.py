@@ -1,3 +1,1 @@
-"""
-Test package for worker modules
-"""
+"""Test package for worker modules."""

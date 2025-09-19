@@ -1,11 +1,16 @@
-"""
-PackageStatus model for tracking package processing status
-"""
+"""PackageStatus model for tracking package processing status."""
 
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+)
 
 from .base import Base
 
@@ -22,15 +27,25 @@ class PackageStatus(Base):
     security_scan_status = Column(
         String(50), default="pending", nullable=False
     )  # pending, running, completed, failed, skipped
-    license_status = Column(String(20))  # Primary license status calculated from supported_licenses table
-    approver_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # User who approved the package
-    rejector_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # User who rejected the package
-    published_at = Column(DateTime, nullable=True)  # Timestamp when package was successfully published
+    license_status = Column(
+        String(20)
+    )  # Primary license status calculated from supported_licenses table
+    approver_id = Column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )  # User who approved the package
+    rejector_id = Column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )  # User who rejected the package
+    published_at = Column(
+        DateTime, nullable=True
+    )  # Timestamp when package was successfully published
     publish_status = Column(
         String(20), default="pending", nullable=False
     )  # Publishing status: pending, publishing, published, failed
     created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -44,14 +59,20 @@ class PackageStatus(Base):
             "license_status": self.license_status,
             "approver_id": self.approver_id,
             "rejector_id": self.rejector_id,
-            "published_at": self.published_at.isoformat() if self.published_at else None,
+            "published_at": (
+                self.published_at.isoformat() if self.published_at else None
+            ),
             "publish_status": self.publish_status,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_at": (
+                self.created_at.isoformat() if self.created_at else None
+            ),
+            "updated_at": (
+                self.updated_at.isoformat() if self.updated_at else None
+            ),
         }
 
     def is_processing(self) -> bool:
-        """Check if package is in a processing state"""
+        """Check if package is in a processing state."""
         processing_statuses = {
             "Submitted",
             "Parsed",
@@ -62,7 +83,7 @@ class PackageStatus(Base):
         return self.status in processing_statuses
 
     def is_completed_processing(self) -> bool:
-        """Check if package has completed all processing steps"""
+        """Check if package has completed all processing steps."""
         completed_statuses = {
             "Licence Checked",
             "Downloaded",
@@ -78,7 +99,7 @@ class PackageStatus(Base):
         return self.status in {"Approved", "Rejected"}
 
     def get_processing_stage(self) -> str:
-        """Get the current processing stage for display purposes"""
+        """Get the current processing stage for display purposes."""
         stage_mapping = {
             "Submitted": "Submitted",
             "Parsed": "Parsed",

@@ -1,4 +1,4 @@
-# Base Docker Compose Configuration
+﻿# Base Docker Compose Configuration
 # Contains all common services and configurations
 
 services:

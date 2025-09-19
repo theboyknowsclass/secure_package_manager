@@ -1,5 +1,4 @@
-"""
-Flask-specific database utilities
+"""Flask-specific database utilities.
 
 Provides Flask context managers and utilities for using pure SQLAlchemy
 with Flask applications.
@@ -15,8 +14,7 @@ from .service import DatabaseService
 
 @contextmanager
 def get_db_operations() -> Generator[DatabaseOperations, None, None]:
-    """
-    Context manager to get DatabaseOperations for Flask requests.
+    """Context manager to get DatabaseOperations for Flask requests.
 
     Usage:
         with get_db_operations() as ops:

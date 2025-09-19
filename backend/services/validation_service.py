@@ -19,7 +19,7 @@ class ValidationService:
         ]
 
     def run_full_validation(self, package: Package) -> List[Dict[str, Any]]:
-        """Run all validation checks on a package"""
+        """Run all validation checks on a package."""
         try:
             validation_results = []
 
@@ -28,17 +28,27 @@ class ValidationService:
                 validation_results.append(result)
 
                 # If any critical validation fails, stop processing
-                if validation_type in ["file_integrity", "malware_scan"] and result["status"] == "failed":
+                if (
+                    validation_type in ["file_integrity", "malware_scan"]
+                    and result["status"] == "failed"
+                ):
                     break
 
             return validation_results
 
         except Exception as e:
-            logger.error(f"Error running full validation for package {package.name}@{package.version}: {str(e)}")
+            logger.error(
+                f"Error running full validation for package {
+                    package.name}@{
+                    package.version}: {
+                    str(e)}"
+            )
             return []
 
-    def _run_validation(self, package: Package, validation_type: str) -> Dict[str, Any]:
-        """Run a specific validation check"""
+    def _run_validation(
+        self, package: Package, validation_type: str
+    ) -> Dict[str, Any]:
+        """Run a specific validation check."""
         try:
             if validation_type == "file_integrity":
                 return self._validate_file_integrity(package)
@@ -68,9 +78,11 @@ class ValidationService:
             }
 
     def _validate_file_integrity(self, package: Package) -> Dict[str, Any]:
-        """Validate file integrity and checksum"""
+        """Validate file integrity and checksum."""
         try:
-            if not package.local_path or not os.path.exists(package.local_path):
+            if not package.local_path or not os.path.exists(
+                package.local_path
+            ):
                 return {
                     "type": "file_integrity",
                     "status": "failed",
@@ -78,13 +90,18 @@ class ValidationService:
                 }
 
             # Check file size
-            if package.package_status and package.package_status.file_size and package.package_status.file_size > 0:
+            if (
+                package.package_status
+                and package.package_status.file_size
+                and package.package_status.file_size > 0
+            ):
                 actual_size = os.path.getsize(package.local_path)
                 if actual_size != package.package_status.file_size:
                     return {
                         "type": "file_integrity",
                         "status": "failed",
-                        "details": f"File size mismatch: expected {package.package_status.file_size}, got {actual_size}",
+                        "details": f"File size mismatch: expected {
+                            package.package_status.file_size}, got {actual_size}",
                     }
 
             # Check checksum if available
@@ -111,13 +128,19 @@ class ValidationService:
         # Security scanning is handled by the Trivy service
         # This validation just checks if the scan was completed
         try:
-            if package.package_status and package.package_status.security_scan_status == "completed":
+            if (
+                package.package_status
+                and package.package_status.security_scan_status == "completed"
+            ):
                 return {
                     "type": "security_scan",
                     "status": "passed",
                     "details": "Security scan completed successfully",
                 }
-            elif package.package_status and package.package_status.security_scan_status == "failed":
+            elif (
+                package.package_status
+                and package.package_status.security_scan_status == "failed"
+            ):
                 return {
                     "type": "security_scan",
                     "status": "failed",
@@ -138,11 +161,13 @@ class ValidationService:
             }
 
     def _validate_license(self, package: Package) -> Dict[str, Any]:
-        """Check package license compliance"""
+        """Check package license compliance."""
         try:
             # License validation is now handled by LicenseWorker
             # This method is deprecated and should not be used
-            logger.warning("_validate_license is deprecated - license validation is handled by LicenseWorker")
+            logger.warning(
+                "_validate_license is deprecated - license validation is handled by LicenseWorker"
+            )
 
             return {
                 "type": "license_check",
@@ -158,11 +183,13 @@ class ValidationService:
             }
 
     def _validate_dependencies(self, package: Package) -> Dict[str, Any]:
-        """Analyze package dependencies"""
+        """Analyze package dependencies."""
         try:
             # Dependency analysis is now handled by TrivyService
             # This method is deprecated and should not be used
-            logger.warning("_validate_dependencies is deprecated - dependency analysis is handled by TrivyService")
+            logger.warning(
+                "_validate_dependencies is deprecated - dependency analysis is handled by TrivyService"
+            )
 
             return {
                 "type": "dependency_analysis",
@@ -178,11 +205,13 @@ class ValidationService:
             }
 
     def _validate_malware_scan(self, package: Package) -> Dict[str, Any]:
-        """Run malware scan on package"""
+        """Run malware scan on package."""
         try:
             # Malware scanning is now handled by TrivyService
             # This method is deprecated and should not be used
-            logger.warning("_validate_malware_scan is deprecated - malware scanning is handled by TrivyService")
+            logger.warning(
+                "_validate_malware_scan is deprecated - malware scanning is handled by TrivyService"
+            )
 
             return {
                 "type": "malware_scan",
@@ -198,7 +227,7 @@ class ValidationService:
             }
 
     def _validate_vulnerabilities(self, package: Package) -> Dict[str, Any]:
-        """Assess package for known vulnerabilities"""
+        """Assess package for known vulnerabilities."""
         try:
             # Vulnerability assessment is now handled by TrivyService
             # This method is deprecated and should not be used
@@ -220,7 +249,7 @@ class ValidationService:
             }
 
     def get_validation_summary(self, package: Package) -> Dict[str, Any]:
-        """Get summary of all validations for a package"""
+        """Get summary of all validations for a package."""
         try:
             # Since we removed PackageValidation table, we'll generate validation summary
             # based on package status

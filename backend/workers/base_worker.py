@@ -1,9 +1,8 @@
-"""
-Base Worker Class
+"""Base Worker Class.
 
 Provides common functionality for all background workers including
-logging, signal handling, and error handling.
-Workers now use the database service directly instead of Flask app context.
+logging, signal handling, and error handling. Workers now use the
+database service directly instead of Flask app context.
 """
 
 import logging
@@ -17,17 +16,22 @@ logger = logging.getLogger(__name__)
 
 
 class BaseWorker(ABC):
-    """Base class for all background workers"""
+    """Base class for all background workers."""
 
     # Worker type identifier - must be overridden in subclasses
     WORKER_TYPE: str = "base_worker"
 
-    # Default required environment variables for workers (can be overridden in subclasses)
-    required_env_vars: List[str] = ["DATABASE_URL", "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"]
+    # Default required environment variables for workers (can be overridden in
+    # subclasses)
+    required_env_vars: List[str] = [
+        "DATABASE_URL",
+        "POSTGRES_USER",
+        "POSTGRES_PASSWORD",
+        "POSTGRES_DB",
+    ]
 
     def __init__(self, worker_name: str, sleep_interval: int = 5):
-        """
-        Initialize the worker
+        """Initialize the worker.
 
         Args:
             worker_name: Name of the worker for logging
@@ -42,30 +46,36 @@ class BaseWorker(ABC):
         self._validate_required_env_vars()
 
     def _validate_required_env_vars(self) -> None:
-        """Validate required environment variables for this worker"""
+        """Validate required environment variables for this worker."""
         missing_vars = []
         for var in self.required_env_vars:
             if not os.getenv(var):
                 missing_vars.append(f"  - {var}")
 
         if missing_vars:
-            error_msg = f"Missing required environment variables for {self.worker_name}:\n" + "\n".join(missing_vars)
+            error_msg = (
+                f"Missing required environment variables for {
+                    self.worker_name}:\n"
+                + "\n".join(missing_vars)
+            )
             error_msg += "\n\nPlease set these environment variables before starting this worker."
             error_msg += "\nSee env.example for reference values."
             raise ValueError(error_msg)
 
     def _setup_signal_handlers(self) -> None:
-        """Setup signal handlers for graceful shutdown"""
+        """Setup signal handlers for graceful shutdown."""
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
 
     def _signal_handler(self, signum: int, frame: Any) -> None:
-        """Handle shutdown signals"""
-        logger.info(f"{self.worker_name} received signal {signum}, shutting down gracefully...")
+        """Handle shutdown signals."""
+        logger.info(
+            f"{self.worker_name} received signal {signum}, shutting down gracefully..."
+        )
         self.running = False
 
     def start(self) -> None:
-        """Start the worker"""
+        """Start the worker."""
         logger.info(f"Starting {self.worker_name} worker...")
 
         self.running = True
@@ -104,7 +114,7 @@ class BaseWorker(ABC):
         """Cleanup resources - called on shutdown"""
 
     def get_worker_status(self) -> Dict[str, Any]:
-        """Get current worker status"""
+        """Get current worker status."""
         return {
             "worker_name": self.worker_name,
             "running": self.running,

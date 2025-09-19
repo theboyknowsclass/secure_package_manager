@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""
-Simple test runner for the secure package manager.
+"""Simple test runner for the secure package manager.
+
 Run this to verify all admin API endpoints are working correctly.
 """
 
@@ -24,7 +24,11 @@ def run_tests():
     # Run admin API tests
     print("\n📋 Running Admin API Tests...")
     try:
-        result = subprocess.run([sys.executable, "tests/test_admin_api.py"], capture_output=False, text=True)
+        result = subprocess.run(
+            [sys.executable, "tests/test_admin_api.py"],
+            capture_output=False,
+            text=True,
+        )
         if result.returncode != 0:
             all_passed = False
     except Exception as e:

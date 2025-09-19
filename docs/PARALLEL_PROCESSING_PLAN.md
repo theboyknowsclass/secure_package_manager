@@ -1,4 +1,4 @@
-# Parallel Processing Implementation Plan
+﻿# Parallel Processing Implementation Plan
 
 ## Current State
 

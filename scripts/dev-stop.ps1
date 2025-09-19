@@ -1,4 +1,4 @@
-# Development tear-down script for Windows PowerShell
+﻿# Development tear-down script for Windows PowerShell
 
 Write-Host "🛑 Stopping development environment..." -ForegroundColor Yellow
 

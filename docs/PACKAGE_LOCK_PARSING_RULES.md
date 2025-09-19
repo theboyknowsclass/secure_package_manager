@@ -1,4 +1,4 @@
-# Package-lock.json Parsing Rules
+﻿# Package-lock.json Parsing Rules
 
 ## Overview
 

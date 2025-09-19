@@ -22,11 +22,13 @@ validate_all_required_env()
 
 
 def create_app() -> Flask:
-    """Create and configure the Flask application"""
+    """Create and configure the Flask application."""
     app = Flask(__name__)
     app.config["SECRET_KEY"] = FLASK_SECRET_KEY
     app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = SQLALCHEMY_TRACK_MODIFICATIONS
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = (
+        SQLALCHEMY_TRACK_MODIFICATIONS
+    )
     app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 
     # Initialize extensions with explicit CORS configuration
@@ -65,12 +67,14 @@ app = create_app()
 
 @app.route("/health", methods=["GET"])
 def health_check() -> Response:
-    """Health check endpoint"""
-    return jsonify({"status": "healthy", "timestamp": datetime.utcnow().isoformat()})
+    """Health check endpoint."""
+    return jsonify(
+        {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+    )
 
 
 def wait_for_db(max_retries: int = 30, delay: int = 2) -> bool:
-    """Wait for database to be ready"""
+    """Wait for database to be ready."""
     import time
 
     from database.service import DatabaseService
@@ -79,18 +83,24 @@ def wait_for_db(max_retries: int = 30, delay: int = 2) -> bool:
         try:
             database_url = os.getenv("DATABASE_URL")
             if not database_url:
-                raise ValueError("DATABASE_URL environment variable is required")
+                raise ValueError(
+                    "DATABASE_URL environment variable is required"
+                )
 
             db_service = DatabaseService(database_url)
             if db_service.test_connection():
                 logging.info("Database connection successful")
                 return True
         except Exception as e:
-            logging.warning(f"Database connection attempt {attempt + 1} failed: {str(e)}")
+            logging.warning(
+                f"Database connection attempt {attempt + 1} failed: {str(e)}"
+            )
             if attempt < max_retries - 1:
                 time.sleep(delay)
             else:
-                logging.error("Failed to connect to database after all retries")
+                logging.error(
+                    "Failed to connect to database after all retries"
+                )
                 raise e
     return False
 
@@ -101,7 +111,6 @@ if __name__ == "__main__":
 
     # Create database tables using pure SQLAlchemy
     from database.models import Base
-    from database.service import DatabaseService
     from sqlalchemy import create_engine
 
     database_url = os.getenv("DATABASE_URL")

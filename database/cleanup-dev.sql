@@ -1,4 +1,4 @@
--- Development cleanup script
+﻿-- Development cleanup script
 -- This removes all data but preserves the schema and dev users
 
 -- Clear package-related data (in correct order due to foreign key constraints)

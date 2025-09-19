@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "mock-secure-npm-registry",
   "version": "1.0.0",
   "description": "Mock secure npm registry for testing package publishing",

@@ -1,4 +1,4 @@
-# Development startup script for Windows PowerShell
+﻿# Development startup script for Windows PowerShell
 # Fresh database every time
 
 Write-Host "🚀 Starting development environment with fresh database..." -ForegroundColor Green

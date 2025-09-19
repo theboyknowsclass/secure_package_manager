@@ -1,5 +1,4 @@
-"""
-Test cases for scoped package parsing from package-lock.json files.
+"""Test cases for scoped package parsing from package-lock.json files.
 
 This module tests the critical functionality of extracting package names
 from package-lock.json paths, with special focus on scoped packages.
@@ -8,21 +7,22 @@ from package-lock.json paths, with special focus on scoped packages.
 import os
 import sys
 
+import pytest
+from services.package_service import PackageService
+
 # Add the backend directory to the Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from services.package_service import PackageService
-
 
 class TestScopedPackageParsing:
-    """Test cases for scoped package name extraction"""
+    """Test cases for scoped package name extraction."""
 
     def setup_method(self):
-        """Set up test fixtures"""
+        """Set up test fixtures."""
         self.package_service = PackageService()
 
     def test_extract_regular_package_name(self):
-        """Test extraction of regular (non-scoped) package names"""
+        """Test extraction of regular (non-scoped) package names."""
         test_cases = [
             {
                 "path": "node_modules/lodash",
@@ -42,11 +42,15 @@ class TestScopedPackageParsing:
         ]
 
         for case in test_cases:
-            result = self.package_service._extract_package_name(case["path"], case["info"])
-            assert result == case["expected"], f"Failed for path: {case['path']}"
+            result = self.package_service._extract_package_name(
+                case["path"], case["info"]
+            )
+            assert (
+                result == case["expected"]
+            ), f"Failed for path: {case['path']}"
 
     def test_extract_scoped_package_name(self):
-        """Test extraction of scoped package names"""
+        """Test extraction of scoped package names."""
         test_cases = [
             {
                 "path": "node_modules/@types/node",
@@ -76,11 +80,15 @@ class TestScopedPackageParsing:
         ]
 
         for case in test_cases:
-            result = self.package_service._extract_package_name(case["path"], case["info"])
-            assert result == case["expected"], f"Failed for path: {case['path']}"
+            result = self.package_service._extract_package_name(
+                case["path"], case["info"]
+            )
+            assert (
+                result == case["expected"]
+            ), f"Failed for path: {case['path']}"
 
     def test_extract_nested_scoped_package_name(self):
-        """Test extraction of nested scoped package names"""
+        """Test extraction of nested scoped package names."""
         test_cases = [
             {
                 "path": "node_modules/express/node_modules/@types/express",
@@ -95,11 +103,15 @@ class TestScopedPackageParsing:
         ]
 
         for case in test_cases:
-            result = self.package_service._extract_package_name(case["path"], case["info"])
-            assert result == case["expected"], f"Failed for path: {case['path']}"
+            result = self.package_service._extract_package_name(
+                case["path"], case["info"]
+            )
+            assert (
+                result == case["expected"]
+            ), f"Failed for path: {case['path']}"
 
     def test_extract_package_name_with_explicit_name(self):
-        """Test extraction when package info contains explicit name field"""
+        """Test extraction when package info contains explicit name field."""
         test_cases = [
             {
                 "path": "node_modules/@types/node",
@@ -114,11 +126,15 @@ class TestScopedPackageParsing:
         ]
 
         for case in test_cases:
-            result = self.package_service._extract_package_name(case["path"], case["info"])
-            assert result == case["expected"], f"Failed for path: {case['path']}"
+            result = self.package_service._extract_package_name(
+                case["path"], case["info"]
+            )
+            assert (
+                result == case["expected"]
+            ), f"Failed for path: {case['path']}"
 
     def test_extract_incomplete_scoped_package(self):
-        """Test extraction of incomplete scoped package paths"""
+        """Test extraction of incomplete scoped package paths."""
         test_cases = [
             {
                 "path": "node_modules/@types",
@@ -128,27 +144,39 @@ class TestScopedPackageParsing:
         ]
 
         for case in test_cases:
-            result = self.package_service._extract_package_name(case["path"], case["info"])
-            assert result == case["expected"], f"Failed for path: {case['path']}"
+            result = self.package_service._extract_package_name(
+                case["path"], case["info"]
+            )
+            assert (
+                result == case["expected"]
+            ), f"Failed for path: {case['path']}"
 
     def test_extract_invalid_paths(self):
-        """Test extraction with invalid or malformed paths"""
+        """Test extraction with invalid or malformed paths."""
         test_cases = [
             {
                 "path": "not_node_modules/package",
                 "info": {"version": "1.0.0"},
                 "expected": None,
             },
-            {"path": "node_modules", "info": {"version": "1.0.0"}, "expected": None},
+            {
+                "path": "node_modules",
+                "info": {"version": "1.0.0"},
+                "expected": None,
+            },
             {"path": "", "info": {"version": "1.0.0"}, "expected": None},
         ]
 
         for case in test_cases:
-            result = self.package_service._extract_package_name(case["path"], case["info"])
-            assert result == case["expected"], f"Failed for path: {case['path']}"
+            result = self.package_service._extract_package_name(
+                case["path"], case["info"]
+            )
+            assert (
+                result == case["expected"]
+            ), f"Failed for path: {case['path']}"
 
     def test_extract_missing_version(self):
-        """Test extraction when version is missing"""
+        """Test extraction when version is missing."""
         test_cases = [
             {
                 "path": "node_modules/lodash",
@@ -163,11 +191,15 @@ class TestScopedPackageParsing:
         ]
 
         for case in test_cases:
-            result = self.package_service._extract_package_name(case["path"], case["info"])
-            assert result == case["expected"], f"Failed for path: {case['path']}"
+            result = self.package_service._extract_package_name(
+                case["path"], case["info"]
+            )
+            assert (
+                result == case["expected"]
+            ), f"Failed for path: {case['path']}"
 
     def test_real_world_scoped_packages(self):
-        """Test with real-world scoped package examples"""
+        """Test with real-world scoped package examples."""
         real_world_cases = [
             # Common TypeScript packages
             ("node_modules/@types/node", "@types/node"),
@@ -185,7 +217,10 @@ class TestScopedPackageParsing:
             ("node_modules/@mui/icons-material", "@mui/icons-material"),
             ("node_modules/@mui/system", "@mui/system"),
             # ESLint ecosystem
-            ("node_modules/@typescript-eslint/parser", "@typescript-eslint/parser"),
+            (
+                "node_modules/@typescript-eslint/parser",
+                "@typescript-eslint/parser",
+            ),
             (
                 "node_modules/@typescript-eslint/eslint-plugin",
                 "@typescript-eslint/eslint-plugin",
@@ -199,11 +234,15 @@ class TestScopedPackageParsing:
         ]
 
         for path, expected in real_world_cases:
-            result = self.package_service._extract_package_name(path, {"version": "1.0.0"})
-            assert result == expected, f"Failed for real-world case: {path} -> expected {expected}, got {result}"
+            result = self.package_service._extract_package_name(
+                path, {"version": "1.0.0"}
+            )
+            assert (
+                result == expected
+            ), f"Failed for real-world case: {path} -> expected {expected}, got {result}"
 
     def test_edge_cases(self):
-        """Test edge cases and boundary conditions"""
+        """Test edge cases and boundary conditions."""
         edge_cases = [
             # Very long scoped package names
             {
@@ -226,19 +265,23 @@ class TestScopedPackageParsing:
         ]
 
         for case in edge_cases:
-            result = self.package_service._extract_package_name(case["path"], case["info"])
-            assert result == case["expected"], f"Failed for edge case: {case['path']}"
+            result = self.package_service._extract_package_name(
+                case["path"], case["info"]
+            )
+            assert (
+                result == case["expected"]
+            ), f"Failed for edge case: {case['path']}"
 
 
 class TestPackageLockProcessing:
-    """Test cases for full package-lock.json processing"""
+    """Test cases for full package-lock.json processing."""
 
     def setup_method(self):
-        """Set up test fixtures"""
+        """Set up test fixtures."""
         self.package_service = PackageService()
 
     def test_process_scoped_package_lock(self):
-        """Test processing a package-lock.json with scoped packages"""
+        """Test processing a package-lock.json with scoped packages."""
         package_lock_data = {
             "name": "test-project",
             "version": "1.0.0",
@@ -266,16 +309,24 @@ class TestPackageLockProcessing:
         }
 
         # Extract packages
-        packages = self.package_service._extract_packages_from_json(package_lock_data)
+        packages = self.package_service._extract_packages_from_json(
+            package_lock_data
+        )
 
         # Filter new packages (simulate with request_id=1)
-        new_packages, existing_packages = self.package_service._filter_new_packages(packages, 1)
+        new_packages, existing_packages = (
+            self.package_service._filter_new_packages(packages, 1)
+        )
 
         # Verify scoped packages are correctly extracted
         package_names = [pkg["name"] for pkg in new_packages]
 
-        assert "@types/node" in package_names, "Scoped package @types/node not found"
-        assert "@babel/core" in package_names, "Scoped package @babel/core not found"
+        assert (
+            "@types/node" in package_names
+        ), "Scoped package @types/node not found"
+        assert (
+            "@babel/core" in package_names
+        ), "Scoped package @babel/core not found"
 
         # Verify versions are correct
         for pkg in new_packages:
@@ -285,30 +336,35 @@ class TestPackageLockProcessing:
                 assert pkg["version"] == "7.22.0"
 
     def test_deduplication_with_scoped_packages(self):
-        """Test that scoped packages are properly deduplicated"""
-        package_lock_data = {
-            "name": "test-project",
-            "version": "1.0.0",
-            "lockfileVersion": 3,
-            "packages": {
-                "": {"name": "test-project", "version": "1.0.0"},
-                "node_modules/@types/node": {
-                    "version": "18.15.0",
-                    "resolved": "https://registry.npmjs.org/@types/node/-/node-18.15.0.tgz",
-                },
-                "node_modules/express/node_modules/@types/node": {
-                    "version": "18.15.0",
-                    "resolved": "https://registry.npmjs.org/@types/node/-/node-18.15.0.tgz",
-                },
-            },
-        }
+        """Test that scoped packages are properly deduplicated."""
+        package_lock_data = {"name": "test-project",
+                             "version": "1.0.0",
+                             "lockfileVersion": 3,
+                             "packages": {"": {"name": "test-project",
+                                               "version": "1.0.0"},
+                                          "node_modules/@types/node": {"version": "18.15.0",
+                                                                       "resolved": "https://registry.npmjs.org/@types/node/-/node-18.15.0.tgz",
+                                                                       },
+                                          "node_modules/express/node_modules/@types/node": {"version": "18.15.0",
+                                                                                            "resolved": "https://registry.npmjs.org/@types/node/-/node-18.15.0.tgz",
+                                                                                            },
+                                          },
+                             }
 
-        packages = self.package_service._extract_packages_from_json(package_lock_data)
-        new_packages, existing_packages = self.package_service._filter_new_packages(packages, 1)
+        packages = self.package_service._extract_packages_from_json(
+            package_lock_data
+        )
+        new_packages, existing_packages = (
+            self.package_service._filter_new_packages(packages, 1)
+        )
 
         # Should only have one @types/node package despite appearing twice
-        types_node_packages = [pkg for pkg in new_packages if pkg["name"] == "@types/node"]
-        assert len(types_node_packages) == 1, f"Expected 1 @types/node package, got {len(types_node_packages)}"
+        types_node_packages = [
+            pkg for pkg in new_packages if pkg["name"] == "@types/node"
+        ]
+        assert (
+            len(types_node_packages) == 1
+        ), f"Expected 1 @types/node package, got {len(types_node_packages)}"
 
 
 if __name__ == "__main__":

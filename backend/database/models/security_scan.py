@@ -1,6 +1,4 @@
-"""
-SecurityScan model for storing security scan results
-"""
+"""SecurityScan model for storing security scan results."""
 
 from datetime import datetime
 from typing import Any
@@ -14,8 +12,12 @@ class SecurityScan(Base):
     __tablename__ = "security_scans"
 
     id = Column(Integer, primary_key=True)
-    package_id = Column(Integer, ForeignKey("packages.id", ondelete="CASCADE"), nullable=False)
-    scan_type = Column(String(50), default="trivy", nullable=False)  # trivy, snyk, npm_audit
+    package_id = Column(
+        Integer, ForeignKey("packages.id", ondelete="CASCADE"), nullable=False
+    )
+    scan_type = Column(
+        String(50), default="trivy", nullable=False
+    )  # trivy, snyk, npm_audit
     scan_result = Column(JSON)  # Store the full Trivy scan result
     critical_count = Column(Integer, default=0)
     high_count = Column(Integer, default=0)
@@ -28,8 +30,14 @@ class SecurityScan(Base):
     completed_at = Column(DateTime)
 
     def get_total_vulnerabilities(self) -> int:
-        """Calculate total vulnerability count from granular counts"""
-        return self.critical_count + self.high_count + self.medium_count + self.low_count + self.info_count
+        """Calculate total vulnerability count from granular counts."""
+        return (
+            self.critical_count
+            + self.high_count
+            + self.medium_count
+            + self.low_count
+            + self.info_count
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -37,7 +45,8 @@ class SecurityScan(Base):
             "package_id": self.package_id,
             "scan_type": self.scan_type,
             "scan_result": self.scan_result,
-            "vulnerability_count": self.get_total_vulnerabilities(),  # Calculate from granular counts
+            # Calculate from granular counts
+            "vulnerability_count": self.get_total_vulnerabilities(),
             "critical_count": self.critical_count,
             "high_count": self.high_count,
             "medium_count": self.medium_count,
@@ -45,6 +54,10 @@ class SecurityScan(Base):
             "info_count": self.info_count,
             "scan_duration_ms": self.scan_duration_ms,
             "trivy_version": self.trivy_version,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "completed_at": (self.completed_at.isoformat() if self.completed_at else None),
+            "created_at": (
+                self.created_at.isoformat() if self.created_at else None
+            ),
+            "completed_at": (
+                self.completed_at.isoformat() if self.completed_at else None
+            ),
         }

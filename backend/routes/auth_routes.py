@@ -17,9 +17,12 @@ auth_service = AuthService()
 
 @auth_bp.route("/login", methods=["POST"])  # type: ignore[misc]
 def login() -> ResponseReturnValue:
-    """Login endpoint - integrates with mock-idp service in dev, ADFS in production"""
+    """Login endpoint - integrates with mock-idp service in dev, ADFS in
+    production"""
     try:
-        logger.info(f"Login request received. Content-Type: {request.content_type}")
+        logger.info(
+            f"Login request received. Content-Type: {request.content_type}"
+        )
         logger.info(f"Raw data: {request.get_data()}")
 
         data = request.get_json()
@@ -32,7 +35,8 @@ def login() -> ResponseReturnValue:
 
         logger.info(f"Username: {username}, Password: {password}")
 
-        # Authentication - validates against mock-idp in dev, ADFS in production
+        # Authentication - validates against mock-idp in dev, ADFS in
+        # production
         if username == "admin" and password == "admin":
             with get_db_operations() as ops:
                 user = ops.get_user_by_username(username, User)
@@ -69,7 +73,7 @@ def login() -> ResponseReturnValue:
 @auth_bp.route("/userinfo", methods=["GET"])  # type: ignore[misc]
 @auth_service.require_auth
 def userinfo() -> ResponseReturnValue:
-    """Get current user information"""
+    """Get current user information."""
     try:
         logger.info(f"UserInfo request from user: {request.user.username}")
         return jsonify({"user": request.user.to_dict()}), 200

@@ -1,4 +1,4 @@
-# Code Quality and Linting Guide
+﻿# Code Quality and Linting Guide
 
 This document explains how to maintain code quality and PEP 8 compliance in the Secure Package Manager project.
 

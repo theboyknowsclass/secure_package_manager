@@ -1,5 +1,4 @@
-"""
-Download Service
+"""Download Service.
 
 Handles downloading packages from npm registry to the package cache.
 """
@@ -16,18 +15,19 @@ logger = logging.getLogger(__name__)
 
 
 class DownloadService:
-    """Service for downloading packages from npm registry"""
+    """Service for downloading packages from npm registry."""
 
     def __init__(self):
-        self.package_cache_dir = os.getenv("PACKAGE_CACHE_DIR", "/app/package_cache")
+        self.package_cache_dir = os.getenv(
+            "PACKAGE_CACHE_DIR", "/app/package_cache"
+        )
         self.download_timeout = int(os.getenv("DOWNLOAD_TIMEOUT", "60"))
 
         # Ensure package cache directory exists
         os.makedirs(self.package_cache_dir, exist_ok=True)
 
     def download_package(self, package) -> bool:
-        """
-        Download package from npm registry to package cache
+        """Download package from npm registry to package cache.
 
         Args:
             package: Package object with name, version, and npm_url
@@ -37,20 +37,38 @@ class DownloadService:
         """
         try:
             if not package.npm_url:
-                logger.error(f"No npm_url available for package {package.name}@{package.version}")
+                logger.error(
+                    (
+                        f"No npm_url available for package "
+                        f"{package.name}@{package.version}"
+                    )
+                )
                 return False
 
             # Create package cache directory
             package_dir = self._get_package_cache_path(package)
             os.makedirs(package_dir, exist_ok=True)
 
-            logger.info(f"Downloading package {package.name}@{package.version} from {package.npm_url}")
+            logger.info(
+                (
+                    f"Downloading package {
+                        package.name}@{
+                        package.version} from "
+                    f"{
+                        package.npm_url}"
+                )
+            )
 
             # Download tarball
-            response = requests.get(package.npm_url, timeout=self.download_timeout)
+            response = requests.get(
+                package.npm_url, timeout=self.download_timeout
+            )
 
             if response.status_code != 200:
-                logger.error(f"Failed to download package tarball: HTTP {response.status_code}")
+                logger.error(
+                    f"Failed to download package tarball: HTTP {
+                        response.status_code}"
+                )
                 return False
 
             # Extract tarball to package cache directory
@@ -58,22 +76,40 @@ class DownloadService:
             with tarfile.open(fileobj=tarball_buffer, mode="r:gz") as tar:
                 tar.extractall(package_dir)
 
-            logger.info(f"Successfully downloaded and extracted {package.name}@{package.version} to {package_dir}")
+            logger.info(
+                f"Successfully downloaded and extracted {
+                    package.name}@{
+                    package.version} to {package_dir}"
+            )
             return True
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Network error downloading package {package.name}@{package.version}: {str(e)}")
+            logger.error(
+                (
+                    f"Network error downloading package "
+                    f"{package.name}@{package.version}: {str(e)}"
+                )
+            )
             return False
         except tarfile.TarError as e:
-            logger.error(f"Error extracting tarball for {package.name}@{package.version}: {str(e)}")
+            logger.error(
+                (
+                    f"Error extracting tarball for "
+                    f"{package.name}@{package.version}: {str(e)}"
+                )
+            )
             return False
         except Exception as e:
-            logger.error(f"Unexpected error downloading package {package.name}@{package.version}: {str(e)}")
+            logger.error(
+                f"Unexpected error downloading package {
+                    package.name}@{
+                    package.version}: {
+                    str(e)}"
+            )
             return False
 
     def is_package_downloaded(self, package) -> bool:
-        """
-        Check if package is already downloaded in cache
+        """Check if package is already downloaded in cache.
 
         Args:
             package: Package object
@@ -82,12 +118,13 @@ class DownloadService:
             True if package exists in cache, False otherwise
         """
         package_dir = self._get_package_cache_path(package)
-        package_json_path = os.path.join(package_dir, "package", "package.json")
+        package_json_path = os.path.join(
+            package_dir, "package", "package.json"
+        )
         return os.path.exists(package_json_path)
 
     def get_package_path(self, package) -> Optional[str]:
-        """
-        Get the local path to downloaded package
+        """Get the local path to downloaded package.
 
         Args:
             package: Package object
@@ -96,12 +133,13 @@ class DownloadService:
             Path to package directory or None if not downloaded
         """
         if self.is_package_downloaded(package):
-            return os.path.join(self._get_package_cache_path(package), "package")
+            return os.path.join(
+                self._get_package_cache_path(package), "package"
+            )
         return None
 
     def _get_package_cache_path(self, package) -> str:
-        """
-        Get the cache directory path for a package
+        """Get the cache directory path for a package.
 
         Args:
             package: Package object
@@ -111,4 +149,6 @@ class DownloadService:
         """
         # Sanitize package name for use in file paths
         safe_package_name = package.name.replace("/", "-").replace("@", "")
-        return os.path.join(self.package_cache_dir, f"{safe_package_name}-{package.version}")
+        return os.path.join(
+            self.package_cache_dir, f"{safe_package_name}-{package.version}"
+        )

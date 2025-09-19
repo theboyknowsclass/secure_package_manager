@@ -4,7 +4,14 @@ from datetime import datetime
 from typing import Any, Dict, Union
 
 from database.flask_utils import get_db_operations
-from database.models import Package, PackageStatus, Request, RequestPackage, SecurityScan
+from database.models import (
+    AuditLog,
+    Package,
+    PackageStatus,
+    Request,
+    RequestPackage,
+    SecurityScan,
+)
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from services.auth_service import AuthService
@@ -23,7 +30,7 @@ trivy_service = TrivyService()
 @package_bp.route("/upload", methods=["POST"])  # type: ignore[misc]
 @auth_service.require_auth
 def upload_package_lock() -> ResponseReturnValue:
-    """Upload package-lock.json file for background processing"""
+    """Upload package-lock.json file for background processing."""
     try:
         # Validate the uploaded file
         file = _validate_uploaded_file()
@@ -46,7 +53,7 @@ def upload_package_lock() -> ResponseReturnValue:
 
 
 def _validate_uploaded_file() -> Union[Any, ResponseReturnValue]:
-    """Validate the uploaded file"""
+    """Validate the uploaded file."""
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
 
@@ -60,8 +67,10 @@ def _validate_uploaded_file() -> Union[Any, ResponseReturnValue]:
     return file
 
 
-def _parse_package_lock_file(file: Any) -> Union[Dict[str, Any], ResponseReturnValue]:
-    """Parse and validate the package-lock.json file"""
+def _parse_package_lock_file(
+    file: Any,
+) -> Union[Dict[str, Any], ResponseReturnValue]:
+    """Parse and validate the package-lock.json file."""
     try:
         package_data = json.load(file)
     except json.JSONDecodeError:
@@ -76,7 +85,10 @@ def _parse_package_lock_file(file: Any) -> Union[Dict[str, Any], ResponseReturnV
             jsonify(
                 {
                     "error": "Invalid file format",
-                    "details": "This file does not appear to be a package-lock.json file. Missing required fields.",
+                    "details": (
+                        "This file does not appear to be a package-lock.json"
+                        " file. Missing required fields."
+                    ),
                 }
             ),
             400,
@@ -86,7 +98,7 @@ def _parse_package_lock_file(file: Any) -> Union[Dict[str, Any], ResponseReturnV
 
 
 def _create_request_with_blob(package_data: Dict[str, Any]) -> Request:
-    """Create a new request record with raw blob"""
+    """Create a new request record with raw blob."""
     app_name = package_data.get("name", "Unknown Application")
     app_version = package_data.get("version", "1.0.0")
 
@@ -99,6 +111,18 @@ def _create_request_with_blob(package_data: Dict[str, Any]) -> Request:
     with get_db_operations() as ops:
         ops.add(request_record)
         ops.commit()
+        
+        # Log the request creation
+        audit_log = AuditLog(
+            user_id=request.user.id,
+            action="create_request",
+            resource_type="request",
+            resource_id=request_record.id,
+            details=f"Created package request for {app_name}@{app_version}",
+        )
+        ops.add(audit_log)
+        ops.commit()
+        
     return request_record
 
 
@@ -106,7 +130,7 @@ def _create_success_response(
     request_record: Request,
     package_data: Dict[str, Any],
 ) -> ResponseReturnValue:
-    """Create success response for package upload"""
+    """Create success response for package upload."""
     app_name = package_data.get("name", "Unknown Application")
     app_version = package_data.get("version", "1.0.0")
 
@@ -125,32 +149,44 @@ def _create_success_response(
     )
 
 
-@package_bp.route("/requests/<int:request_id>", methods=["GET"])  # type: ignore[misc]
+@package_bp.route(
+    "/requests/<int:request_id>", methods=["GET"]
+)  # type: ignore[misc]
 @auth_service.require_auth
 def get_package_request(request_id: int) -> ResponseReturnValue:
-    """Get package request details"""
+    """Get package request details."""
     try:
         with get_db_operations() as ops:
-            request_record = ops.query(Request).filter(Request.id == request_id).first()
+            request_record = (
+                ops.query(Request).filter(Request.id == request_id).first()
+            )
             if not request_record:
                 return jsonify({"error": "Request not found"}), 404
 
         # Check if user has access to this request
-        if not request.user.is_admin() and request_record.requestor_id != request.user.id:
+        if (
+            not request.user.is_admin()
+            and request_record.requestor_id != request.user.id
+        ):
             return jsonify({"error": "Access denied"}), 403
 
-        # Get packages for this request with their creation context and scan results
+        # Get packages for this request with their creation context and scan
+        # results
         with get_db_operations() as ops:
             packages_with_context = (
                 ops.query(Package, RequestPackage, SecurityScan)
                 .join(RequestPackage)
-                .outerjoin(SecurityScan)  # LEFT JOIN - allows null scan results
+                .outerjoin(
+                    SecurityScan
+                )  # LEFT JOIN - allows null scan results
                 .filter(RequestPackage.request_id == request_id)
                 .all()
             )
 
         # Get request status from status manager
-        from services.package_request_status_manager import PackageRequestStatusManager
+        from services.package_request_status_manager import (
+            PackageRequestStatusManager,
+        )
 
         status_manager = PackageRequestStatusManager()
         status_summary = status_manager.get_request_status_summary(request_id)
@@ -164,7 +200,9 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                         "version": request_record.version,
                         "status": status_summary["current_status"],
                         "total_packages": status_summary["total_packages"],
-                        "completion_percentage": status_summary["completion_percentage"],
+                        "completion_percentage": status_summary[
+                            "completion_percentage"
+                        ],
                         "created_at": request_record.created_at.isoformat(),
                         "requestor": {
                             "id": request_record.requestor.id,
@@ -178,14 +216,32 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                             "id": pkg.id,
                             "name": pkg.name,
                             "version": pkg.version,
-                            "status": (pkg.package_status.status if pkg.package_status else "Submitted"),
-                            "security_score": (pkg.package_status.security_score if pkg.package_status else None),
-                            "license_score": (pkg.package_status.license_score if pkg.package_status else None),
+                            "status": (
+                                pkg.package_status.status
+                                if pkg.package_status
+                                else "Submitted"
+                            ),
+                            "security_score": (
+                                pkg.package_status.security_score
+                                if pkg.package_status
+                                else None
+                            ),
+                            "license_score": (
+                                pkg.package_status.license_score
+                                if pkg.package_status
+                                else None
+                            ),
                             "security_scan_status": (
-                                pkg.package_status.security_scan_status if pkg.package_status else "pending"
+                                pkg.package_status.security_scan_status
+                                if pkg.package_status
+                                else "pending"
                             ),
                             "license_identifier": pkg.license_identifier,
-                            "license_status": (pkg.package_status.license_status if pkg.package_status else None),
+                            "license_status": (
+                                pkg.package_status.license_status
+                                if pkg.package_status
+                                else None
+                            ),
                             "type": rp.package_type,
                             "scan_result": (
                                 {
@@ -197,8 +253,16 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                                     "info_count": scan.info_count,
                                     "scan_type": scan.scan_type,
                                     "trivy_version": scan.trivy_version,
-                                    "created_at": scan.created_at.isoformat() if scan.created_at else None,
-                                    "completed_at": scan.completed_at.isoformat() if scan.completed_at else None,
+                                    "created_at": (
+                                        scan.created_at.isoformat()
+                                        if scan.created_at
+                                        else None
+                                    ),
+                                    "completed_at": (
+                                        scan.completed_at.isoformat()
+                                        if scan.completed_at
+                                        else None
+                                    ),
                                 }
                                 if scan
                                 else None
@@ -219,17 +283,22 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
 @package_bp.route("/requests", methods=["GET"])  # type: ignore[misc]
 @auth_service.require_auth
 def list_package_requests() -> ResponseReturnValue:
-    """List package requests for the user"""
+    """List package requests for the user."""
     try:
         with get_db_operations() as ops:
             if request.user.is_admin():
                 requests = ops.query(Request).all()
             else:
-                requests = ops.query(Request).filter_by(requestor_id=request.user.id).all()
+                requests = (
+                    ops.query(Request)
+                    .filter_by(requestor_id=request.user.id)
+                    .all()
+                )
 
         result_requests = []
         for req in requests:
-            # Get request status from status manager (this already includes package counts)
+            # Get request status from status manager (this already includes
+            # package counts)
             from services.package_request_status_manager import (
                 PackageRequestStatusManager,
             )
@@ -244,7 +313,9 @@ def list_package_requests() -> ResponseReturnValue:
                     "version": req.version,
                     "status": status_summary["current_status"],
                     "total_packages": status_summary["total_packages"],
-                    "completion_percentage": status_summary["completion_percentage"],
+                    "completion_percentage": status_summary[
+                        "completion_percentage"
+                    ],
                     "created_at": req.created_at.isoformat(),
                     "requestor": {
                         "id": req.requestor.id,
@@ -262,13 +333,17 @@ def list_package_requests() -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
-@package_bp.route("/<int:package_id>/security-scan/status", methods=["GET"])  # type: ignore[misc]
+@package_bp.route(
+    "/<int:package_id>/security-scan/status", methods=["GET"]
+)  # type: ignore[misc]
 @auth_service.require_auth
 def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
-    """Get security scan status for a package"""
+    """Get security scan status for a package."""
     try:
         with get_db_operations() as ops:
-            package = ops.query(Package).filter(Package.id == package_id).first()
+            package = (
+                ops.query(Package).filter(Package.id == package_id).first()
+            )
             if not package:
                 return jsonify({"error": "Package not found"}), 404
 
@@ -292,7 +367,10 @@ def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
         scan_status = trivy_service.get_scan_status(package_id)
 
         if not scan_status:
-            return jsonify({"error": "No security scan found for this package"}), 404
+            return (
+                jsonify({"error": "No security scan found for this package"}),
+                404,
+            )
 
         return (
             jsonify(
@@ -311,13 +389,17 @@ def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
-@package_bp.route("/<int:package_id>/security-scan/report", methods=["GET"])  # type: ignore[misc]
+@package_bp.route(
+    "/<int:package_id>/security-scan/report", methods=["GET"]
+)  # type: ignore[misc]
 @auth_service.require_auth
 def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
-    """Get detailed security scan report for a package"""
+    """Get detailed security scan report for a package."""
     try:
         with get_db_operations() as ops:
-            package = ops.query(Package).filter(Package.id == package_id).first()
+            package = (
+                ops.query(Package).filter(Package.id == package_id).first()
+            )
             if not package:
                 return jsonify({"error": "Package not found"}), 404
 
@@ -342,7 +424,9 @@ def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
 
         if not scan_report:
             return (
-                jsonify({"error": "No security scan report found for this package"}),
+                jsonify(
+                    {"error": "No security scan report found for this package"}
+                ),
                 404,
             )
 
@@ -363,13 +447,17 @@ def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
-@package_bp.route("/<int:package_id>/security-scan/trigger", methods=["POST"])  # type: ignore[misc]
+@package_bp.route(
+    "/<int:package_id>/security-scan/trigger", methods=["POST"]
+)  # type: ignore[misc]
 @auth_service.require_auth
 def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
-    """Trigger a new security scan for a package"""
+    """Trigger a new security scan for a package."""
     try:
         with get_db_operations() as ops:
-            package = ops.query(Package).filter(Package.id == package_id).first()
+            package = (
+                ops.query(Package).filter(Package.id == package_id).first()
+            )
             if not package:
                 return jsonify({"error": "Package not found"}), 404
 
@@ -413,7 +501,7 @@ def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
 @package_bp.route("/processing/status", methods=["GET"])  # type: ignore[misc]
 @auth_service.require_auth
 def get_processing_status() -> ResponseReturnValue:
-    """Get overall processing status and statistics"""
+    """Get overall processing status and statistics."""
     try:
         # Count packages by status
         status_counts = {}
@@ -427,7 +515,12 @@ def get_processing_status() -> ResponseReturnValue:
             "Rejected",
         ]:
             with get_db_operations() as ops:
-                count = ops.query(Package).join(PackageStatus).filter(PackageStatus.status == status).count()
+                count = (
+                    ops.query(Package)
+                    .join(PackageStatus)
+                    .filter(PackageStatus.status == status)
+                    .count()
+                )
             status_counts[status] = count
 
         # Count total requests
@@ -451,7 +544,11 @@ def get_processing_status() -> ResponseReturnValue:
                     "package_name": package.name,
                     "package_version": package.version,
                     "status": status.status,
-                    "updated_at": status.updated_at.isoformat() if status.updated_at else None,
+                    "updated_at": (
+                        status.updated_at.isoformat()
+                        if status.updated_at
+                        else None
+                    ),
                 }
             )
 
@@ -475,7 +572,7 @@ def get_processing_status() -> ResponseReturnValue:
 @package_bp.route("/processing/retry", methods=["POST"])  # type: ignore[misc]
 @auth_service.require_auth
 def retry_failed_packages() -> ResponseReturnValue:
-    """Retry failed packages, optionally for a specific request"""
+    """Retry failed packages, optionally for a specific request."""
     try:
         data = request.get_json() or {}
         request_id = data.get("request_id")
@@ -486,15 +583,24 @@ def retry_failed_packages() -> ResponseReturnValue:
 
         # Build query for failed packages
         with get_db_operations() as ops:
-            query = ops.query(Package).join(PackageStatus).filter(PackageStatus.status == "Rejected")
+            query = (
+                ops.query(Package)
+                .join(PackageStatus)
+                .filter(PackageStatus.status == "Rejected")
+            )
 
         if request_id:
-            query = query.join(RequestPackage).filter(RequestPackage.request_id == request_id)
+            query = query.join(RequestPackage).filter(
+                RequestPackage.request_id == request_id
+            )
 
         failed_packages = query.all()
 
         if not failed_packages:
-            return jsonify({"message": "No failed packages found", "retried": 0}), 200
+            return (
+                jsonify({"message": "No failed packages found", "retried": 0}),
+                200,
+            )
 
         retried_count = 0
         for package in failed_packages:

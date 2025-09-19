@@ -15,11 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 class DatabaseService:
-    """Service for managing database connections and sessions using pure SQLAlchemy"""
+    """Service for managing database connections and sessions using pure
+    SQLAlchemy."""
 
     def __init__(self, database_url: str, echo: bool = False):
-        """
-        Initialize the database service
+        """Initialize the database service.
 
         Args:
             database_url: Database connection URL
@@ -32,7 +32,7 @@ class DatabaseService:
         self._initialize_engine()
 
     def _initialize_engine(self) -> None:
-        """Initialize the SQLAlchemy engine and session factory"""
+        """Initialize the SQLAlchemy engine and session factory."""
         try:
             # Create engine with appropriate configuration
             engine_kwargs = {
@@ -49,14 +49,17 @@ class DatabaseService:
             self._engine = create_engine(self.database_url, **engine_kwargs)
             self._SessionLocal = sessionmaker(bind=self._engine)
 
-            logger.info(f"Database service initialized with URL: {self._mask_database_url()}")
+            logger.info(
+                f"Database service initialized with URL: {
+                    self._mask_database_url()}"
+            )
 
         except Exception as e:
             logger.error(f"Failed to initialize database service: {str(e)}")
             raise
 
     def _mask_database_url(self) -> str:
-        """Mask sensitive information in database URL for logging"""
+        """Mask sensitive information in database URL for logging."""
         if "@" in self.database_url:
             # Mask password in URL like postgresql://user:password@host/db
             parts = self.database_url.split("@")
@@ -70,8 +73,7 @@ class DatabaseService:
 
     @contextmanager
     def get_session(self) -> Generator[Session, None, None]:
-        """
-        Get a database session with automatic cleanup
+        """Get a database session with automatic cleanup.
 
         Usage:
             with db_service.get_session() as session:
@@ -89,8 +91,7 @@ class DatabaseService:
             session.close()
 
     def get_session_direct(self) -> Session:
-        """
-        Get a database session that must be manually closed
+        """Get a database session that must be manually closed.
 
         Usage:
             session = db_service.get_session_direct()
@@ -103,8 +104,7 @@ class DatabaseService:
         return self._SessionLocal()
 
     def test_connection(self) -> bool:
-        """
-        Test the database connection
+        """Test the database connection.
 
         Returns:
             True if connection is successful, False otherwise
@@ -125,7 +125,7 @@ class DatabaseService:
         return self._engine
 
     def close(self) -> None:
-        """Close the database engine and cleanup resources"""
+        """Close the database engine and cleanup resources."""
         if self._engine:
             self._engine.dispose()
             logger.info("Database service closed")

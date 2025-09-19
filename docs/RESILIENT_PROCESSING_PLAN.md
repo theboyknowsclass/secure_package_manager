@@ -1,4 +1,4 @@
-# Resilient Package Processing Implementation Plan
+﻿# Resilient Package Processing Implementation Plan
 
 ## Current Architecture Problems
 

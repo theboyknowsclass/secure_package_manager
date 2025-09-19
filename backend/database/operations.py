@@ -1,6 +1,7 @@
 """
-Database Operations - Shared operations for both Flask-SQLAlchemy and pure SQLAlchemy
-Abstracts common database patterns used across API and workers
+Database Operations - Shared operations for both Flask-SQLAlchemy
+and pure SQLAlchemy. Abstracts common database patterns used across
+API and workers
 """
 
 import logging
@@ -11,28 +12,28 @@ logger = logging.getLogger(__name__)
 
 
 class DatabaseOperations:
-    """
-    Shared database operations that work with both Flask-SQLAlchemy and pure SQLAlchemy
-    """
+    """Shared database operations that work with both Flask-SQLAlchemy and pure
+    SQLAlchemy."""
 
     def __init__(self, session_or_db):
-        """
-        Initialize with either Flask-SQLAlchemy db or pure SQLAlchemy session
+        """Initialize with either Flask-SQLAlchemy db or pure SQLAlchemy
+        session.
 
         Args:
-            session_or_db: Either Flask-SQLAlchemy db object or SQLAlchemy session
+            session_or_db: Either Flask-SQLAlchemy db object or SQLAlchemy
+            session
         """
         self.session_or_db = session_or_db
         self.is_flask_sqlalchemy = hasattr(session_or_db, "session")
 
     def _get_session(self):
-        """Get the appropriate session object"""
+        """Get the appropriate session object."""
         if self.is_flask_sqlalchemy:
             return self.session_or_db.session
         return self.session_or_db
 
     def _get_query(self, model_class):
-        """Get the appropriate query object"""
+        """Get the appropriate query object."""
         if self.is_flask_sqlalchemy:
             return model_class.query
         else:
@@ -43,7 +44,7 @@ class DatabaseOperations:
     # ===== PACKAGE OPERATIONS =====
 
     def get_package_by_id(self, package_id: int, model_class) -> Optional[Any]:
-        """Get package by ID"""
+        """Get package by ID."""
         try:
             if self.is_flask_sqlalchemy:
                 return model_class.query.get(package_id)
@@ -66,48 +67,68 @@ class DatabaseOperations:
                 raise NotFound(f"Package {package_id} not found")
             return package
 
-    def get_packages_by_status(self, status: str, model_class, status_model_class) -> List[Any]:
-        """Get packages by status"""
+    def get_packages_by_status(
+        self, status: str, model_class, status_model_class
+    ) -> List[Any]:
+        """Get packages by status."""
         try:
             if self.is_flask_sqlalchemy:
-                return model_class.query.join(status_model_class).filter(status_model_class.status == status).all()
+                return (
+                    model_class.query.join(status_model_class)
+                    .filter(status_model_class.status == status)
+                    .all()
+                )
             else:
                 session = self._get_session()
                 from sqlalchemy import select
 
                 return (
                     session.execute(
-                        select(model_class).join(status_model_class).where(status_model_class.status == status)
+                        select(model_class)
+                        .join(status_model_class)
+                        .where(status_model_class.status == status)
                     )
                     .scalars()
                     .all()
                 )
         except Exception as e:
-            logger.error(f"Error getting packages by status {status}: {str(e)}")
+            logger.error(
+                f"Error getting packages by status {status}: {str(e)}"
+            )
             return []
 
-    def get_packages_by_statuses(self, statuses: List[str], model_class, status_model_class) -> List[Any]:
-        """Get packages by multiple statuses"""
+    def get_packages_by_statuses(
+        self, statuses: List[str], model_class, status_model_class
+    ) -> List[Any]:
+        """Get packages by multiple statuses."""
         try:
             if self.is_flask_sqlalchemy:
-                return model_class.query.join(status_model_class).filter(status_model_class.status.in_(statuses)).all()
+                return (
+                    model_class.query.join(status_model_class)
+                    .filter(status_model_class.status.in_(statuses))
+                    .all()
+                )
             else:
                 session = self._get_session()
                 from sqlalchemy import select
 
                 return (
                     session.execute(
-                        select(model_class).join(status_model_class).where(status_model_class.status.in_(statuses))
+                        select(model_class)
+                        .join(status_model_class)
+                        .where(status_model_class.status.in_(statuses))
                     )
                     .scalars()
                     .all()
                 )
         except Exception as e:
-            logger.error(f"Error getting packages by statuses {statuses}: {str(e)}")
+            logger.error(
+                f"Error getting packages by statuses {statuses}: {str(e)}"
+            )
             return []
 
     def create_package(self, package_data: Dict[str, Any], model_class) -> Any:
-        """Create a new package"""
+        """Create a new package."""
         try:
             package = model_class(**package_data)
             session = self._get_session()
@@ -118,17 +139,27 @@ class DatabaseOperations:
             logger.error(f"Error creating package: {str(e)}")
             raise
 
-    def update_package_status(self, package_id: int, new_status: str, status_model_class, **kwargs) -> bool:
-        """Update package status"""
+    def update_package_status(
+        self, package_id: int, new_status: str, status_model_class, **kwargs
+    ) -> bool:
+        """Update package status."""
         try:
             session = self._get_session()
 
             if self.is_flask_sqlalchemy:
-                status = session.query(status_model_class).filter_by(package_id=package_id).first()
+                status = (
+                    session.query(status_model_class)
+                    .filter_by(package_id=package_id)
+                    .first()
+                )
             else:
                 from sqlalchemy import select
 
-                result = session.execute(select(status_model_class).where(status_model_class.package_id == package_id))
+                result = session.execute(
+                    select(status_model_class).where(
+                        status_model_class.package_id == package_id
+                    )
+                )
                 status = result.scalar_one_or_none()
 
             if not status:
@@ -148,18 +179,24 @@ class DatabaseOperations:
             return True
 
         except Exception as e:
-            logger.error(f"Error updating package {package_id} status: {str(e)}")
+            logger.error(
+                f"Error updating package {package_id} status: {str(e)}"
+            )
             session.rollback()
             return False
 
-    def advance_package_status(self, package_id: int, next_status: str, status_model_class) -> bool:
+    def advance_package_status(
+        self, package_id: int, next_status: str, status_model_class
+    ) -> bool:
         """Advance package to next status (alias for update_package_status)"""
-        return self.update_package_status(package_id, next_status, status_model_class)
+        return self.update_package_status(
+            package_id, next_status, status_model_class
+        )
 
     # ===== REQUEST OPERATIONS =====
 
     def get_request_by_id(self, request_id: int, model_class) -> Optional[Any]:
-        """Get request by ID"""
+        """Get request by ID."""
         try:
             if self.is_flask_sqlalchemy:
                 return model_class.query.get(request_id)
@@ -171,7 +208,7 @@ class DatabaseOperations:
             return None
 
     def create_request(self, request_data: Dict[str, Any], model_class) -> Any:
-        """Create a new request"""
+        """Create a new request."""
         try:
             request = model_class(**request_data)
             session = self._get_session()
@@ -192,7 +229,7 @@ class DatabaseOperations:
         status_model_class,
         request_package_model_class,
     ) -> List[Any]:
-        """Create multiple package records with status and request links"""
+        """Create multiple package records with status and request links."""
         try:
             session = self._get_session()
             package_objects = []
@@ -205,18 +242,24 @@ class DatabaseOperations:
 
                 # Create package status
                 package_status = status_model_class(
-                    package_id=package.id, status="Submitted", security_scan_status="pending"
+                    package_id=package.id,
+                    status="Submitted",
+                    security_scan_status="pending",
                 )
                 session.add(package_status)
 
                 # Create request-package link
                 request_package = request_package_model_class(
-                    request_id=request_id, package_id=package.id, package_type="new"
+                    request_id=request_id,
+                    package_id=package.id,
+                    package_type="new",
                 )
                 session.add(request_package)
 
                 package_objects.append(package)
-                logger.info(f"Created package: {package.name}@{package.version}")
+                logger.info(
+                    f"Created package: {package.name}@{package.version}"
+                )
 
             session.commit()
             return package_objects
@@ -229,12 +272,22 @@ class DatabaseOperations:
     # ===== AUDIT OPERATIONS =====
 
     def log_action(
-        self, user_id: int, action: str, resource_type: str, resource_id: int, details: str, audit_model_class
+        self,
+        user_id: int,
+        action: str,
+        resource_type: str,
+        resource_id: int,
+        details: str,
+        audit_model_class,
     ) -> bool:
-        """Log an audit action"""
+        """Log an audit action."""
         try:
             audit_log = audit_model_class(
-                user_id=user_id, action=action, resource_type=resource_type, resource_id=resource_id, details=details
+                user_id=user_id,
+                action=action,
+                resource_type=resource_type,
+                resource_id=resource_id,
+                details=details,
             )
             session = self._get_session()
             session.add(audit_log)
@@ -247,8 +300,10 @@ class DatabaseOperations:
 
     # ===== QUERY HELPERS =====
 
-    def count_packages_by_status(self, status: str, package_model_class, status_model_class) -> int:
-        """Count packages by status"""
+    def count_packages_by_status(
+        self, status: str, package_model_class, status_model_class
+    ) -> int:
+        """Count packages by status."""
         try:
             if self.is_flask_sqlalchemy:
                 return (
@@ -267,11 +322,13 @@ class DatabaseOperations:
                 )
                 return result.scalar() or 0
         except Exception as e:
-            logger.error(f"Error counting packages by status {status}: {str(e)}")
+            logger.error(
+                f"Error counting packages by status {status}: {str(e)}"
+            )
             return 0
 
     def get_pending_requests(self, request_model_class) -> List[Any]:
-        """Get requests that need processing"""
+        """Get requests that need processing."""
         try:
             if self.is_flask_sqlalchemy:
                 return request_model_class.query.all()
@@ -279,23 +336,32 @@ class DatabaseOperations:
                 session = self._get_session()
                 from sqlalchemy import select
 
-                return session.execute(select(request_model_class)).scalars().all()
+                return (
+                    session.execute(select(request_model_class))
+                    .scalars()
+                    .all()
+                )
         except Exception as e:
             logger.error(f"Error getting pending requests: {str(e)}")
             return []
 
-    def get_package_by_name_version(self, name: str, version: str, package_model_class) -> Optional[Any]:
-        """Get package by name and version"""
+    def get_package_by_name_version(
+        self, name: str, version: str, package_model_class
+    ) -> Optional[Any]:
+        """Get package by name and version."""
         try:
             if self.is_flask_sqlalchemy:
-                return package_model_class.query.filter_by(name=name, version=version).first()
+                return package_model_class.query.filter_by(
+                    name=name, version=version
+                ).first()
             else:
                 session = self._get_session()
                 from sqlalchemy import select
 
                 result = session.execute(
                     select(package_model_class).where(
-                        package_model_class.name == name, package_model_class.version == version
+                        package_model_class.name == name,
+                        package_model_class.version == version,
                     )
                 )
                 return result.scalar_one_or_none()
@@ -303,11 +369,15 @@ class DatabaseOperations:
             logger.error(f"Error getting package by name/version: {str(e)}")
             return None
 
-    def get_request_package_link(self, request_id: int, package_id: int, request_package_model_class) -> Optional[Any]:
-        """Get request-package link"""
+    def get_request_package_link(
+        self, request_id: int, package_id: int, request_package_model_class
+    ) -> Optional[Any]:
+        """Get request-package link."""
         try:
             if self.is_flask_sqlalchemy:
-                return request_package_model_class.query.filter_by(request_id=request_id, package_id=package_id).first()
+                return request_package_model_class.query.filter_by(
+                    request_id=request_id, package_id=package_id
+                ).first()
             else:
                 session = self._get_session()
                 from sqlalchemy import select
@@ -324,12 +394,18 @@ class DatabaseOperations:
             return None
 
     def create_request_package_link(
-        self, request_id: int, package_id: int, package_type: str, request_package_model_class
+        self,
+        request_id: int,
+        package_id: int,
+        package_type: str,
+        request_package_model_class,
     ) -> bool:
-        """Create request-package link"""
+        """Create request-package link."""
         try:
             request_package = request_package_model_class(
-                request_id=request_id, package_id=package_id, package_type=package_type
+                request_id=request_id,
+                package_id=package_id,
+                package_type=package_type,
             )
             session = self._get_session()
             session.add(request_package)
@@ -342,8 +418,10 @@ class DatabaseOperations:
 
     # ===== USER OPERATIONS =====
 
-    def get_user_by_username(self, username: str, model_class) -> Optional[Any]:
-        """Get user by username"""
+    def get_user_by_username(
+        self, username: str, model_class
+    ) -> Optional[Any]:
+        """Get user by username."""
         try:
             if self.is_flask_sqlalchemy:
                 return model_class.query.filter_by(username=username).first()
@@ -351,14 +429,18 @@ class DatabaseOperations:
                 from sqlalchemy import select
 
                 session = self._get_session()
-                stmt = select(model_class).where(model_class.username == username)
+                stmt = select(model_class).where(
+                    model_class.username == username
+                )
                 return session.execute(stmt).scalar_one_or_none()
         except Exception as e:
-            logger.error(f"Error getting user by username {username}: {str(e)}")
+            logger.error(
+                f"Error getting user by username {username}: {str(e)}"
+            )
             return None
 
     def get_user_by_id(self, user_id: int, model_class) -> Optional[Any]:
-        """Get user by ID"""
+        """Get user by ID."""
         try:
             if self.is_flask_sqlalchemy:
                 return model_class.query.get(user_id)
@@ -372,8 +454,10 @@ class DatabaseOperations:
             logger.error(f"Error getting user by ID {user_id}: {str(e)}")
             return None
 
-    def create_user(self, user_data: Dict[str, Any], model_class) -> Optional[Any]:
-        """Create a new user"""
+    def create_user(
+        self, user_data: Dict[str, Any], model_class
+    ) -> Optional[Any]:
+        """Create a new user."""
         try:
             session = self._get_session()
             user = model_class(**user_data)
@@ -388,7 +472,7 @@ class DatabaseOperations:
             return None
 
     def update_user(self, user: Any, update_data: Dict[str, Any]) -> bool:
-        """Update an existing user"""
+        """Update an existing user."""
         try:
             session = self._get_session()
             for key, value in update_data.items():
@@ -405,27 +489,27 @@ class DatabaseOperations:
     # ===== BASIC SESSION OPERATIONS =====
 
     def add(self, obj: Any) -> None:
-        """Add an object to the session"""
+        """Add an object to the session."""
         session = self._get_session()
         session.add(obj)
 
     def commit(self) -> None:
-        """Commit the current transaction"""
+        """Commit the current transaction."""
         session = self._get_session()
         session.commit()
 
     def rollback(self) -> None:
-        """Rollback the current transaction"""
+        """Rollback the current transaction."""
         session = self._get_session()
         session.rollback()
 
     def delete(self, obj: Any) -> None:
-        """Delete an object from the session"""
+        """Delete an object from the session."""
         session = self._get_session()
         session.delete(obj)
 
     def query(self, *entities):
-        """Create a query object"""
+        """Create a query object."""
         if self.is_flask_sqlalchemy:
             # For Flask-SQLAlchemy, we need to use the model's query attribute
             if len(entities) == 1:

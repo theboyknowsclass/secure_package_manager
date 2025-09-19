@@ -1,6 +1,4 @@
-"""
-RequestPackage model for linking requests to packages
-"""
+"""RequestPackage model for linking requests to packages."""
 
 from typing import Any
 
