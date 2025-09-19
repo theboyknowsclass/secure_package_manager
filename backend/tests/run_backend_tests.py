@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Test runner for backend license service tests.
+"""Test runner for backend tests.
 
-Run this to verify license validation functionality.
+Run this to verify all backend functionality including services,
+workers, and integrations.
 """
 
 import os
@@ -10,9 +11,9 @@ import sys
 import unittest
 
 
-def run_license_tests():
-    """Run the license service tests."""
-    print("🚀 Starting License Service Tests...")
+def run_backend_tests():
+    """Run all backend tests."""
+    print("🚀 Starting Backend Tests...")
     print("=" * 50)
 
     # Get the directory containing this script
@@ -30,7 +31,7 @@ def run_license_tests():
     # Print summary
     print("\n" + "=" * 50)
     if result.wasSuccessful():
-        print("🎉 All license tests passed!")
+        print("🎉 All backend tests passed!")
         return True
     else:
         print(
@@ -72,6 +73,6 @@ if __name__ == "__main__":
         success = run_specific_test(test_file)
     else:
         # Run all tests
-        success = run_license_tests()
+        success = run_backend_tests()
 
     sys.exit(0 if success else 1)

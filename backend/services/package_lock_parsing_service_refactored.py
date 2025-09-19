@@ -9,21 +9,25 @@ structure and focuses purely on business logic.
 """
 
 import logging
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 class PackageLockParsingService:
     """Service for parsing package-lock.json files and extracting packages.
-    
-    This service handles the business logic of parsing package-lock.json files
-    and extracting package information. It works with database operations
-    passed in from the caller (worker or API) to maintain separation of concerns.
+
+    This service handles the business logic of parsing package-lock.json
+    files and extracting package information. It works with database
+    operations passed in from the caller (worker or API) to maintain
+    separation of concerns.
     """
 
     def parse_package_lock(
-        self, request_id: int, package_data: Dict[str, Any], ops: Dict[str, Any]
+        self,
+        request_id: int,
+        package_data: Dict[str, Any],
+        ops: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Parse package-lock.json and extract all packages.
 
@@ -53,14 +57,14 @@ class PackageLockParsingService:
             )
 
             logger.info(
-                f"Parsed {len(packages_to_process)} new packages and "
-                f"{len(existing_packages)} existing packages for request {request_id}"
+                f"Parsed {len(packages_to_process)} new packages and {len(existing_packages)} existing packages for request {request_id}"
             )
 
             return {
                 "packages_to_process": len(packages_to_process),
                 "existing_packages": len(existing_packages),
-                "total_packages": len(packages_to_process) + len(existing_packages),
+                "total_packages": len(packages_to_process)
+                + len(existing_packages),
                 "created_packages": created_packages,
             }
 
@@ -68,7 +72,9 @@ class PackageLockParsingService:
             logger.error(f"Error parsing package-lock.json: {str(e)}")
             raise e
 
-    def _validate_package_lock_file(self, package_data: Dict[str, Any]) -> None:
+    def _validate_package_lock_file(
+        self, package_data: Dict[str, Any]
+    ) -> None:
         """Validate that the package data is a valid package-lock.json file."""
         if "lockfileVersion" not in package_data:
             raise ValueError(
@@ -85,7 +91,9 @@ class PackageLockParsingService:
                 f"Please upgrade your npm version (npm 8+) and regenerate the lockfile."
             )
 
-    def _extract_packages_from_json(self, package_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _extract_packages_from_json(
+        self, package_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Extract package information from package-lock.json data."""
         packages = package_data.get("packages", {})
         logger.info(
@@ -114,7 +122,7 @@ class PackageLockParsingService:
             package_info = package_data["info"]
 
             # Check if package already exists in database
-            existing_package = ops['package'].get_by_name_version(
+            existing_package = ops["package"].get_by_name_version(
                 package_name, package_version
             )
 
@@ -137,7 +145,9 @@ class PackageLockParsingService:
 
         return packages_to_process, existing_packages
 
-    def _deduplicate_packages(self, packages: Dict[str, Any]) -> Dict[str, Any]:
+    def _deduplicate_packages(
+        self, packages: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Deduplicate packages by name+version within the same lock file."""
         unique_packages = {}
 
@@ -145,7 +155,9 @@ class PackageLockParsingService:
             if package_path == "":  # Skip root package
                 continue
 
-            package_name = self._extract_package_name(package_path, package_info)
+            package_name = self._extract_package_name(
+                package_path, package_info
+            )
             package_version = package_info.get("version")
 
             if not package_name or not package_version:
@@ -203,14 +215,19 @@ class PackageLockParsingService:
     ) -> None:
         """Link an existing package to a request if not already linked."""
         # Check if link already exists
-        if not ops['request_package'].link_exists(request_id, existing_package.id):
+        if not ops["request_package"].link_exists(
+            request_id, existing_package.id
+        ):
             # Create link between request and existing package
-            ops['request_package'].create_link(
+            ops["request_package"].create_link(
                 request_id, existing_package.id, "existing"
             )
 
     def _create_package_records(
-        self, packages_to_process: List[Dict[str, Any]], request_id: int, ops: Dict[str, Any]
+        self,
+        packages_to_process: List[Dict[str, Any]],
+        request_id: int,
+        ops: Dict[str, Any],
     ) -> List[Any]:
         """Create database records for new packages."""
         created_packages = []
@@ -227,14 +244,12 @@ class PackageLockParsingService:
             }
 
             # Create package with initial status
-            package = ops['package'].create_with_status(
+            package = ops["package"].create_with_status(
                 package_record_data, status="Submitted"
             )
 
             # Create request-package link
-            ops['request_package'].create_link(
-                request_id, package.id, "new"
-            )
+            ops["request_package"].create_link(request_id, package.id, "new")
 
             created_packages.append(package)
             logger.info(

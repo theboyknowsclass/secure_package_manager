@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
 from database.models import Package, PackageStatus
-from database.operations import DatabaseOperations
+from database.operations import OperationsFactory
 from database.service import DatabaseService
 from services.license_service import LicenseService
 from workers.base_worker import BaseWorker
@@ -52,7 +52,7 @@ class LicenseWorker(BaseWorker):
         """Process one cycle of license checking."""
         try:
             with self.db_service.get_session() as session:
-                self.ops = DatabaseOperations(session)
+                self.ops = OperationsFactory.create_all_operations(session)
                 # Check for stuck packages first
                 self._handle_stuck_packages()
 
@@ -84,8 +84,7 @@ class LicenseWorker(BaseWorker):
 
             if stuck_packages:
                 logger.warning(
-                    f"Found {
-                        len(stuck_packages)} stuck packages in license checking, resetting to Submitted"
+                    f"Found {len(stuck_packages)} stuck packages in license checking, resetting to Submitted"
                 )
 
                 for package in stuck_packages:
@@ -117,8 +116,7 @@ class LicenseWorker(BaseWorker):
                 len(packages) for packages in license_groups.values()
             )
             logger.info(
-                f"Processing {total_packages} packages across {
-                    len(license_groups)} unique license groups"
+                f"Processing {total_packages} packages across {len(license_groups)} unique license groups"
             )
 
             # Process each license group as a batch
@@ -167,10 +165,8 @@ class LicenseWorker(BaseWorker):
             )
 
             logger.debug(
-                f"Grouped {
-                    len(pending_packages)} packages into {
-                    len(license_groups)} license groups, processing {
-                    len(limited_groups)} groups"
+                f"Grouped {len(pending_packages)} packages into {len(license_groups)} license groups, "
+                f"processing {len(limited_groups)} groups"
             )
 
             return limited_groups
@@ -232,8 +228,7 @@ class LicenseWorker(BaseWorker):
                 len(packages) for packages in license_groups.values()
             )
             logger.info(
-                f"Successfully processed {total_packages} packages across {
-                    len(license_groups)} license groups"
+                f"Successfully processed {total_packages} packages across {len(license_groups)} license groups"
             )
 
         except Exception as e:
@@ -268,7 +263,8 @@ class LicenseWorker(BaseWorker):
             ):
                 if i >= len(validation_results):
                     logger.error(
-                        f"No validation result for license group {i}: {license_string}")
+                        f"No validation result for license group {i}: {license_string}"
+                    )
                     continue
 
                 result = validation_results[i]
@@ -294,11 +290,7 @@ class LicenseWorker(BaseWorker):
                             failed_packages.append(
                                 (
                                     package,
-                                    f"License validation failed: {
-                                        ', '.join(
-                                            result.get(
-                                                'errors',
-                                                []))}",
+                                    f"License validation failed: {', '.join(result.get('errors', []))}",
                                 )
                             )
                         else:
@@ -310,16 +302,14 @@ class LicenseWorker(BaseWorker):
                                 )
 
                         logger.debug(
-                            f"Package {
-                                package.name}@{
-                                package.version} (license: {license_string}): Score={
-                                result['score']}, Status={
-                                result.get('license_status')}")
+                            f"Package {package.name}@{package.version} (license: {license_string}): "
+                            f"Score={result['score']}, Status={result.get('license_status')}"
+                        )
 
                 except Exception as e:
                     logger.error(
-                        f"Error processing result for license group {license_string}: {
-                            str(e)}")
+                        f"Error processing result for license group {license_string}: {str(e)}"
+                    )
                     for package in packages:
                         failed_packages.append((package, str(e)))
 
@@ -342,9 +332,8 @@ class LicenseWorker(BaseWorker):
                     )
 
             logger.info(
-                f"License group processing complete: {
-                    len(successful_packages)} successful, {
-                    len(failed_packages)} failed"
+                f"License group processing complete: {len(successful_packages)} successful, "
+                f"{len(failed_packages)} failed"
             )
 
         except Exception as e:
@@ -454,11 +443,7 @@ class LicenseWorker(BaseWorker):
                         failed_packages.append(
                             (
                                 package,
-                                f"License validation failed: {
-                                    ', '.join(
-                                        result.get(
-                                            'errors',
-                                            []))}",
+                                f"License validation failed: {', '.join(result.get('errors', []))}",
                             )
                         )
                     else:
@@ -468,19 +453,13 @@ class LicenseWorker(BaseWorker):
                             package.package_status.status = "Licence Checked"
 
                     logger.debug(
-                        f"Package {
-                            package.name}@{
-                            package.version}: Score={
-                            result['score']}, Status={
-                            result.get('license_status')}"
+                        f"Package {package.name}@{package.version}: Score={result['score']}, "
+                        f"Status={result.get('license_status')}"
                     )
 
                 except Exception as e:
                     logger.error(
-                        f"Error processing result for package {
-                            package.name}@{
-                            package.version}: {
-                            str(e)}"
+                        f"Error processing result for package {package.name}@{package.version}: {str(e)}"
                     )
                     failed_packages.append((package, str(e)))
 
@@ -503,9 +482,8 @@ class LicenseWorker(BaseWorker):
                     )
 
             logger.info(
-                f"Batch processing complete: {
-                    len(successful_packages)} successful, {
-                    len(failed_packages)} failed"
+                f"Batch processing complete: {len(successful_packages)} successful, "
+                f"{len(failed_packages)} failed"
             )
 
         except Exception as e:
@@ -526,10 +504,7 @@ class LicenseWorker(BaseWorker):
                 self._check_single_package_license(package)
             except Exception as e:
                 logger.error(
-                    f"Error in fallback processing for package {
-                        package.name}@{
-                        package.version}: {
-                        str(e)}"
+                    f"Error in fallback processing for package {package.name}@{package.version}: {str(e)}"
                 )
                 self._mark_package_license_failed(package, str(e))
 
@@ -572,10 +547,7 @@ class LicenseWorker(BaseWorker):
                 # License validation failed
                 self._mark_package_license_failed(
                     package,
-                    f"License validation failed: {
-                        ', '.join(
-                            license_validation.get(
-                                'errors', []))}",
+                    f"License validation failed: {', '.join(license_validation.get('errors', []))}",
                 )
                 return
 
@@ -585,18 +557,13 @@ class LicenseWorker(BaseWorker):
                 package.package_status.updated_at = datetime.utcnow()
 
             logger.info(
-                f"Successfully checked license for package {
-                    package.name}@{
-                    package.version} (Score: {
-                    license_validation['score']}, Status: {license_status})"
+                f"Successfully checked license for package {package.name}@{package.version} "
+                f"(Score: {license_validation['score']}, Status: {license_status})"
             )
 
         except Exception as e:
             logger.error(
-                f"Error checking license for package {
-                    package.name}@{
-                    package.version}: {
-                    str(e)}"
+                f"Error checking license for package {package.name}@{package.version}: {str(e)}"
             )
             self._mark_package_license_failed(package, str(e))
 
@@ -620,10 +587,7 @@ class LicenseWorker(BaseWorker):
 
         except Exception as e:
             logger.error(
-                f"Error validating package license for {
-                    package.name}@{
-                    package.version}: {
-                    str(e)}"
+                f"Error validating package license for {package.name}@{package.version}: {str(e)}"
             )
             return {
                 "score": 0,

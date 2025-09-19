@@ -50,8 +50,7 @@ class DatabaseService:
             self._SessionLocal = sessionmaker(bind=self._engine)
 
             logger.info(
-                f"Database service initialized with URL: {
-                    self._mask_database_url()}"
+                f"Database service initialized with URL: {self._mask_database_url()}"
             )
 
         except Exception as e:

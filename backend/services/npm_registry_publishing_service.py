@@ -45,10 +45,7 @@ class NpmRegistryPublishingService:
                 )
 
             logger.info(
-                f"Publishing {
-                    package.name}@{
-                    package.version} to repository at {
-                    self.target_repo_url}"
+                f"Publishing {package.name}@{package.version} to repository at {self.target_repo_url}"
             )
 
             # Create package tarball
@@ -167,8 +164,8 @@ class NpmRegistryPublishingService:
             )
             f.write("## Security Information\n\n")
             f.write(
-                f'- Security Score: {
-                    package.package_status.security_score if package.package_status else "N/A"}\n')
+                f'- Security Score: {package.package_status.security_score if package.package_status else "N/A"}\n'
+            )
             f.write(f'- License: {package.license_identifier or "N/A"}\n')
             f.write(
                 (

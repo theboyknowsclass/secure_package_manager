@@ -70,8 +70,8 @@ class ApprovalWorker(BaseWorker):
 
                 if stuck_packages:
                     logger.warning(
-                        f"Found {
-                            len(stuck_packages)} packages stuck in Security Scanned state")
+                        f"Found {len(stuck_packages)} packages stuck in Security Scanned state"
+                    )
                     # Just refresh their timestamp to avoid constant
                     # reprocessing
                     for package in stuck_packages:
@@ -108,8 +108,7 @@ class ApprovalWorker(BaseWorker):
                     return
 
                 logger.info(
-                    f"Transitioning {
-                        len(security_scanned_packages)} packages from Security Scanned to Pending Approval"
+                    f"Transitioning {len(security_scanned_packages)} packages from Security Scanned to Pending Approval"
                 )
 
                 # Batch update all packages to Pending Approval
@@ -120,8 +119,8 @@ class ApprovalWorker(BaseWorker):
 
                 session.commit()
                 logger.info(
-                    f"Successfully transitioned {
-                        len(security_scanned_packages)} packages to Pending Approval")
+                    f"Successfully transitioned {len(security_scanned_packages)} packages to Pending Approval"
+                )
 
         except Exception as e:
             logger.error(

@@ -16,7 +16,9 @@ from typing import Any, Dict, List, Optional
 
 from database.operations import OperationsFactory
 from database.service import DatabaseService
-from services.package_lock_parsing_service_refactored import PackageLockParsingService
+from services.package_lock_parsing_service_refactored import (
+    PackageLockParsingService,
+)
 from workers.base_worker import BaseWorker
 
 logger = logging.getLogger(__name__)
@@ -25,7 +27,7 @@ logger = logging.getLogger(__name__)
 class ParseWorker(BaseWorker):
     """Background worker for parsing package-lock.json blobs and extracting
     packages.
-    
+
     This worker coordinates the parsing process by:
     1. Finding requests that need parsing
     2. Delegating parsing logic to PackageLockParsingService
@@ -44,7 +46,7 @@ class ParseWorker(BaseWorker):
     def initialize(self) -> None:
         """Initialize the worker and its dependencies."""
         logger.info("Initializing ParseWorker...")
-        
+
         # Initialize database service
         database_url = os.getenv("DATABASE_URL")
         if not database_url:
@@ -52,7 +54,7 @@ class ParseWorker(BaseWorker):
 
         self.db_service = DatabaseService(database_url)
         logger.info("ParseWorker database service initialized")
-        
+
         # Initialize parsing service
         self.parsing_service = PackageLockParsingService()
         logger.info("ParseWorker parsing service initialized")
@@ -62,13 +64,13 @@ class ParseWorker(BaseWorker):
         try:
             with self.db_service.get_session() as session:
                 ops = OperationsFactory.create_all_operations(session)
-                
+
                 # Handle stuck requests first
                 self._handle_stuck_requests(ops)
-                
+
                 # Process requests that need parsing
                 self._process_submitted_requests(ops)
-                
+
         except Exception as e:
             logger.error(f"Error in parse cycle: {str(e)}", exc_info=True)
 
@@ -76,12 +78,11 @@ class ParseWorker(BaseWorker):
         """Handle requests that have been stuck in processing too long."""
         try:
             stuck_threshold = datetime.utcnow() - self.stuck_request_timeout
-            
+
             # Get all requests and check for stuck ones
-            all_requests = ops['request'].get_all()
+            all_requests = ops["request"].get_all()
             stuck_requests = [
-                r for r in all_requests 
-                if r.created_at < stuck_threshold
+                r for r in all_requests if r.created_at < stuck_threshold
             ]
 
             if stuck_requests:
@@ -100,13 +101,17 @@ class ParseWorker(BaseWorker):
         """Process requests that need package extraction."""
         try:
             # Find requests that need parsing
-            requests_to_process = ops['request'].get_needing_parsing()
-            
+            requests_to_process = ops["request"].get_needing_parsing()
+
             # Limit the number of requests processed per cycle
-            requests_to_process = requests_to_process[:self.max_requests_per_cycle]
-            
+            requests_to_process = requests_to_process[
+                : self.max_requests_per_cycle
+            ]
+
             if not requests_to_process:
-                logger.info("ParseWorker heartbeat: No requests found to parse")
+                logger.info(
+                    "ParseWorker heartbeat: No requests found to parse"
+                )
                 return
 
             logger.info(
@@ -121,7 +126,8 @@ class ParseWorker(BaseWorker):
                         f"Failed to parse request {request.id}: {str(e)}",
                         exc_info=True,
                     )
-                    # Mark request as failed (could add a status field to Request model)
+                    # Mark request as failed (could add a status field to
+                    # Request model)
 
         except Exception as e:
             logger.error(
@@ -132,18 +138,18 @@ class ParseWorker(BaseWorker):
         """Parse a request's raw blob and extract packages."""
         try:
             logger.info(f"Starting to parse request {request.id}")
-            
+
             # Parse the JSON blob
             package_data = json.loads(request.raw_request_blob)
-            
+
             # Delegate parsing logic to the service
             result = self.parsing_service.parse_package_lock(
                 request.id, package_data, ops
             )
-            
+
             # Handle the results
             self._handle_parsing_results(request, result, ops)
-            
+
             logger.info(
                 f"Successfully parsed request {request.id}: "
                 f"Created {result.get('packages_to_process', 0)} new packages, "
@@ -154,24 +160,26 @@ class ParseWorker(BaseWorker):
             logger.error(f"Error parsing request {request.id} blob: {str(e)}")
             raise e
 
-    def _handle_parsing_results(self, request, result: Dict[str, Any], ops: Dict[str, Any]) -> None:
+    def _handle_parsing_results(
+        self, request, result: Dict[str, Any], ops: Dict[str, Any]
+    ) -> None:
         """Handle the results of parsing a request."""
         try:
             # Log the parsing results
-            packages_created = result.get('packages_to_process', 0)
-            existing_packages = result.get('existing_packages', 0)
-            total_packages = result.get('total_packages', 0)
-            
+            packages_created = result.get("packages_to_process", 0)
+            existing_packages = result.get("existing_packages", 0)
+            total_packages = result.get("total_packages", 0)
+
             logger.info(
                 f"Request {request.id} parsing complete: "
                 f"{packages_created} new packages, "
                 f"{existing_packages} existing packages, "
                 f"{total_packages} total packages"
             )
-            
+
             # Update request status if needed (when Request model has status field)
             # For now, we just log the completion
-            
+
         except Exception as e:
             logger.error(
                 f"Error handling parsing results for request {request.id}: {str(e)}"
@@ -183,26 +191,31 @@ class ParseWorker(BaseWorker):
         try:
             with self.db_service.get_session() as session:
                 ops = OperationsFactory.create_all_operations(session)
-                
+
                 # Get request statistics
-                all_requests = ops['request'].get_all()
-                requests_with_packages = len([
-                    r for r in all_requests 
-                    if ops['request_package'].get_by_request_id(r.id)
-                ])
-                
+                all_requests = ops["request"].get_all()
+                requests_with_packages = len(
+                    [
+                        r
+                        for r in all_requests
+                        if ops["request_package"].get_by_request_id(r.id)
+                    ]
+                )
+
                 # Get package statistics
-                all_packages = ops['package'].get_all()
-                
+                all_packages = ops["package"].get_all()
+
                 return {
                     "worker_status": self.get_worker_status(),
                     "total_requests": len(all_requests),
                     "requests_with_packages": requests_with_packages,
-                    "requests_needing_parsing": len(ops['request'].get_needing_parsing()),
+                    "requests_needing_parsing": len(
+                        ops["request"].get_needing_parsing()
+                    ),
                     "total_packages": len(all_packages),
                     "timestamp": datetime.utcnow().isoformat(),
                 }
-                
+
         except Exception as e:
             logger.error(f"Error getting worker stats: {str(e)}")
             return {"error": str(e)}

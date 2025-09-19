@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict
 
 from database.models import Package, PackageStatus
-from database.operations import DatabaseOperations
+from database.operations import OperationsFactory
 from database.service import DatabaseService
 from services.npm_registry_publishing_service import (
     NpmRegistryPublishingService,
@@ -59,7 +59,7 @@ class PublishWorker(BaseWorker):
         """Process one cycle of package publishing."""
         try:
             with self.db_service.get_session() as session:
-                self.ops = DatabaseOperations(session)
+                self.ops = OperationsFactory.create_all_operations(session)
                 # Check for stuck packages first
                 self._handle_stuck_packages()
 
@@ -92,17 +92,15 @@ class PublishWorker(BaseWorker):
 
             if stuck_packages:
                 logger.warning(
-                    f"Found {
-                        len(stuck_packages)} stuck packages in publishing, resetting publish status")
+                    f"Found {len(stuck_packages)} stuck packages in publishing, resetting publish status"
+                )
 
                 for package in stuck_packages:
                     if package.package_status:
                         package.package_status.publish_status = "pending"
                         package.package_status.updated_at = datetime.utcnow()
                         logger.info(
-                            f"Reset stuck package {
-                                package.name}@{
-                                package.version} publish status to pending"
+                            f"Reset stuck package {package.name}@{package.version} publish status to pending"
                         )
 
         except Exception as e:
@@ -143,10 +141,7 @@ class PublishWorker(BaseWorker):
                     self._publish_single_package(package)
                 except Exception as e:
                     logger.error(
-                        f"Error publishing package {
-                            package.name}@{
-                            package.version}: {
-                            str(e)}",
+                        f"Error publishing package {package.name}@{package.version}: {str(e)}",
                         exc_info=True,
                     )
                     self._mark_package_publish_failed(package, str(e))

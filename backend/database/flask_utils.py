@@ -8,18 +8,18 @@ import os
 from contextlib import contextmanager
 from typing import Generator
 
-from .operations import DatabaseOperations
+from .operations import OperationsFactory
 from .service import DatabaseService
 
 
 @contextmanager
-def get_db_operations() -> Generator[DatabaseOperations, None, None]:
-    """Context manager to get DatabaseOperations for Flask requests.
+def get_db_operations() -> Generator[dict, None, None]:
+    """Context manager to get database operations for Flask requests.
 
     Usage:
         with get_db_operations() as ops:
-            user = ops.get_user_by_username("admin")
-            ops.create_user(...)
+            user = ops['user'].get_user_by_username("admin")
+            ops['user'].create_user(...)
     """
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
@@ -27,7 +27,7 @@ def get_db_operations() -> Generator[DatabaseOperations, None, None]:
 
     db_service = DatabaseService(database_url)
     with db_service.get_session() as session:
-        ops = DatabaseOperations(session)
+        ops = OperationsFactory.create_all_operations(session)
         yield ops
 
 

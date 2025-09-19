@@ -50,13 +50,7 @@ class DownloadService:
             os.makedirs(package_dir, exist_ok=True)
 
             logger.info(
-                (
-                    f"Downloading package {
-                        package.name}@{
-                        package.version} from "
-                    f"{
-                        package.npm_url}"
-                )
+                f"Downloading package {package.name}@{package.version} from {package.npm_url}"
             )
 
             # Download tarball
@@ -66,8 +60,7 @@ class DownloadService:
 
             if response.status_code != 200:
                 logger.error(
-                    f"Failed to download package tarball: HTTP {
-                        response.status_code}"
+                    f"Failed to download package tarball: HTTP {response.status_code}"
                 )
                 return False
 
@@ -77,9 +70,7 @@ class DownloadService:
                 tar.extractall(package_dir)
 
             logger.info(
-                f"Successfully downloaded and extracted {
-                    package.name}@{
-                    package.version} to {package_dir}"
+                f"Successfully downloaded and extracted {package.name}@{package.version} to {package_dir}"
             )
             return True
 
@@ -101,10 +92,8 @@ class DownloadService:
             return False
         except Exception as e:
             logger.error(
-                f"Unexpected error downloading package {
-                    package.name}@{
-                    package.version}: {
-                    str(e)}"
+                f"Unexpected error downloading package "
+                f"{package.name}@{package.version}: {str(e)}"
             )
             return False
 

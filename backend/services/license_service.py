@@ -55,11 +55,7 @@ class LicenseService:
 
         except Exception as e:
             self.logger.error(
-                f"License validation error for {
-                    package_data.get(
-                        'name',
-                        'Unknown')}: {
-                    str(e)}"
+                f"License validation error for {package_data.get('name', 'Unknown')}: {str(e)}"
             )
             return {
                 "score": 0,
@@ -404,8 +400,8 @@ class LicenseService:
 
         except Exception as e:
             self.logger.error(
-                f"Error validating complex license expression '{license_expression}': {
-                    str(e)}")
+                f"Error validating complex license expression '{license_expression}': {str(e)}"
+            )
             return {
                 "score": 0,
                 "errors": [
@@ -494,7 +490,7 @@ class LicenseService:
 
         for operator in operators:
             if (
-                expression[position: position + len(operator)].upper()
+                expression[position : position + len(operator)].upper()
                 == operator.upper()
             ):
                 return True
@@ -510,7 +506,7 @@ class LicenseService:
 
         for operator in operators:
             if (
-                expression[position: position + len(operator)].upper()
+                expression[position : position + len(operator)].upper()
                 == operator.upper()
             ):
                 return position + len(operator)
@@ -578,29 +574,30 @@ class LicenseService:
                 ]
                 if other_licenses:
                     best_result["warnings"].append(
-                        f"OR expression contains {
-                            len(valid_licenses)} valid licenses, using best: {
-                            best_result.get(
-                                'license_identifier',
-                                'Unknown')}"
+                        f"OR expression contains {len(valid_licenses)} valid licenses, using best: {best_result.get('license_identifier', 'Unknown')}"
                     )
                     best_result["warnings"].append(
-                        f"Other valid licenses in expression: {
-                            ', '.join(other_licenses)}"
+                        f"Other valid licenses in expression: {', '.join(other_licenses)}"
                     )
 
             if invalid_licenses:
                 best_result["warnings"].append(
-                    f"Some licenses in OR expression were not recognized: {
-                        ', '.join(invalid_licenses)}"
+                    f"Some licenses in OR expression were not recognized: {', '.join(invalid_licenses)}"
                 )
 
             return best_result
         else:
             # No valid licenses found
-            return {"score": 0, "license_status": None, "errors": all_errors +
-                    ["No valid licenses found in OR expression"], "warnings": all_warnings +
-                    [f"OR expression '{original_expression}' contains no recognized licenses"], }
+            return {
+                "score": 0,
+                "license_status": None,
+                "errors": all_errors
+                + ["No valid licenses found in OR expression"],
+                "warnings": all_warnings
+                + [
+                    f"OR expression '{original_expression}' contains no recognized licenses"
+                ],
+            }
 
     def validate_packages_batch(
         self, packages_data: List[Dict[str, Any]]
@@ -636,9 +633,7 @@ class LicenseService:
                 results.append(result)
 
             self.logger.debug(
-                f"Batch validated {
-                    len(packages_data)} packages with {
-                    len(unique_licenses)} unique licenses"
+                f"Batch validated {len(packages_data)} packages with {len(unique_licenses)} unique licenses"
             )
             return results
 
@@ -666,10 +661,7 @@ class LicenseService:
 
             self._cache_loaded = True
             self.logger.info(
-                f"Loaded {
-                    len(licenses)} licenses into cache with {
-                    len(
-                        self._license_cache)} total entries"
+                f"Loaded {len(licenses)} licenses into cache with {len(self._license_cache)} total entries"
             )
 
         except Exception as e:
@@ -726,9 +718,7 @@ class LicenseService:
                     self._license_cache[missing_license] = None
 
             self.logger.debug(
-                f"Batch looked up {
-                    len(missing_licenses)} licenses, found {
-                    len(licenses)}"
+                f"Batch looked up {len(missing_licenses)} licenses, found {len(licenses)}"
             )
 
         except Exception as e:
@@ -765,11 +755,7 @@ class LicenseService:
 
         except Exception as e:
             self.logger.error(
-                f"License validation error for {
-                    package_data.get(
-                        'name',
-                        'Unknown')}: {
-                    str(e)}"
+                f"License validation error for {package_data.get('name', 'Unknown')}: {str(e)}"
             )
             return {
                 "score": 0,
@@ -814,8 +800,8 @@ class LicenseService:
 
         except Exception as e:
             self.logger.error(
-                f"Error validating complex license expression '{license_expression}': {
-                    str(e)}")
+                f"Error validating complex license expression '{license_expression}': {str(e)}"
+            )
             return {
                 "score": 0,
                 "errors": [
@@ -899,7 +885,8 @@ class LicenseService:
         if worst_result:
             # Add information about the AND expression
             worst_result["warnings"].append(
-                f"Using worst license from AND expression: {original_expression}")
+                f"Using worst license from AND expression: {original_expression}"
+            )
             return worst_result
         else:
             return {
@@ -964,21 +951,15 @@ class LicenseService:
                     for lid, result in valid_licenses
                 ]
                 worst_result["warnings"].append(
-                    f"AND expression contains {
-                        len(valid_licenses)} licenses, using worst: {
-                        worst_result.get(
-                            'license_identifier',
-                            'Unknown')}"
+                    f"AND expression contains {len(valid_licenses)} licenses, using worst: {worst_result.get('license_identifier', 'Unknown')}"
                 )
                 worst_result["warnings"].append(
-                    f"All license scores in expression: {
-                        ', '.join(all_license_scores)}"
+                    f"All license scores in expression: {', '.join(all_license_scores)}"
                 )
 
             if invalid_licenses:
                 worst_result["warnings"].append(
-                    f"Some licenses in AND expression were not recognized: {
-                        ', '.join(invalid_licenses)}"
+                    f"Some licenses in AND expression were not recognized: {', '.join(invalid_licenses)}"
                 )
                 # For AND expressions, any unrecognized license should fail the
                 # entire expression
@@ -990,6 +971,13 @@ class LicenseService:
             return worst_result
         else:
             # No valid licenses found
-            return {"score": 0, "license_status": None, "errors": all_errors +
-                    ["No valid licenses found in AND expression"], "warnings": all_warnings +
-                    [f"AND expression '{original_expression}' contains no recognized licenses"], }
+            return {
+                "score": 0,
+                "license_status": None,
+                "errors": all_errors
+                + ["No valid licenses found in AND expression"],
+                "warnings": all_warnings
+                + [
+                    f"AND expression '{original_expression}' contains no recognized licenses"
+                ],
+            }

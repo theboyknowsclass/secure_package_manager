@@ -54,8 +54,7 @@ class BaseWorker(ABC):
 
         if missing_vars:
             error_msg = (
-                f"Missing required environment variables for {
-                    self.worker_name}:\n"
+                f"Missing required environment variables for {self.worker_name}:\n"
                 + "\n".join(missing_vars)
             )
             error_msg += "\n\nPlease set these environment variables before starting this worker."

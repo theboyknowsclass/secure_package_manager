@@ -82,9 +82,7 @@ def create_supported_license() -> ResponseReturnValue:
                 action="create_license",
                 resource_type="license",
                 resource_id=license.id,
-                details=f"Created license: {
-                    license.name} ({
-                    license.identifier})",
+                details=f"Created license: {license.name} ({license.identifier})",
             )
             ops.add(audit_log)
             ops.commit()
@@ -141,9 +139,7 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
                 action="update_license",
                 resource_type="license",
                 resource_id=license.id,
-                details=f"Updated license: {
-                    license.name} ({
-                    license.identifier})",
+                details=f"Updated license: {license.name} ({license.identifier})",
             )
             ops.add(audit_log)
             ops.commit()
@@ -210,9 +206,7 @@ def delete_supported_license(license_id: int) -> ResponseReturnValue:
                 action="delete_license",
                 resource_type="license",
                 resource_id=license_id,
-                details=f"Deleted license: {
-                    license.name} ({
-                    license.identifier})",
+                details=f"Deleted license: {license.name} ({license.identifier})",
             )
             ops.add(audit_log)
             ops.commit()

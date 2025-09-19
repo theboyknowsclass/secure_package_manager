@@ -235,9 +235,7 @@ class TrivyService:
                     )
                 else:
                     logger.error(
-                        f"Trivy scan failed with return code {
-                            result.returncode}: {
-                            result.stderr}"
+                        f"Trivy scan failed with return code {result.returncode}: {result.stderr}"
                     )
                     return None
 
@@ -289,11 +287,6 @@ class TrivyService:
             vulnerabilities, summary = self._parse_trivy_results(
                 trivy_response, package
             )
-
-            else:
-                logger.info(
-                    "No 'Results' found in Trivy response - this is normal for packages with no vulnerabilities"
-                )
 
             # Extract additional metadata from Trivy response
             metadata = trivy_response.get("Metadata", {})
@@ -448,9 +441,8 @@ class TrivyService:
 
             total_vulnerabilities = security_scan.get_total_vulnerabilities()
             logger.info(
-                f"Completed Trivy scan for {
-                    package.name}@{
-                    package.version}: {total_vulnerabilities} vulnerabilities found")
+                f"Completed Trivy scan for {package.name}@{package.version}: {total_vulnerabilities} vulnerabilities found"
+            )
 
             return {
                 "status": "completed",

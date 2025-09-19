@@ -28,7 +28,8 @@ class QueueInterface:
                 )
                 if not status:
                     logger.warning(
-                        f"advance_status: no PackageStatus for package_id={package_id}")
+                        f"advance_status: no PackageStatus for package_id={package_id}"
+                    )
                     return False
 
                 prev_status = status.status
@@ -37,7 +38,8 @@ class QueueInterface:
                 ops.commit()
 
                 logger.info(
-                    f"Status advanced: package_id={package_id} {prev_status} -> {next_status}")
+                    f"Status advanced: package_id={package_id} {prev_status} -> {next_status}"
+                )
                 return True
         except Exception as e:
             logger.error(

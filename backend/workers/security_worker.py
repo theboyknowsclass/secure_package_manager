@@ -9,7 +9,7 @@ import os
 from datetime import datetime, timedelta
 
 from database.models import Package, PackageStatus
-from database.operations import DatabaseOperations
+from database.operations import OperationsFactory
 from database.service import DatabaseService
 from services.trivy_service import TrivyService
 from workers.base_worker import BaseWorker
@@ -51,7 +51,7 @@ class SecurityWorker(BaseWorker):
     def process_cycle(self) -> None:
         try:
             with self.db_service.get_session() as session:
-                self.ops = DatabaseOperations(session)
+                self.ops = OperationsFactory.create_all_operations(session)
                 self._handle_stuck_packages()
                 self._process_downloaded_packages()
         except Exception as e:
@@ -73,8 +73,8 @@ class SecurityWorker(BaseWorker):
             if not stuck_packages:
                 return
             logger.warning(
-                f"Found {
-                    len(stuck_packages)} stuck security scans; resetting to Downloaded")
+                f"Found {len(stuck_packages)} stuck security scans; resetting to Downloaded"
+            )
             for package in stuck_packages:
                 if package.package_status:
                     self.ops.update_package_status(

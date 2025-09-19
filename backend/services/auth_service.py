@@ -190,9 +190,7 @@ class AuthService:
         }
         if ops.update_user(user, update_data):
             logger.info(
-                f"Updated existing user: {
-                    user.username} with role: {
-                    user.role}"
+                f"Updated existing user: {user.username} with role: {user.role}"
             )
         return user
 
@@ -245,10 +243,7 @@ class AuthService:
                 return jsonify({"error": "Invalid or expired token"}), 401
 
             logger.info(
-                f"Token verified successfully for user: {
-                    user.username} (ID: {
-                    user.id}, Role: {
-                    user.role})"
+                f"Token verified successfully for user: {user.username} (ID: {user.id}, Role: {user.role})"
             )
 
             # Add user to request context

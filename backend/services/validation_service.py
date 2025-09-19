@@ -38,10 +38,7 @@ class ValidationService:
 
         except Exception as e:
             logger.error(
-                f"Error running full validation for package {
-                    package.name}@{
-                    package.version}: {
-                    str(e)}"
+                f"Error running full validation for package {package.name}@{package.version}: {str(e)}"
             )
             return []
 
@@ -100,8 +97,7 @@ class ValidationService:
                     return {
                         "type": "file_integrity",
                         "status": "failed",
-                        "details": f"File size mismatch: expected {
-                            package.package_status.file_size}, got {actual_size}",
+                        "details": f"File size mismatch: expected {package.package_status.file_size}, got {actual_size}",
                     }
 
             # Check checksum if available

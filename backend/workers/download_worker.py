@@ -9,7 +9,7 @@ import os
 from datetime import datetime, timedelta
 
 from database.models import Package, PackageStatus
-from database.operations import DatabaseOperations
+from database.operations import OperationsFactory
 from database.service import DatabaseService
 from services.download_service import DownloadService
 from services.queue_interface import QueueInterface
@@ -51,7 +51,7 @@ class DownloadWorker(BaseWorker):
     def process_cycle(self) -> None:
         try:
             with self.db_service.get_session() as session:
-                self.ops = DatabaseOperations(session)
+                self.ops = OperationsFactory.create_all_operations(session)
                 self._handle_stuck_packages()
                 self._process_ready_packages()
         except Exception as e:
@@ -61,8 +61,8 @@ class DownloadWorker(BaseWorker):
         try:
             stuck_threshold = datetime.utcnow() - self.stuck_package_timeout
             stuck_statuses = ["Downloading"]
-            stuck_packages = self.ops.get_packages_by_statuses(
-                stuck_statuses, Package, PackageStatus
+            stuck_packages = self.ops["package"].get_packages_by_statuses(
+                stuck_statuses
             )
             stuck_packages = [
                 p
@@ -74,19 +74,19 @@ class DownloadWorker(BaseWorker):
             if not stuck_packages:
                 return
             logger.warning(
-                f"Found {
-                    len(stuck_packages)} stuck downloads; resetting to Licence Checked")
+                f"Found {len(stuck_packages)} stuck downloads; resetting to Licence Checked"
+            )
             for package in stuck_packages:
                 if package.package_status:
-                    self.ops.update_package_status(
-                        package.id, "Licence Checked", PackageStatus
+                    self.ops["package_status"].update_package_status(
+                        package.id, "Licence Checked"
                     )
         except Exception:
             logger.exception("Error handling stuck downloads")
 
     def _process_ready_packages(self) -> None:
-        packages = self.ops.get_packages_by_status(
-            "Licence Checked", Package, PackageStatus
+        packages = self.ops["package"].get_packages_by_status(
+            "Licence Checked"
         )
         packages = packages[: self.max_packages_per_cycle]
 
@@ -113,26 +113,28 @@ class DownloadWorker(BaseWorker):
 
         # Already downloaded
         if self.download_service.is_package_downloaded(package):
-            self.ops.update_package_status(
-                package.id, "Downloaded", PackageStatus
+            self.ops["package_status"].update_package_status(
+                package.id, "Downloaded"
             )
             return
 
         # Mark downloading
-        self.ops.update_package_status(
-            package.id, "Downloading", PackageStatus
+        self.ops["package_status"].update_package_status(
+            package.id, "Downloading"
         )
 
         if not self.download_service.download_package(package):
             raise RuntimeError("download failed")
 
-        self.ops.update_package_status(package.id, "Downloaded", PackageStatus)
+        self.ops["package_status"].update_package_status(
+            package.id, "Downloaded"
+        )
 
     def _mark_failed(self, package: Package) -> None:
         try:
             if package.package_status:
-                self.ops.update_package_status(
-                    package.id, "Rejected", PackageStatus
+                self.ops["package_status"].update_package_status(
+                    package.id, "Rejected"
                 )
         except Exception:
             logger.exception(

@@ -337,19 +337,22 @@ class TestPackageLockProcessing:
 
     def test_deduplication_with_scoped_packages(self):
         """Test that scoped packages are properly deduplicated."""
-        package_lock_data = {"name": "test-project",
-                             "version": "1.0.0",
-                             "lockfileVersion": 3,
-                             "packages": {"": {"name": "test-project",
-                                               "version": "1.0.0"},
-                                          "node_modules/@types/node": {"version": "18.15.0",
-                                                                       "resolved": "https://registry.npmjs.org/@types/node/-/node-18.15.0.tgz",
-                                                                       },
-                                          "node_modules/express/node_modules/@types/node": {"version": "18.15.0",
-                                                                                            "resolved": "https://registry.npmjs.org/@types/node/-/node-18.15.0.tgz",
-                                                                                            },
-                                          },
-                             }
+        package_lock_data = {
+            "name": "test-project",
+            "version": "1.0.0",
+            "lockfileVersion": 3,
+            "packages": {
+                "": {"name": "test-project", "version": "1.0.0"},
+                "node_modules/@types/node": {
+                    "version": "18.15.0",
+                    "resolved": "https://registry.npmjs.org/@types/node/-/node-18.15.0.tgz",
+                },
+                "node_modules/express/node_modules/@types/node": {
+                    "version": "18.15.0",
+                    "resolved": "https://registry.npmjs.org/@types/node/-/node-18.15.0.tgz",
+                },
+            },
+        }
 
         packages = self.package_service._extract_packages_from_json(
             package_lock_data

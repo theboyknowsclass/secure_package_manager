@@ -116,8 +116,8 @@ def batch_approve_packages() -> ResponseReturnValue:
             resource_type="batch_operation",
             resource_id=None,  # No single resource ID for batch operations
             details=(
-                f"Batch approval: {approved_count}/{
-                    len(package_ids)} packages "
+                f"Batch approval: {approved_count}/"
+                f"{len(package_ids)} packages "
                 f"approved by {request.user.username}. Package IDs: "
                 f"{list(package_ids)}. Reason: {reason}"
             ),
@@ -200,10 +200,10 @@ def batch_reject_packages() -> ResponseReturnValue:
             action="batch_reject_packages",
             resource_type="batch_operation",
             resource_id=None,  # No single resource ID for batch operations
-            details=f"Batch rejection: {rejected_count}/{
-                len(package_ids)} packages rejected by {
-                request.user.username}. Package IDs: {
-                list(package_ids)}. Reason: {reason}",
+            details=(
+                f"Batch rejection: {rejected_count}/{len(package_ids)} packages rejected by "
+                f"{request.user.username}. Package IDs: {list(package_ids)}. Reason: {reason}"
+            ),
         )
         with get_db_operations() as ops:
             ops.add(summary_audit_log)
@@ -284,18 +284,22 @@ def get_validated_packages() -> ResponseReturnValue:
                         "id": pkg.id,
                         "name": pkg.name,
                         "version": pkg.version,
-                        "security_score": pkg.package_status.security_score or 0,
+                        "security_score": pkg.package_status.security_score
+                        or 0,
                         "license_score": pkg.package_status.license_score,
-                        "license_identifier": pkg.license_identifier or "Unknown",
+                        "license_identifier": pkg.license_identifier
+                        or "Unknown",
                         "license_status": pkg.package_status.license_status,
                         "security_scan_status": pkg.package_status.security_scan_status,
                         "type": package_type,
-                        "request": request_data or {
+                        "request": request_data
+                        or {
                             "id": 0,
                             "application_name": "Unknown",
                             "version": "Unknown",
                         },
-                    })
+                    }
+                )
             except Exception as pkg_error:
                 logger.warning(
                     f"Error processing package {pkg.id}: {str(pkg_error)}"
@@ -311,28 +315,29 @@ def get_validated_packages() -> ResponseReturnValue:
 
 def _process_package_approval(package_id: int, user, reason: str) -> dict:
     """Process approval of a single package.
-    
+
     Returns:
         dict: {"success": bool, "error": dict or None}
     """
     try:
         with get_db_operations() as ops:
             package = (
-                ops.query(Package)
-                .filter(Package.id == package_id)
-                .first()
+                ops.query(Package).filter(Package.id == package_id).first()
             )
-        
+
         if not package:
             return {
                 "success": False,
-                "error": {"id": package_id, "error": "Package not found"}
+                "error": {"id": package_id, "error": "Package not found"},
             }
 
         if not package.package_status:
             return {
                 "success": False,
-                "error": {"id": package_id, "error": "Package status not found"}
+                "error": {
+                    "id": package_id,
+                    "error": "Package status not found",
+                },
             }
 
         if package.package_status.status != "Pending Approval":
@@ -340,8 +345,8 @@ def _process_package_approval(package_id: int, user, reason: str) -> dict:
                 "success": False,
                 "error": {
                     "id": package_id,
-                    "error": "Package must be pending approval"
-                }
+                    "error": "Package must be pending approval",
+                },
             }
 
         # Approve the package
@@ -351,7 +356,7 @@ def _process_package_approval(package_id: int, user, reason: str) -> dict:
         # Log the approval
         audit_log = AuditLog(
             user_id=user.id,
-            action="batch_approve_package",
+            action="approve_package",
             resource_type="package",
             resource_id=package.id,
             details=(
@@ -368,34 +373,35 @@ def _process_package_approval(package_id: int, user, reason: str) -> dict:
         logger.error(f"Error approving package {package_id}: {str(pkg_error)}")
         return {
             "success": False,
-            "error": {"id": package_id, "error": str(pkg_error)}
+            "error": {"id": package_id, "error": str(pkg_error)},
         }
 
 
 def _process_package_rejection(package_id: int, user, reason: str) -> dict:
     """Process rejection of a single package.
-    
+
     Returns:
         dict: {"success": bool, "error": dict or None}
     """
     try:
         with get_db_operations() as ops:
             package = (
-                ops.query(Package)
-                .filter(Package.id == package_id)
-                .first()
+                ops.query(Package).filter(Package.id == package_id).first()
             )
-        
+
         if not package:
             return {
                 "success": False,
-                "error": {"id": package_id, "error": "Package not found"}
+                "error": {"id": package_id, "error": "Package not found"},
             }
 
         if not package.package_status:
             return {
                 "success": False,
-                "error": {"id": package_id, "error": "Package status not found"}
+                "error": {
+                    "id": package_id,
+                    "error": "Package status not found",
+                },
             }
 
         if package.package_status.status in ["Approved"]:
@@ -403,8 +409,8 @@ def _process_package_rejection(package_id: int, user, reason: str) -> dict:
                 "success": False,
                 "error": {
                     "id": package_id,
-                    "error": "Cannot reject an already approved package"
-                }
+                    "error": "Cannot reject an already approved package",
+                },
             }
 
         # Reject the package
@@ -431,5 +437,5 @@ def _process_package_rejection(package_id: int, user, reason: str) -> dict:
         logger.error(f"Error rejecting package {package_id}: {str(pkg_error)}")
         return {
             "success": False,
-            "error": {"id": package_id, "error": str(pkg_error)}
+            "error": {"id": package_id, "error": str(pkg_error)},
         }

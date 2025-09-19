@@ -45,9 +45,8 @@ class PackageLockParsingService:
             self._create_package_records(packages_to_process, request_id)
 
             logger.info(
-                f"Parsed {
-                    len(packages_to_process)} new packages and {
-                    len(existing_packages)} existing packages for request {request_id}")
+                f"Parsed {len(packages_to_process)} new packages and {len(existing_packages)} existing packages for request {request_id}"
+            )
 
             return {
                 "packages_to_process": len(packages_to_process),
@@ -177,9 +176,7 @@ class PackageLockParsingService:
                 }
 
         logger.info(
-            f"Deduplicated {
-                len(packages)} package entries to {
-                len(unique_packages)} unique packages"
+            f"Deduplicated {len(packages)} package entries to {len(unique_packages)} unique packages"
         )
         return unique_packages
 

@@ -111,7 +111,7 @@ def _create_request_with_blob(package_data: Dict[str, Any]) -> Request:
     with get_db_operations() as ops:
         ops.add(request_record)
         ops.commit()
-        
+
         # Log the request creation
         audit_log = AuditLog(
             user_id=request.user.id,
@@ -122,7 +122,7 @@ def _create_request_with_blob(package_data: Dict[str, Any]) -> Request:
         )
         ops.add(audit_log)
         ops.commit()
-        
+
     return request_record
 
 

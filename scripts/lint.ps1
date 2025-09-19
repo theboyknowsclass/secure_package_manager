@@ -1,94 +1,83 @@
-﻿# Lint script for Secure Package Manager
-# This script runs all linting tools to ensure PEP 8 compliance
+﻿#!/usr/bin/env pwsh
+# Linting script for the secure package manager backend
 
-param(
-    [switch]$Fix
-)
+Write-Host "Running linting checks..." -ForegroundColor Green
 
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
+# Change to backend directory
+Set-Location -Path "backend"
 
-Write-Host "🔍 Running Python linting tools..." -ForegroundColor Cyan
+# Run flake8 for syntax and style checking
+Write-Host "Running flake8..." -ForegroundColor Yellow
+python -m flake8 . --max-line-length=79 --extend-ignore=E203,W503
 
-# Change to project root
-$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-$projectRoot = Split-Path -Parent $scriptPath
-Set-Location $projectRoot
-
-# Check if we're in a virtual environment
-if (-not $env:VIRTUAL_ENV) {
-    Write-Host "⚠️  Warning: No virtual environment detected. Consider using one for better dependency management." -ForegroundColor Yellow
-}
-
-# Install linting tools if not already installed
-Write-Host "📦 Installing/updating linting tools..." -ForegroundColor Cyan
-pip install -q flake8 black isort mypy autopep8 docformatter
-
-if ($Fix) {
-    Write-Host "🔧 Fixing code formatting issues..." -ForegroundColor Green
-    
-    # Run isort to fix import ordering
-    Write-Host "📋 Fixing import order with isort..." -ForegroundColor Cyan
-    isort backend/ tests/
-    
-    # Run black to fix code formatting
-    Write-Host "🎨 Fixing code formatting with black..." -ForegroundColor Cyan
-    black backend/ tests/
-    
-    # Run autopep8 to fix remaining PEP 8 violations
-    Write-Host "🔧 Fixing PEP 8 violations with autopep8..." -ForegroundColor Cyan
-    autopep8 --in-place --recursive --aggressive --aggressive backend/ tests/
-    
-    # Run docformatter to fix docstring formatting
-    Write-Host "📝 Fixing docstring formatting with docformatter..." -ForegroundColor Cyan
-    docformatter --in-place --recursive backend/ tests/
-    
-    # Convert line endings from CRLF to LF
-    Write-Host "🔄 Converting line endings from CRLF to LF..." -ForegroundColor Cyan
-    Get-ChildItem -Path "backend", "tests" -Recurse -Include "*.py" | ForEach-Object {
-        $content = Get-Content $_.FullName -Raw
-        $content = $content -replace "`r`n", "`n"
-        Set-Content -Path $_.FullName -Value $content -NoNewline
-    }
-    
-    Write-Host "✅ Code formatting fixes applied!" -ForegroundColor Green
-} else {
-    # Run isort to check import ordering
-    Write-Host "📋 Checking import order with isort..." -ForegroundColor Cyan
-    isort --check-only --diff backend/ tests/
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "❌ Import order issues found. Run '.\scripts\lint.ps1 -Fix' to fix." -ForegroundColor Red
-        exit 1
-    }
-    
-    # Run black to check code formatting
-    Write-Host "🎨 Checking code formatting with black..." -ForegroundColor Cyan
-    black --check --diff backend/ tests/
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "❌ Code formatting issues found. Run '.\scripts\lint.ps1 -Fix' to fix." -ForegroundColor Red
-        exit 1
-    }
-}
-
-# Run flake8 for PEP 8 compliance
-Write-Host "🔍 Checking PEP 8 compliance with flake8..." -ForegroundColor Cyan
-flake8 backend/ tests/
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ PEP 8 violations found. See output above for details." -ForegroundColor Red
-    exit 1
+    Write-Host "Flake8 found issues!" -ForegroundColor Red
+    $flake8Failed = $true
+} else {
+    Write-Host "Flake8 passed!" -ForegroundColor Green
 }
 
-# Run mypy for type checking (disabled for now - too many type annotation issues)
-# Write-Host "🔬 Running type checking with mypy..." -ForegroundColor Cyan
-# mypy backend/
-# if ($LASTEXITCODE -ne 0) {
-#     Write-Host "❌ Type checking issues found. See output above for details." -ForegroundColor Red
-#     exit 1
-# }
-Write-Host "🔬 Type checking with mypy is disabled (156 type annotation issues found)" -ForegroundColor Yellow
-Write-Host "   To enable: Add type annotations to all functions and run 'python -m mypy backend/'" -ForegroundColor Yellow
+# Run black for code formatting check
+Write-Host "Running black (format check)..." -ForegroundColor Yellow
+python -m black --check --diff .
 
-Write-Host "✅ All linting checks passed!" -ForegroundColor Green
-Write-Host ""
-Write-Host "💡 To automatically fix formatting issues, run:" -ForegroundColor Yellow
-Write-Host "   .\scripts\lint.ps1 -Fix" -ForegroundColor Yellow
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Black found formatting issues!" -ForegroundColor Red
+    $blackFailed = $true
+} else {
+    Write-Host "Black formatting is correct!" -ForegroundColor Green
+}
+
+# Run isort for import sorting check
+Write-Host "Running isort (import check)..." -ForegroundColor Yellow
+python -m isort --check-only --diff .
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "isort found import issues!" -ForegroundColor Red
+    $isortFailed = $true
+} else {
+    Write-Host "isort imports are correct!" -ForegroundColor Green
+}
+
+# Run mypy for type checking
+Write-Host "Running mypy..." -ForegroundColor Yellow
+python -m mypy .
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "mypy found type issues!" -ForegroundColor Red
+    $mypyFailed = $true
+} else {
+    Write-Host "mypy type checking passed!" -ForegroundColor Green
+}
+
+# Check for multi-line f-string issues (custom check)
+Write-Host "Checking for multi-line f-string issues..." -ForegroundColor Yellow
+$fstringIssues = Get-ChildItem -Path . -Recurse -Include "*.py" | ForEach-Object {
+    $content = Get-Content $_.FullName -Raw
+    # Comprehensive pattern: Any f-string with curly braces split across lines
+    if ($content -match 'f"[^"]*\{[^}]*\s*\n[^"]*\}') {
+        Write-Host "Found multi-line f-string issue in: $($_.FullName)" -ForegroundColor Red
+        $_.FullName
+    }
+}
+
+if ($fstringIssues) {
+    Write-Host "Multi-line f-string issues found!" -ForegroundColor Red
+    $fstringFailed = $true
+} else {
+    Write-Host "No multi-line f-string issues found!" -ForegroundColor Green
+}
+
+# Return to original directory
+Set-Location -Path ".."
+
+# Summary
+Write-Host "`nLinting Summary:" -ForegroundColor Cyan
+if ($flake8Failed -or $blackFailed -or $isortFailed -or $mypyFailed -or $fstringFailed) {
+    Write-Host "❌ Some linting checks failed!" -ForegroundColor Red
+    Write-Host "Run 'scripts/fix.ps1' to automatically fix formatting issues." -ForegroundColor Yellow
+    exit 1
+} else {
+    Write-Host "✅ All linting checks passed!" -ForegroundColor Green
+    exit 0
+}

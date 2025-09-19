@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from database.models import Package, PackageStatus, Request, RequestPackage
-from database.operations import DatabaseOperations
+from database.operations import OperationsFactory
 from database.service import DatabaseService
 from workers.base_worker import BaseWorker
 
@@ -45,7 +45,7 @@ class ParseWorker(BaseWorker):
     def process_cycle(self) -> None:
         try:
             with self.db_service.get_session() as session:
-                self.ops = DatabaseOperations(session)
+                self.ops = OperationsFactory.create_all_operations(session)
                 self._handle_stuck_requests()
                 self._process_submitted_requests()
         except Exception as e:
@@ -100,13 +100,12 @@ class ParseWorker(BaseWorker):
                     )
                 else:
                     logger.info(
-                        f"ParseWorker heartbeat: No requests found to parse - {
-                            len(all_requests)} requests exist but all are either processed or have no raw_request_blob")
+                        f"ParseWorker heartbeat: No requests found to parse - {len(all_requests)} requests exist but all are either processed or have no raw_request_blob"
+                    )
                 return
 
             logger.info(
-                f"Processing {
-                    len(requests_to_process)} requests for package extraction"
+                f"Processing {len(requests_to_process)} requests for package extraction"
             )
 
             for request in requests_to_process:
@@ -146,11 +145,8 @@ class ParseWorker(BaseWorker):
             self._create_package_records(packages_to_process, request.id)
 
             logger.info(
-                f"Request {
-                    request.id}: Created {
-                    len(packages_to_process)} new packages, "
-                f"linked {
-                    len(existing_packages)} existing packages"
+                f"Request {request.id}: Created {len(packages_to_process)} new packages, "
+                f"linked {len(existing_packages)} existing packages"
             )
 
         except Exception as e:
@@ -227,9 +223,7 @@ class ParseWorker(BaseWorker):
                 }
 
         logger.info(
-            f"Deduplicated {
-                len(packages)} package entries to {
-                len(unique_packages)} unique packages"
+            f"Deduplicated {len(packages)} package entries to {len(unique_packages)} unique packages"
         )
 
         # Now process the deduplicated packages
