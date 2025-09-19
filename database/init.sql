@@ -77,12 +77,16 @@ CREATE TABLE IF NOT EXISTS package_status (
     CONSTRAINT package_status_status_check CHECK (status IN (
         'Submitted',
         'Parsed',
+        'Parse Failed',
         'Checking Licence',
         'Licence Checked', 
+        'Licence Check Failed',
         'Downloading',
         'Downloaded', 
+        'Download Failed',
         'Security Scanning',
         'Security Scanned',
+        'Security Scan Failed',
         'Pending Approval', 
         'Approved', 
         'Rejected'
