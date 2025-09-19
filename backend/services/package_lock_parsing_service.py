@@ -1,30 +1,40 @@
-"""Package Parsing Service.
+"""Package Parsing Service - Refactored.
 
 Handles parsing of package-lock.json files and extracting package
 information. This service is used by both the API (for immediate
 processing) and workers (for background processing).
+
+This refactored version works with the new entity-based operations
+structure and focuses purely on business logic.
 """
 
 import logging
-from typing import Any, Dict, List, Tuple
-
-from database.flask_utils import get_db_operations
-from database.models import Package, PackageStatus, RequestPackage
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 class PackageLockParsingService:
-    """Service for parsing package-lock.json files and extracting packages."""
+    """Service for parsing package-lock.json files and extracting packages.
+
+    This service handles the business logic of parsing package-lock.json
+    files and extracting package information. It works with database
+    operations passed in from the caller (worker or API) to maintain
+    separation of concerns.
+    """
 
     def parse_package_lock(
-        self, request_id: int, package_data: Dict[str, Any]
+        self,
+        request_id: int,
+        package_data: Dict[str, Any],
+        ops: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Parse package-lock.json and extract all packages.
 
         Args:
             request_id: ID of the request this package-lock belongs to
             package_data: The parsed JSON data from package-lock.json
+            ops: Dictionary of database operations instances
 
         Returns:
             Dict with processing results
@@ -38,11 +48,13 @@ class PackageLockParsingService:
 
             # Filter and process packages
             packages_to_process, existing_packages = self._filter_new_packages(
-                packages, request_id
+                packages, request_id, ops
             )
 
             # Create database records for new packages
-            self._create_package_records(packages_to_process, request_id)
+            created_packages = self._create_package_records(
+                packages_to_process, request_id, ops
+            )
 
             logger.info(
                 f"Parsed {len(packages_to_process)} new packages and {len(existing_packages)} existing packages for request {request_id}"
@@ -53,6 +65,7 @@ class PackageLockParsingService:
                 "existing_packages": len(existing_packages),
                 "total_packages": len(packages_to_process)
                 + len(existing_packages),
+                "created_packages": created_packages,
             }
 
         except Exception as e:
@@ -65,18 +78,17 @@ class PackageLockParsingService:
         """Validate that the package data is a valid package-lock.json file."""
         if "lockfileVersion" not in package_data:
             raise ValueError(
-                "This file does not appear to be a package-lock.json file. Missing 'lockfileVersion' field."
+                "This file does not appear to be a package-lock.json file. "
+                "Missing 'lockfileVersion' field."
             )
 
         lockfile_version = package_data.get("lockfileVersion")
         if lockfile_version is None or lockfile_version < 3:
             raise ValueError(
-                (
-                    f"Unsupported lockfile version: {lockfile_version}. "
-                    f"This system only supports package-lock.json files with "
-                    f"lockfileVersion 3 or higher. "
-                    f"Please upgrade your npm version (npm 8+) and regenerate the lockfile."
-                )
+                f"Unsupported lockfile version: {lockfile_version}. "
+                f"This system only supports package-lock.json files with "
+                f"lockfileVersion 3 or higher. "
+                f"Please upgrade your npm version (npm 8+) and regenerate the lockfile."
             )
 
     def _extract_packages_from_json(
@@ -90,8 +102,8 @@ class PackageLockParsingService:
         return dict(packages)
 
     def _filter_new_packages(
-        self, packages: Dict[str, Any], request_id: int
-    ) -> Tuple[List[Dict[str, Any]], List[Package]]:
+        self, packages: Dict[str, Any], request_id: int, ops: Dict[str, Any]
+    ) -> Tuple[List[Dict[str, Any]], List[Any]]:
         """Filter packages to find new ones that need processing.
 
         Returns:
@@ -110,33 +122,26 @@ class PackageLockParsingService:
             package_info = package_data["info"]
 
             # Check if package already exists in database
-            with get_db_operations() as ops:
-                existing_package = (
-                    ops.query(Package)
-                    .filter_by(
-                        name=package_name,
-                        version=package_version,
-                    )
-                    .first()
-                )
+            existing_package = ops["package"].get_by_name_version(
+                package_name, package_version
+            )
 
-                if existing_package:
-                    # Link existing package to this request if not already
-                    # linked
-                    self._link_existing_package_to_request(
-                        request_id, existing_package, ops
-                    )
-                    existing_packages.append(existing_package)
-                else:
-                    # This is a new package that needs processing
-                    packages_to_process.append(
-                        {
-                            "name": package_name,
-                            "version": package_version,
-                            "info": package_info,
-                            "request_id": request_id,
-                        }
-                    )
+            if existing_package:
+                # Link existing package to this request if not already linked
+                self._link_existing_package_to_request(
+                    request_id, existing_package, ops
+                )
+                existing_packages.append(existing_package)
+            else:
+                # This is a new package that needs processing
+                packages_to_process.append(
+                    {
+                        "name": package_name,
+                        "version": package_version,
+                        "info": package_info,
+                        "request_id": request_id,
+                    }
+                )
 
         return packages_to_process, existing_packages
 
@@ -157,10 +162,8 @@ class PackageLockParsingService:
 
             if not package_name or not package_version:
                 logger.debug(
-                    (
-                        f"Skipping package at path '{package_path}': "
-                        f"name='{package_name}', version='{package_version}'"
-                    )
+                    f"Skipping package at path '{package_path}': "
+                    f"name='{package_name}', version='{package_version}'"
                 )
                 continue
 
@@ -176,13 +179,14 @@ class PackageLockParsingService:
                 }
 
         logger.info(
-            f"Deduplicated {len(packages)} package entries to {len(unique_packages)} unique packages"
+            f"Deduplicated {len(packages)} package entries to "
+            f"{len(unique_packages)} unique packages"
         )
         return unique_packages
 
     def _extract_package_name(
         self, package_path: str, package_info: Dict[str, Any]
-    ) -> str | None:
+    ) -> Optional[str]:
         """Extract package name from package info or infer from path."""
         package_name = package_info.get("name")
 
@@ -207,79 +211,49 @@ class PackageLockParsingService:
         return package_name
 
     def _link_existing_package_to_request(
-        self, request_id: int, existing_package: Package, ops
+        self, request_id: int, existing_package: Any, ops: Dict[str, Any]
     ) -> None:
         """Link an existing package to a request if not already linked."""
-        existing_link = (
-            ops.query(RequestPackage)
-            .filter_by(request_id=request_id, package_id=existing_package.id)
-            .first()
-        )
-
-        if not existing_link:
+        # Check if link already exists
+        if not ops["request_package"].link_exists(
+            request_id, existing_package.id
+        ):
             # Create link between request and existing package
-            request_package = RequestPackage(
-                request_id=request_id,
-                package_id=existing_package.id,
-                package_type="existing",
+            ops["request_package"].create_link(
+                request_id, existing_package.id, "existing"
             )
-            ops.add(request_package)
-            ops.commit()
 
     def _create_package_records(
-        self, packages_to_process: List[Dict[str, Any]], request_id: int
-    ) -> List[Package]:
+        self,
+        packages_to_process: List[Dict[str, Any]],
+        request_id: int,
+        ops: Dict[str, Any],
+    ) -> List[Any]:
         """Create database records for new packages."""
-        package_objects = []
+        created_packages = []
 
         for package_data in packages_to_process:
-            package = self._create_package_object(
-                package_data["name"],
-                package_data["version"],
-                package_data["info"],
-                request_id,
+            # Create package object with proper field mapping
+            package_info = package_data["info"]
+            package_record_data = {
+                "name": package_data["name"],
+                "version": package_data["version"],
+                "npm_url": package_info.get("resolved"),
+                "integrity": package_info.get("integrity"),
+                "license_identifier": package_info.get("license"),
+            }
+
+            # Create package with initial status
+            package = ops["package"].create_with_status(
+                package_record_data, status="Submitted"
             )
 
-            with get_db_operations() as ops:
-                ops.add(package)
-                ops.commit()  # Commit to get the package ID
+            # Create request-package link
+            ops["request_package"].create_link(request_id, package.id, "new")
 
-                # Create package status record
-                package_status = PackageStatus(
-                    package_id=package.id,
-                    status="Submitted",
-                    security_scan_status="pending",
-                )
-                ops.add(package_status)
-
-                # Create request-package link
-                request_package = RequestPackage(
-                    request_id=request_id,
-                    package_id=package.id,
-                    package_type="new",
-                )
-                ops.add(request_package)
-                ops.commit()
-
-            package_objects.append(package)
+            created_packages.append(package)
             logger.info(
                 f"Created new package: {package.name}@{package.version}"
             )
 
-        return package_objects
-
-    def _create_package_object(
-        self,
-        package_name: str,
-        package_version: str,
-        package_info: Dict[str, Any],
-        request_id: int,
-    ) -> Package:
-        """Create a new Package object from package information."""
-        return Package(
-            name=package_name,
-            version=package_version,
-            license_identifier=package_info.get("license"),
-            integrity=package_info.get("integrity"),
-            npm_url=package_info.get("resolved"),
-        )
+        return created_packages
