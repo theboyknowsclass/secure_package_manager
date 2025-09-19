@@ -560,8 +560,7 @@ class LicenseService:
                     f'License "{license_id.strip()}" is not recognized'
                 )
                 all_warnings.append(
-                    f'License "{
-                        license_id.strip()}" is not in the license database'
+                    f'License "{license_id.strip()}" is not in the license database'
                 )
 
         if best_result:
@@ -939,8 +938,7 @@ class LicenseService:
                     f'License "{license_id.strip()}" is not recognized'
                 )
                 all_warnings.append(
-                    f'License "{
-                        license_id.strip()}" is not in the license database'
+                    f'License "{license_id.strip()}" is not in the license database'
                 )
 
         if worst_result:

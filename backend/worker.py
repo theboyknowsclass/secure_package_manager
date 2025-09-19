@@ -27,37 +27,41 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def _get_worker_registry():
-    """Get the worker registry using class attributes - DRY implementation"""
-    # Import all worker classes
-    from workers.approval_worker import ApprovalWorker
-    from workers.download_worker import DownloadWorker
-    from workers.license_worker import LicenseWorker
-    from workers.parse_worker import ParseWorker
-    from workers.publish_worker import PublishWorker
-    from workers.security_worker import SecurityWorker
-
-    # Create a registry using the WORKER_TYPE class attribute
-    return {
-        LicenseWorker.WORKER_TYPE: LicenseWorker,
-        PublishWorker.WORKER_TYPE: PublishWorker,
-        ParseWorker.WORKER_TYPE: ParseWorker,
-        DownloadWorker.WORKER_TYPE: DownloadWorker,
-        SecurityWorker.WORKER_TYPE: SecurityWorker,
-        ApprovalWorker.WORKER_TYPE: ApprovalWorker,
-    }
-
-
 def get_worker_class_by_type(worker_type: str):
-    """Get worker class by type using class attributes."""
-    registry = _get_worker_registry()
-    return registry.get(worker_type)
+    """Get worker class by type using dynamic import - only load the specific worker needed."""
+    # Define worker type to module mapping
+    worker_modules = {
+        "approval_worker": ("workers.approval_worker", "ApprovalWorker"),
+        "download_worker": ("workers.download_worker", "DownloadWorker"), 
+        "license_worker": ("workers.license_worker", "LicenseWorker"),
+        "parse_worker": ("workers.parse_worker", "ParseWorker"),
+        "package_publisher": ("workers.publish_worker", "PublishWorker"),
+        "security_worker": ("workers.security_worker", "SecurityWorker"),
+    }
+    
+    if worker_type not in worker_modules:
+        return None
+        
+    module_name, class_name = worker_modules[worker_type]
+    try:
+        module = __import__(module_name, fromlist=[class_name])
+        return getattr(module, class_name)
+    except (ImportError, AttributeError) as e:
+        logger.error(f"Failed to import {worker_type} from {module_name}: {e}")
+        return None
 
 
 def get_available_worker_types():
     """Get list of all available worker types."""
-    registry = _get_worker_registry()
-    return list(registry.keys())
+    # Return the predefined worker types without importing all modules
+    return [
+        "approval_worker",
+        "download_worker", 
+        "license_worker",
+        "parse_worker",
+        "package_publisher",
+        "security_worker",
+    ]
 
 
 def main():
