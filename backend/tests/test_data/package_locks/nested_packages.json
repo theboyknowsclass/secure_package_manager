@@ -1,0 +1,61 @@
+{
+  "name": "nested-packages-test",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "nested-packages-test",
+      "version": "1.0.0",
+      "dependencies": {
+        "test-exclude": "^7.0.1"
+      }
+    },
+    "node_modules/test-exclude": {
+      "version": "7.0.1",
+      "resolved": "https://repo/repository/npm/test-exclude/-/test-exclude-7.0.1.tgz",
+      "integrity": "sha512-test-exclude-integrity",
+      "dev": true,
+      "license": "ISC",
+      "dependencies": {
+        "@istanbuljs/schema": "^0.1.2",
+        "glob": "^10.4.1",
+        "minimatch": "^9.0.4"
+      }
+    },
+    "node_modules/test-exclude/node_modules/brace-expansion": {
+      "version": "2.0.2",
+      "resolved": "https://repo/repository/npm/brace-expansion/-/brace-expansion-2.0.2.tgz",
+      "integrity": "sha512-brace-expansion-integrity",
+      "dev": true,
+      "license": "MIT"
+    },
+    "node_modules/test-exclude/node_modules/minimatch": {
+      "version": "9.0.5",
+      "resolved": "https://repo/repository/npm/minimatch/-/minimatch-9.0.5.tgz",
+      "integrity": "sha512-minimatch-integrity",
+      "dev": true,
+      "license": "ISC"
+    },
+    "node_modules/test-exclude/node_modules/@types/node": {
+      "version": "18.15.0",
+      "resolved": "https://repo/repository/npm/@types/node/-/node-18.15.0.tgz",
+      "integrity": "sha512-types-node-integrity",
+      "dev": true,
+      "license": "MIT"
+    },
+    "node_modules/glob": {
+      "version": "10.4.5",
+      "resolved": "https://repo/repository/npm/glob/-/glob-10.4.5.tgz",
+      "integrity": "sha512-glob-integrity",
+      "license": "ISC"
+    },
+    "node_modules/glob/node_modules/@types/glob": {
+      "version": "8.1.0",
+      "resolved": "https://repo/repository/npm/@types/glob/-/glob-8.1.0.tgz",
+      "integrity": "sha512-types-glob-integrity",
+      "dev": true,
+      "license": "MIT"
+    }
+  }
+}

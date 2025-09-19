@@ -13,7 +13,7 @@ export interface ScanDurationChipProps {
   variant?: "filled" | "outlined";
 }
 
-export const ScanDurationChip: React.FC<ScanDurationChipProps> = ({
+export const ScanDurationChip: React.FC<ScanDurationChipProps> = React.memo(({
   scanResult,
   showTooltip = true,
   size = "small",
@@ -65,6 +65,6 @@ export const ScanDurationChip: React.FC<ScanDurationChipProps> = ({
   }
 
   return chip;
-};
+});
 
 export default ScanDurationChip;

@@ -423,29 +423,43 @@ class PackageOperations(BaseOperations):
         from ..models import RequestPackage, SecurityScan
         from sqlalchemy import func
         
-        # Optimized single query using joins instead of N+1 queries
-        # This gets all packages, request_packages, and latest security scans in one query
-        stmt = (
-            select(
-                Package,
-                RequestPackage,
-                SecurityScan
-            )
-            .select_from(RequestPackage)
-            .join(Package, RequestPackage.package_id == Package.id)
-            .outerjoin(
-                SecurityScan,
-                and_(
-                    Package.id == SecurityScan.package_id,
-                    SecurityScan.id == (
-                        select(func.max(SecurityScan.id))
-                        .where(SecurityScan.package_id == Package.id)
-                        .scalar_subquery()
-                    )
-                )
-            )
+        # First, get all request_packages for this request
+        request_package_stmt = (
+            select(RequestPackage)
             .where(RequestPackage.request_id == request_id)
         )
+        request_packages = self.session.execute(request_package_stmt).scalars().all()
         
-        results = list(self.session.execute(stmt).all())
+        if not request_packages:
+            return []
+        
+        # Get package IDs for batch query
+        package_ids = [rp.package_id for rp in request_packages]
+        
+        # Get all packages in one query
+        packages_stmt = select(Package).where(Package.id.in_(package_ids))
+        packages = {pkg.id: pkg for pkg in self.session.execute(packages_stmt).scalars().all()}
+        
+        # Get latest security scans for all packages in one query
+        latest_scans_stmt = (
+            select(SecurityScan)
+            .where(
+                SecurityScan.package_id.in_(package_ids),
+                SecurityScan.id.in_(
+                    select(func.max(SecurityScan.id))
+                    .where(SecurityScan.package_id.in_(package_ids))
+                    .group_by(SecurityScan.package_id)
+                )
+            )
+        )
+        latest_scans = {scan.package_id: scan for scan in self.session.execute(latest_scans_stmt).scalars().all()}
+        
+        # Build results maintaining order
+        results = []
+        for rp in request_packages:
+            package = packages.get(rp.package_id)
+            if package:
+                scan = latest_scans.get(rp.package_id)
+                results.append((package, rp, scan))
+        
         return results

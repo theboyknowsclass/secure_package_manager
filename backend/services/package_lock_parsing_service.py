@@ -339,20 +339,30 @@ class PackageLockParsingService:
         # If name is not provided, try to extract it from the path
         if not package_name and package_path.startswith("node_modules/"):
             # Extract package name from path
-            # For regular packages: "node_modules/lodash" -> "lodash"
-            # For scoped packages: "node_modules/@nodelib/package_name" ->
-            # "@nodelib/package_name"
-            path_parts = package_path.split("/")
-            if len(path_parts) >= 2:
-                if path_parts[1].startswith("@"):
-                    # Scoped package: take both scope and package name
-                    if len(path_parts) >= 3:
-                        package_name = f"{path_parts[1]}/{path_parts[2]}"
+            # Handle nested packages by finding the last node_modules segment
+            # Examples:
+            # "node_modules/lodash" -> "lodash"
+            # "node_modules/@nodelib/package_name" -> "@nodelib/package_name"
+            # "node_modules/test-exclude/node_modules/minimatch" -> "minimatch"
+            # "node_modules/test-exclude/node_modules/@types/node" -> "@types/node"
+            
+            # Find the last occurrence of "node_modules/" in the path
+            last_node_modules = package_path.rfind("node_modules/")
+            if last_node_modules != -1:
+                # Get the part after the last "node_modules/"
+                remaining_path = package_path[last_node_modules + len("node_modules/"):]
+                path_parts = remaining_path.split("/")
+                
+                if len(path_parts) >= 1:
+                    if path_parts[0].startswith("@"):
+                        # Scoped package: take both scope and package name
+                        if len(path_parts) >= 2:
+                            package_name = f"{path_parts[0]}/{path_parts[1]}"
+                        else:
+                            package_name = path_parts[0]
                     else:
-                        package_name = path_parts[1]
-                else:
-                    # Regular package: take just the package name
-                    package_name = path_parts[1]
+                        # Regular package: take just the package name
+                        package_name = path_parts[0]
 
         return package_name
 

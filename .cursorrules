@@ -24,4 +24,5 @@ This is a production system. All code must be production-ready from day one:
 - This is a dockerized application with service management scripts in `scripts/` folder
 - Use PowerShell scripts (`.ps1`) on Windows and shell scripts (`.sh`) on *nix systems
 - Default to using these scripts for starting, stopping, and managing services
+- the dev-start and dev-stop both take an optional parameter for a specific container
 - Scripts handle both development and production environments via docker-compose configurations

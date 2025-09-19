@@ -25,7 +25,7 @@ const getScoreColor = (score: number) => {
   return "error";
 };
 
-export const SecurityScoreChip: React.FC<SecurityScoreChipProps> = ({
+export const SecurityScoreChip: React.FC<SecurityScoreChipProps> = React.memo(({
   score,
   scanStatus,
   scanResult,
@@ -108,6 +108,6 @@ export const SecurityScoreChip: React.FC<SecurityScoreChipProps> = ({
       -
     </Typography>
   );
-};
+});
 
 export default SecurityScoreChip;

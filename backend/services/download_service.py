@@ -144,11 +144,15 @@ class DownloadService:
         Returns:
             Constructed download URL
         """
+        # If package has an npm_url that starts with the same base as source_repository_url, use it directly
+        if package.npm_url and package.npm_url.startswith(self.source_repository_url):
+            return package.npm_url
+        
+        # Otherwise, use custom logic to construct the URL
         # Handle scoped packages (e.g., @babel/core)
         if package.name.startswith("@"):
-            # For scoped packages: @scope/package -> @scope%2fpackage
-            encoded_name = package.name.replace("/", "%2f")
-            return f"{self.source_repository_url}/{encoded_name}/-/{package.name.split('/')[-1]}-{package.version}.tgz"
+            # For scoped packages: @scope/package -> @scope/package (no URL encoding needed)
+            return f"{self.source_repository_url}/{package.name}/-/{package.name.split('/')[-1]}-{package.version}.tgz"
         else:
             # For regular packages: package -> package
             return f"{self.source_repository_url}/{package.name}/-/{package.name}-{package.version}.tgz"

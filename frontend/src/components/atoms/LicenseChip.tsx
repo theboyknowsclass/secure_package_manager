@@ -13,7 +13,7 @@ export interface LicenseChipProps {
   variant?: "filled" | "outlined";
 }
 
-export const LicenseChip: React.FC<LicenseChipProps> = ({
+export const LicenseChip: React.FC<LicenseChipProps> = React.memo(({
   identifier,
   score = null,
   showTooltip = true,
@@ -47,6 +47,6 @@ export const LicenseChip: React.FC<LicenseChipProps> = ({
   }
 
   return chip;
-};
+});
 
 export default LicenseChip;

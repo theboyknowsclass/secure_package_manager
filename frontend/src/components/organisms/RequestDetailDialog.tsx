@@ -48,15 +48,15 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     accessorKey: "status",
     header: "Status",
     size: 120,
-    Cell: React.memo(({ row }: { row: any }) => (
+    Cell: ({ row }: { row: any }) => (
       <PackageStatusChip status={row.original.status} />
-    )),
+    ),
   },
   {
     accessorKey: "license_identifier",
     header: "License",
     size: 120,
-    Cell: React.memo(({ row }: { row: any }) => {
+    Cell: ({ row }: { row: any }) => {
       const pkg = row.original;
       return (
         <LicenseChip
@@ -64,15 +64,15 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
           score={pkg.license_score}
         />
       );
-    }),
+    },
   },
   {
     accessorKey: "license_score",
     header: "License Score",
     size: 120,
-    Cell: React.memo(({ row }: { row: any }) => (
+    Cell: ({ row }: { row: any }) => (
       <LicenseScoreChip score={row.original.license_score} />
-    )),
+    ),
   },
   {
     accessorKey: "security_score",
@@ -85,7 +85,7 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
         },
       },
     },
-    Cell: React.memo(({ row }: { row: any }) => {
+    Cell: ({ row }: { row: any }) => {
       const pkg = row.original;
       return (
         <SecurityScoreChip
@@ -94,27 +94,27 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
           scanResult={pkg.scan_result}
         />
       );
-    }),
+    },
   },
   {
     accessorKey: "scan_result",
     header: "Vulnerabilities",
     size: 120,
-    Cell: React.memo(({ row }: { row: any }) => {
+    Cell: ({ row }: { row: any }) => {
       const pkg = row.original;
       return <VulnerabilityChip scanResult={pkg.scan_result} />;
-    }),
+    },
   },
   {
     accessorKey: "type",
     header: "Type",
     size: 80,
-    Cell: React.memo(({ row }: { row: any }) => {
+    Cell: ({ row }: { row: any }) => {
       const type = row.original.type;
       return (
         <PackageTypeChip type={type === "existing" ? "existing" : "new"} />
       );
-    }),
+    },
   },
 ];
 

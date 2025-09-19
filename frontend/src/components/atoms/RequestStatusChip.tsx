@@ -38,7 +38,7 @@ const getRequestStatusLabel = (status: string): string => {
   }
 };
 
-export const RequestStatusChip: React.FC<RequestStatusChipProps> = ({
+export const RequestStatusChip: React.FC<RequestStatusChipProps> = React.memo(({
   status,
   showTooltip = true,
   size = "small",
@@ -56,6 +56,6 @@ export const RequestStatusChip: React.FC<RequestStatusChipProps> = ({
   }
 
   return chip;
-};
+});
 
 export default RequestStatusChip;

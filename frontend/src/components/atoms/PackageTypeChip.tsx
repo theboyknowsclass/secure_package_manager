@@ -7,7 +7,7 @@ export interface PackageTypeChipProps {
   variant?: "filled" | "outlined";
 }
 
-export const PackageTypeChip: React.FC<PackageTypeChipProps> = ({
+export const PackageTypeChip: React.FC<PackageTypeChipProps> = React.memo(({
   type,
   size = "small",
   variant = "outlined",
@@ -18,6 +18,6 @@ export const PackageTypeChip: React.FC<PackageTypeChipProps> = ({
     size={size}
     variant={variant}
   />
-);
+));
 
 export default PackageTypeChip;

@@ -51,7 +51,7 @@ const getPackageStatusLabel = (status: PackageStatus): string => {
   }
 };
 
-export const PackageStatusChip: React.FC<PackageStatusChipProps> = ({
+export const PackageStatusChip: React.FC<PackageStatusChipProps> = React.memo(({
   status,
   showTooltip = true,
   size = "small",
@@ -69,6 +69,6 @@ export const PackageStatusChip: React.FC<PackageStatusChipProps> = ({
   }
 
   return chip;
-};
+});
 
 export default PackageStatusChip;
