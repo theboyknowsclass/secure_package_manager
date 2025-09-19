@@ -10,9 +10,10 @@ import logging
 import os
 import sys
 
-# Configure logging
+# Configure logging - minimal output for production
+log_level = logging.ERROR if os.getenv("FLASK_ENV") == "production" else logging.INFO
 logging.basicConfig(
-    level=logging.INFO,
+    level=log_level,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),
@@ -23,6 +24,12 @@ logging.basicConfig(
         ),
     ],
 )
+
+# Suppress noisy loggers
+logging.getLogger("urllib3").setLevel(logging.ERROR)
+logging.getLogger("requests").setLevel(logging.ERROR)
+logging.getLogger("sqlalchemy.engine").setLevel(logging.ERROR)
+logging.getLogger("sqlalchemy.pool").setLevel(logging.ERROR)
 
 logger = logging.getLogger(__name__)
 
@@ -76,14 +83,19 @@ def main():
         os.getenv("WORKER_MAX_LICENSE_GROUPS_PER_CYCLE", "20")
     )
 
-    logger.info(f"Starting {worker_type} worker...")
-    logger.info("Worker configuration:")
-    logger.info(f"  - Type: {worker_type}")
-    logger.info(f"  - Sleep interval: {sleep_interval} seconds")
-    logger.info(f"  - Max packages per cycle: {max_packages_per_cycle}")
-    logger.info(
-        f"  - Max license groups per cycle: {max_license_groups_per_cycle}"
-    )
+    # Only log startup details in development
+    if os.getenv("FLASK_ENV") != "production":
+        logger.info(f"Starting {worker_type} worker...")
+        logger.info("Worker configuration:")
+        logger.info(f"  - Type: {worker_type}")
+        logger.info(f"  - Sleep interval: {sleep_interval} seconds")
+        logger.info(f"  - Max packages per cycle: {max_packages_per_cycle}")
+        logger.info(
+            f"  - Max license groups per cycle: {max_license_groups_per_cycle}"
+        )
+    else:
+        # In production, only log essential startup info
+        logger.info(f"Starting {worker_type} worker")
 
     try:
         # Get the worker class by type
@@ -115,7 +127,9 @@ def main():
         logger.error(f"Worker failed with error: {str(e)}", exc_info=True)
         sys.exit(1)
 
-    logger.info(f"{worker_type} worker stopped")
+    # Only log shutdown in development
+    if os.getenv("FLASK_ENV") != "production":
+        logger.info(f"{worker_type} worker stopped")
 
 
 if __name__ == "__main__":

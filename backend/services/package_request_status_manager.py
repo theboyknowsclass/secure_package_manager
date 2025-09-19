@@ -102,46 +102,50 @@ class PackageRequestStatusManager:
         Returns:
             Dictionary with status counts
         """
-        # Get all packages for this request through the many-to-many
-        # relationship
-        with SessionHelper.get_session() as db:
-            request_ops = RequestOperations(db.session)
-            request_obj = request_ops.get_by_id(request_id)
-            if not request_obj:
-                return {"total": 0, "Submitted": 0, "Parsed": 0, "Checking Licence": 0, 
-                       "Downloading": 0, "Security Scanning": 0, "Pending Approval": 0, 
-                       "Approved": 0, "Rejected": 0}
-            
-            # Get packages for this request using the relationship
-            request_packages = request_obj.request_packages if hasattr(request_obj, 'request_packages') else []
-            logger.info(f"request_packages type: {type(request_packages)}")
-            logger.info(f"request_packages length: {len(request_packages) if request_packages else 'None'}")
-            if request_packages:
-                logger.info(f"First request_package type: {type(request_packages[0])}")
-                logger.info(f"First request_package: {request_packages[0]}")
-            
-            # Build packages list safely
-            packages = []
-            for rp in request_packages:
-                try:
-                    logger.info(f"Processing rp type: {type(rp)}, rp: {rp}")
-                    if hasattr(rp, 'package') and rp.package:
-                        packages.append(rp.package)
-                    elif hasattr(rp, 'id') and hasattr(rp, 'name'):  # This might be a Package object directly
-                        packages.append(rp)
-                    else:
-                        logger.warning(f"Unknown request_package type: {type(rp)}")
-                except Exception as e:
-                    logger.error(f"Error processing request_package: {e}")
-                    logger.error(f"rp type: {type(rp)}, rp: {rp}")
-                    continue
-            
-            logger.info(f"Final packages list length: {len(packages)}")
-            if packages:
-                logger.info(f"First package type: {type(packages[0])}")
-
-            counts = {
-                "total": len(packages),
+        from sqlalchemy import func, case
+        
+        # Use the existing session if available, otherwise create a new one
+        if self.db:
+            session = self.db.session
+        else:
+            with SessionHelper.get_session() as db:
+                session = db.session
+                return self._get_package_counts_by_status_with_session(request_id, session)
+        
+        return self._get_package_counts_by_status_with_session(request_id, session)
+    
+    def _get_package_counts_by_status_with_session(self, request_id: int, session) -> Dict[str, int]:
+        """Get package counts using a single optimized query."""
+        from sqlalchemy import func, case
+        from database.models import RequestPackage, Package, PackageStatus
+        
+        # Single query to get all package status counts for the request
+        stmt = (
+            session.query(
+                func.count().label('total'),
+                func.sum(case((PackageStatus.status == 'Submitted', 1), else_=0)).label('submitted'),
+                func.sum(case((PackageStatus.status == 'Parsed', 1), else_=0)).label('parsed'),
+                func.sum(case((PackageStatus.status == 'Checking Licence', 1), else_=0)).label('checking_licence'),
+                func.sum(case((PackageStatus.status == 'Licence Checked', 1), else_=0)).label('licence_checked'),
+                func.sum(case((PackageStatus.status == 'Downloading', 1), else_=0)).label('downloading'),
+                func.sum(case((PackageStatus.status == 'Downloaded', 1), else_=0)).label('downloaded'),
+                func.sum(case((PackageStatus.status == 'Security Scanning', 1), else_=0)).label('security_scanning'),
+                func.sum(case((PackageStatus.status == 'Security Scanned', 1), else_=0)).label('security_scanned'),
+                func.sum(case((PackageStatus.status == 'Pending Approval', 1), else_=0)).label('pending_approval'),
+                func.sum(case((PackageStatus.status == 'Approved', 1), else_=0)).label('approved'),
+                func.sum(case((PackageStatus.status == 'Rejected', 1), else_=0)).label('rejected'),
+            )
+            .select_from(RequestPackage)
+            .join(Package, RequestPackage.package_id == Package.id)
+            .outerjoin(PackageStatus, Package.id == PackageStatus.package_id)
+            .where(RequestPackage.request_id == request_id)
+        )
+        
+        result = session.execute(stmt).first()
+        
+        if not result or result.total is None:
+            return {
+                "total": 0,
                 "Submitted": 0,
                 "Parsed": 0,
                 "Checking Licence": 0,
@@ -154,20 +158,21 @@ class PackageRequestStatusManager:
                 "Approved": 0,
                 "Rejected": 0,
             }
-
-            for package in packages:
-                if package.package_status:
-                    status = package.package_status.status
-                    if status in counts:
-                        counts[status] += 1
-                    else:
-                        # Handle unknown statuses
-                        counts["Submitted"] += 1
-                else:
-                    # Package without status is considered submitted
-                    counts["Submitted"] += 1
-
-        return counts
+        
+        return {
+            "total": result.total or 0,
+            "Submitted": result.submitted or 0,
+            "Parsed": result.parsed or 0,
+            "Checking Licence": result.checking_licence or 0,
+            "Licence Checked": result.licence_checked or 0,
+            "Downloading": result.downloading or 0,
+            "Downloaded": result.downloaded or 0,
+            "Security Scanning": result.security_scanning or 0,
+            "Security Scanned": result.security_scanned or 0,
+            "Pending Approval": result.pending_approval or 0,
+            "Approved": result.approved or 0,
+            "Rejected": result.rejected or 0,
+        }
 
     def get_request_status_summary(self, request_id: int) -> Dict[str, Any]:
         """Get a summary of the request status and package counts.
@@ -178,27 +183,45 @@ class PackageRequestStatusManager:
         Returns:
             Dictionary with status summary information
         """
-        logger.info(f"get_request_status_summary called for request_id: {request_id}")
-        with SessionHelper.get_session() as db:
-            request_ops = RequestOperations(db.session)
+        # Use the existing session if available, otherwise create a new one
+        if self.db:
+            session = self.db.session
+            request_ops = RequestOperations(session)
             request = request_ops.get_by_id(request_id)
-        if not request:
-            return {"error": f"Request {request_id} not found"}
+            if not request:
+                return {"error": f"Request {request_id} not found"}
 
-        logger.info(f"Request found: {request.id}, calling _get_package_counts_by_status")
-        counts = self._get_package_counts_by_status(request_id)
-        logger.info(f"Package counts retrieved: {counts}")
-        current_status = self._determine_request_status(request_id, request)
+            counts = self._get_package_counts_by_status_with_session(request_id, session)
+            current_status = self._determine_request_status(request_id, request)
 
-        return {
-            "request_id": request_id,
-            "current_status": current_status,
-            "total_packages": counts["total"],
-            "package_counts": counts,
-            "completion_percentage": self._calculate_completion_percentage(
-                counts, counts["total"]
-            ),
-        }
+            return {
+                "request_id": request_id,
+                "current_status": current_status,
+                "total_packages": counts["total"],
+                "package_counts": counts,
+                "completion_percentage": self._calculate_completion_percentage(
+                    counts, counts["total"]
+                ),
+            }
+        else:
+            with SessionHelper.get_session() as db:
+                request_ops = RequestOperations(db.session)
+                request = request_ops.get_by_id(request_id)
+                if not request:
+                    return {"error": f"Request {request_id} not found"}
+
+                counts = self._get_package_counts_by_status_with_session(request_id, db.session)
+                current_status = self._determine_request_status(request_id, request)
+
+                return {
+                    "request_id": request_id,
+                    "current_status": current_status,
+                    "total_packages": counts["total"],
+                    "package_counts": counts,
+                    "completion_percentage": self._calculate_completion_percentage(
+                        counts, counts["total"]
+                    ),
+                }
 
     def _calculate_completion_percentage(
         self, counts: Dict[str, int], total_packages: int

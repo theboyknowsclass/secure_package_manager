@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS package_status (
         'Rejected'
     )),
     CONSTRAINT package_status_security_scan_status_check CHECK (security_scan_status IN ('pending', 'running', 'completed', 'failed', 'skipped')),
-    CONSTRAINT package_status_license_status_check CHECK (license_status IN ('always_allowed', 'allowed', 'avoid', 'blocked')),
+    CONSTRAINT package_status_license_status_check CHECK (license_status IN ('always_allowed', 'allowed', 'avoid', 'blocked', 'unknown')),
     CONSTRAINT package_status_publish_status_check CHECK (publish_status IN ('pending', 'publishing', 'published', 'failed'))
 );
 
@@ -141,6 +141,31 @@ CREATE INDEX IF NOT EXISTS idx_packages_name_version ON packages(name, version);
 CREATE INDEX IF NOT EXISTS idx_package_status_status ON package_status(status);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_request_packages_package_type ON request_packages(package_type);
+
+-- Performance optimization indexes for request/1 endpoint
+-- Composite index for package status queries (package_id + status)
+CREATE INDEX IF NOT EXISTS idx_package_status_package_id_status 
+ON package_status(package_id, status);
+
+-- Index for security scans ordered by creation time (for latest scan queries)
+CREATE INDEX IF NOT EXISTS idx_security_scans_package_id_created_at 
+ON security_scans(package_id, created_at DESC);
+
+-- Composite index for request_packages joins
+CREATE INDEX IF NOT EXISTS idx_request_packages_request_id_package_id 
+ON request_packages(request_id, package_id);
+
+-- Index for package status updated_at (for stuck package queries)
+CREATE INDEX IF NOT EXISTS idx_package_status_updated_at 
+ON package_status(updated_at);
+
+-- Index for security scan status queries
+CREATE INDEX IF NOT EXISTS idx_package_status_security_scan_status 
+ON package_status(security_scan_status);
+
+-- Index for publish status queries
+CREATE INDEX IF NOT EXISTS idx_package_status_publish_status 
+ON package_status(publish_status);
 
 
 -- Create function to update updated_at timestamp

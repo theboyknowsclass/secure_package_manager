@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo, useCallback } from "react";
 import {
   Box,
   Typography,
@@ -32,7 +32,7 @@ interface RequestDetailDialogProps {
   refetchInterval?: number;
 }
 
-// Define columns for package details table
+// Memoized column definitions to prevent recreation on every render
 const packageColumns: MRT_ColumnDef<Package>[] = [
   {
     accessorKey: "name",
@@ -48,13 +48,15 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     accessorKey: "status",
     header: "Status",
     size: 120,
-    Cell: ({ row }) => <PackageStatusChip status={row.original.status} />,
+    Cell: React.memo(({ row }: { row: any }) => (
+      <PackageStatusChip status={row.original.status} />
+    )),
   },
   {
     accessorKey: "license_identifier",
     header: "License",
     size: 120,
-    Cell: ({ row }) => {
+    Cell: React.memo(({ row }: { row: any }) => {
       const pkg = row.original;
       return (
         <LicenseChip
@@ -62,13 +64,15 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
           score={pkg.license_score}
         />
       );
-    },
+    }),
   },
   {
     accessorKey: "license_score",
     header: "License Score",
     size: 120,
-    Cell: ({ row }) => <LicenseScoreChip score={row.original.license_score} />,
+    Cell: React.memo(({ row }: { row: any }) => (
+      <LicenseScoreChip score={row.original.license_score} />
+    )),
   },
   {
     accessorKey: "security_score",
@@ -81,7 +85,7 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
         },
       },
     },
-    Cell: ({ row }) => {
+    Cell: React.memo(({ row }: { row: any }) => {
       const pkg = row.original;
       return (
         <SecurityScoreChip
@@ -90,27 +94,27 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
           scanResult={pkg.scan_result}
         />
       );
-    },
+    }),
   },
   {
     accessorKey: "scan_result",
     header: "Vulnerabilities",
     size: 120,
-    Cell: ({ row }) => {
+    Cell: React.memo(({ row }: { row: any }) => {
       const pkg = row.original;
       return <VulnerabilityChip scanResult={pkg.scan_result} />;
-    },
+    }),
   },
   {
     accessorKey: "type",
     header: "Type",
     size: 80,
-    Cell: ({ row }) => {
+    Cell: React.memo(({ row }: { row: any }) => {
       const type = row.original.type;
       return (
         <PackageTypeChip type={type === "existing" ? "existing" : "new"} />
       );
-    },
+    }),
   },
 ];
 
@@ -128,9 +132,14 @@ export default function RequestDetailDialog({
     refetchInterval: open ? refetchInterval : undefined,
   });
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     onClose();
-  };
+  }, [onClose]);
+
+  // Memoize the packages data to prevent unnecessary re-renders
+  const memoizedPackages = useMemo(() => {
+    return selectedRequest?.packages || [];
+  }, [selectedRequest?.packages]);
 
   return (
     <Dialog

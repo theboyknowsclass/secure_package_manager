@@ -115,14 +115,14 @@ class DownloadProcessingService:
                 self._mark_package_downloaded(package, status_ops)
                 return {"success": True, "message": "Download completed"}
             else:
-                self._mark_package_rejected(package, status_ops)
+                self._mark_package_download_failed(package, status_ops)
                 return {"success": False, "error": "Download failed"}
 
         except Exception as e:
             self.logger.error(
                 f"Error processing package {package.name}@{package.version}: {str(e)}"
             )
-            self._mark_package_rejected(package, status_ops)
+            self._mark_package_download_failed(package, status_ops)
             return {"success": False, "error": str(e)}
 
     def _is_package_already_downloaded(self, package: Any) -> bool:
@@ -183,12 +183,12 @@ class DownloadProcessingService:
         if package.package_status:
             status_ops.go_to_next_stage(package.id)
 
-    def _mark_package_rejected(self, package: Any, status_ops: PackageStatusOperations) -> None:
-        """Mark package as rejected.
+    def _mark_package_download_failed(self, package: Any, status_ops: PackageStatusOperations) -> None:
+        """Mark package as download failed.
 
         Args:
             package: Package to update
             status_ops: Package status operations instance
         """
         if package.package_status:
-            status_ops.update_status(package.id, "Rejected")
+            status_ops.update_status(package.id, "Download Failed")

@@ -36,12 +36,13 @@ class PackageOperations(BaseOperations):
             status: The status to filter by
 
         Returns:
-            List of packages with the specified status
+            List of packages with the specified status, ordered by name
         """
         stmt = (
             select(Package)
             .join(PackageStatus)
             .where(PackageStatus.status == status)
+            .order_by(Package.name.asc())
         )
         return list(self.session.execute(stmt).scalars().all())
 
@@ -311,7 +312,7 @@ class PackageOperations(BaseOperations):
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_packages_needing_license_check(self, limit: int = 50) -> List[Package]:
+    def get_packages_needing_license_check(self, limit: int = None) -> List[Package]:
         """Get packages that need license checking.
 
         Args:
@@ -324,8 +325,9 @@ class PackageOperations(BaseOperations):
             select(Package)
             .join(PackageStatus)
             .where(PackageStatus.status == "Checking Licence")
-            .limit(limit)
         )
+        if limit:
+            stmt = stmt.limit(limit)
         return list(self.session.execute(stmt).scalars().all())
 
     def get_stuck_packages_in_license_checking(self, stuck_threshold) -> List[Package]:
@@ -419,29 +421,31 @@ class PackageOperations(BaseOperations):
             List of tuples containing (Package, RequestPackage, SecurityScan)
         """
         from ..models import RequestPackage, SecurityScan
+        from sqlalchemy import func
         
-        # First, get all request_packages for this request
-        request_package_stmt = (
-            select(RequestPackage)
+        # Optimized single query using joins instead of N+1 queries
+        # This gets all packages, request_packages, and latest security scans in one query
+        stmt = (
+            select(
+                Package,
+                RequestPackage,
+                SecurityScan
+            )
+            .select_from(RequestPackage)
+            .join(Package, RequestPackage.package_id == Package.id)
+            .outerjoin(
+                SecurityScan,
+                and_(
+                    Package.id == SecurityScan.package_id,
+                    SecurityScan.id == (
+                        select(func.max(SecurityScan.id))
+                        .where(SecurityScan.package_id == Package.id)
+                        .scalar_subquery()
+                    )
+                )
+            )
             .where(RequestPackage.request_id == request_id)
         )
-        request_packages = self.session.execute(request_package_stmt).scalars().all()
         
-        results = []
-        for rp in request_packages:
-            # Get the package
-            package = self.get_by_id(rp.package_id)
-            if not package:
-                continue
-                
-            # Get the security scan (if any)
-            scan_stmt = (
-                select(SecurityScan)
-                .where(SecurityScan.package_id == rp.package_id)
-                .order_by(SecurityScan.created_at.desc())
-            )
-            scan = self.session.execute(scan_stmt).scalar_one_or_none()
-            
-            results.append((package, rp, scan))
-        
+        results = list(self.session.execute(stmt).all())
         return results

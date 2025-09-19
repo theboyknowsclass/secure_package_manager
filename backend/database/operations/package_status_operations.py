@@ -234,13 +234,13 @@ class PackageStatusOperations(BaseOperations):
         status.updated_at = datetime.utcnow()
         return True
 
-    def update_license_info(self, package_id: int, license_score: int, license_tier: str) -> bool:
+    def update_license_info(self, package_id: int, license_score: int, license_status: str) -> bool:
         """Update package license information.
 
         Args:
             package_id: The ID of the package
             license_score: The license score (0-100)
-            license_tier: The license tier (e.g., 'Approved', 'Conditional', 'Restricted', 'Prohibited')
+            license_status: The license status (e.g., 'always_allowed', 'allowed', 'avoid', 'blocked')
 
         Returns:
             True if update was successful, False otherwise
@@ -250,7 +250,7 @@ class PackageStatusOperations(BaseOperations):
             return False
 
         status.license_score = license_score
-        status.license_status = license_tier  # Use exact value to match database constraints
+        status.license_status = license_status  # Use exact value to match database constraints
         status.updated_at = datetime.utcnow()
         return True
 
@@ -283,8 +283,22 @@ class PackageStatusOperations(BaseOperations):
             "Approved",
             "Published"
         ]
+        
+        # Failed states are terminal and don't advance
+        failed_states = {
+            "Parse Failed",
+            "Licence Check Failed",
+            "Download Failed", 
+            "Security Scan Failed",
+            "Rejected"
+        }
 
         current_status = status.status
+        
+        # Check if current status is a failed state - these don't advance
+        if current_status in failed_states:
+            return False
+            
         current_index = workflow_stages.index(current_status) if current_status in workflow_stages else -1
 
         if current_index == -1:

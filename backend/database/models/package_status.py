@@ -89,12 +89,24 @@ class PackageStatus(Base):
             "Pending Approval",
             "Approved",
             "Rejected",
+            # Failed states
+            "Parse Failed",
+            "Licence Check Failed",
+            "Download Failed",
+            "Security Scan Failed",
         }
         return self.status in completed_statuses
 
     def is_final_status(self) -> bool:
-        """Check if package is in a final status (approved or rejected)"""
-        return self.status in {"Approved", "Rejected"}
+        """Check if package is in a final status (approved, rejected, or failed)"""
+        return self.status in {
+            "Approved", 
+            "Rejected",
+            "Parse Failed",
+            "Licence Check Failed", 
+            "Download Failed",
+            "Security Scan Failed"
+        }
 
     def get_processing_stage(self) -> str:
         """Get the current processing stage for display purposes."""
@@ -108,5 +120,10 @@ class PackageStatus(Base):
             "Pending Approval": "Awaiting Approval",
             "Approved": "Approved",
             "Rejected": "Rejected",
+            # Failed states
+            "Parse Failed": "Parse Failed",
+            "Licence Check Failed": "License Check Failed",
+            "Download Failed": "Download Failed",
+            "Security Scan Failed": "Security Scan Failed",
         }
         return stage_mapping.get(self.status, "Unknown")

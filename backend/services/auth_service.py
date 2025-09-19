@@ -31,10 +31,6 @@ class AuthService:
 
         logger = logging.getLogger(__name__)
 
-        logger.info("=== TOKEN VERIFICATION DEBUG ===")
-        logger.info(f"Token to verify: {token[:50]}...")
-        logger.info(f"Secret key: {self.secret_key[:10]}...")
-
         try:
             # Decode and validate the JWT token
             payload = self._decode_jwt_token(token)
@@ -75,7 +71,6 @@ class AuthService:
             audience=OAUTH_AUDIENCE,
             issuer=OAUTH_ISSUER,
         )
-        logger.info(f"Token decoded successfully. Payload: {payload}")
         return dict(payload)
 
     def _get_user_from_token(self, payload: Dict[str, Any]) -> Optional[User]:
@@ -102,9 +97,7 @@ class AuthService:
 
         logger = logging.getLogger(__name__)
 
-        logger.info("OAuth2 token detected (has 'sub' field)")
         username = payload.get("username")
-        logger.info(f"Username from token: {username}")
 
         if not username:
             logger.error("No username found in OAuth2 token payload")
@@ -130,9 +123,7 @@ class AuthService:
 
         logger = logging.getLogger(__name__)
 
-        logger.info("Legacy token detected (has 'user_id' field)")
         user_id = payload.get("user_id")
-        logger.info(f"User ID from token: {user_id}")
 
         if not user_id:
             logger.error("No user_id found in legacy token payload")
@@ -205,28 +196,15 @@ class AuthService:
 
             logger = logging.getLogger(__name__)
 
-            logger.info(
-                f"=== AUTH DEBUG: require_auth called for {f.__name__} ==="
-            )
-            logger.info(f"Request URL: {request.url}")
-            logger.info(f"Request method: {request.method}")
-            logger.info(f"Request headers: {dict(request.headers)}")
-
             token = None
 
             # Get token from header
             if "Authorization" in request.headers:
                 auth_header = request.headers["Authorization"]
-                logger.info(
-                    f"Authorization header found: {auth_header[:50]}..."
-                )
                 try:
                     token = auth_header.split(" ")[1]
-                    logger.info(f"Extracted token: {token[:50]}...")
                 except IndexError:
-                    logger.error(
-                        "Invalid token format - missing space separator"
-                    )
+                    logger.error("Invalid token format - missing space separator")
                     return jsonify({"error": "Invalid token format"}), 401
             else:
                 logger.warning("No Authorization header found")
@@ -236,25 +214,16 @@ class AuthService:
                 return jsonify({"error": "Token is missing"}), 401
 
             # Verify token
-            logger.info("Verifying token...")
             user = self.verify_token(token)
             if not user:
-                logger.error(
-                    "Token verification failed - invalid or expired token"
-                )
+                logger.error("Token verification failed - invalid or expired token")
                 return jsonify({"error": "Invalid or expired token"}), 401
-
-            logger.info(
-                f"Token verified successfully for user: {user.username} (ID: {user.id}, Role: {user.role})"
-            )
 
             # Add user to request context
             request.user = user
-            logger.info("User added to request context")
 
             try:
                 result = f(*args, **kwargs)
-                logger.info(f"Endpoint {f.__name__} executed successfully")
                 return result
             except Exception as e:
                 logger.error(f"Error in endpoint {f.__name__}: {str(e)}")

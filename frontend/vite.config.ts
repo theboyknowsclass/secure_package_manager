@@ -10,8 +10,14 @@ export default defineConfig({
     watch: {
       usePolling: true,
     },
+    // Reduce logging noise in production
+    hmr: {
+      overlay: process.env.NODE_ENV !== "production",
+    },
   },
   define: {
     global: "globalThis",
   },
+  // Suppress build warnings and info in production
+  logLevel: process.env.NODE_ENV === "production" ? "error" : "info",
 });

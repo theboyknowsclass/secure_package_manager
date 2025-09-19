@@ -75,19 +75,31 @@ class BaseWorker(ABC):
 
     def start(self) -> None:
         """Start the worker."""
-        logger.info(f"Starting {self.worker_name} worker...")
+        # Only log detailed startup in development
+        if os.getenv("FLASK_ENV") != "production":
+            logger.info(f"Starting {self.worker_name} worker...")
 
         self.running = True
 
         # Initialize worker
         self.initialize()
 
-        logger.info(f"{self.worker_name} worker started successfully")
+        if os.getenv("FLASK_ENV") != "production":
+            logger.info(f"{self.worker_name} worker started successfully")
 
         # Main processing loop
+        cycle_count = 0
         while self.running:
             try:
                 self.process_cycle()
+                cycle_count += 1
+                
+                # Log heartbeat every 10 cycles in production (every ~5 minutes with default sleep)
+                if (os.getenv("FLASK_ENV") == "production" and 
+                    os.getenv("LOG_HEARTBEATS", "false").lower() == "true" and 
+                    cycle_count % 10 == 0):
+                    logger.info(f"{self.worker_name} heartbeat - {cycle_count} cycles completed")
+                    
             except Exception as e:
                 logger.error(
                     f"Error in {self.worker_name} processing cycle: {str(e)}",
@@ -99,7 +111,8 @@ class BaseWorker(ABC):
 
         # Cleanup
         self.cleanup()
-        logger.info(f"{self.worker_name} worker stopped")
+        if os.getenv("FLASK_ENV") != "production":
+            logger.info(f"{self.worker_name} worker stopped")
 
     @abstractmethod
     def initialize(self) -> None:

@@ -40,9 +40,19 @@ def create_app() -> Flask:
         supports_credentials=True,
     )
 
-    # Configure logging
-    logging.basicConfig(level=logging.INFO)
-    logging.getLogger(__name__)
+    # Configure logging - only show errors and warnings in production
+    log_level = logging.ERROR if os.getenv("FLASK_ENV") == "production" else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    
+    # Suppress noisy loggers
+    logging.getLogger("werkzeug").setLevel(logging.ERROR)
+    logging.getLogger("urllib3").setLevel(logging.ERROR)
+    logging.getLogger("requests").setLevel(logging.ERROR)
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.ERROR)
+    logging.getLogger("sqlalchemy.pool").setLevel(logging.ERROR)
 
     # Database will be initialized per-request using DatabaseService
 
@@ -73,6 +83,22 @@ def health_check() -> Response:
     )
 
 
+@app.route("/heartbeat", methods=["GET"])
+def heartbeat() -> Response:
+    """Heartbeat endpoint for monitoring."""
+    # Only log heartbeat in production if specifically requested
+    if os.getenv("FLASK_ENV") == "production" and os.getenv("LOG_HEARTBEATS", "false").lower() == "true":
+        logging.info("API heartbeat check")
+    
+    return jsonify(
+        {
+            "status": "alive", 
+            "timestamp": datetime.utcnow().isoformat(),
+            "service": "secure-package-manager-api"
+        }
+    )
+
+
 def wait_for_db(max_retries: int = 30, delay: int = 2) -> bool:
     """Wait for database to be ready."""
     import time
@@ -89,7 +115,9 @@ def wait_for_db(max_retries: int = 30, delay: int = 2) -> bool:
 
             db_service = DatabaseService(database_url)
             if db_service.test_connection():
-                logging.info("Database connection successful")
+                # Only log successful connection in development
+                if os.getenv("FLASK_ENV") != "production":
+                    logging.info("Database connection successful")
                 return True
         except Exception as e:
             logging.warning(
@@ -117,6 +145,8 @@ if __name__ == "__main__":
     if database_url:
         engine = create_engine(database_url)
         Base.metadata.create_all(engine)
-        logging.getLogger(__name__).info("Database tables created/verified")
+        # Only log table creation in development
+        if os.getenv("FLASK_ENV") != "production":
+            logging.getLogger(__name__).info("Database tables created/verified")
 
     app.run(host="0.0.0.0", port=5000, debug=True)

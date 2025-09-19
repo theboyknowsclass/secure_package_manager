@@ -22,6 +22,7 @@ class DownloadService:
             "PACKAGE_CACHE_DIR", "/app/package_cache"
         )
         self.download_timeout = int(os.getenv("DOWNLOAD_TIMEOUT", "60"))
+        self.source_repository_url = os.getenv("SOURCE_REPOSITORY_URL", "https://registry.npmjs.org")
 
         # Ensure package cache directory exists
         os.makedirs(self.package_cache_dir, exist_ok=True)
@@ -30,32 +31,24 @@ class DownloadService:
         """Download package from npm registry to package cache.
 
         Args:
-            package: Package object with name, version, and npm_url
+            package: Package object with name, version
 
         Returns:
             True if download successful, False otherwise
         """
         try:
-            if not package.npm_url:
-                logger.error(
-                    (
-                        f"No npm_url available for package "
-                        f"{package.name}@{package.version}"
-                    )
-                )
-                return False
+            # Construct download URL using SOURCE_REPOSITORY_URL
+            download_url = self._construct_download_url(package)
+            
+            logger.info(f"Downloading package {package.name}@{package.version} from {download_url}")
 
             # Create package cache directory
             package_dir = self._get_package_cache_path(package)
             os.makedirs(package_dir, exist_ok=True)
 
-            logger.info(
-                f"Downloading package {package.name}@{package.version} from {package.npm_url}"
-            )
-
             # Download tarball
             response = requests.get(
-                package.npm_url, timeout=self.download_timeout
+                download_url, timeout=self.download_timeout
             )
 
             if response.status_code != 200:
@@ -141,3 +134,21 @@ class DownloadService:
         return os.path.join(
             self.package_cache_dir, f"{safe_package_name}-{package.version}"
         )
+
+    def _construct_download_url(self, package) -> str:
+        """Construct download URL using SOURCE_REPOSITORY_URL.
+        
+        Args:
+            package: Package object with name and version
+            
+        Returns:
+            Constructed download URL
+        """
+        # Handle scoped packages (e.g., @babel/core)
+        if package.name.startswith("@"):
+            # For scoped packages: @scope/package -> @scope%2fpackage
+            encoded_name = package.name.replace("/", "%2f")
+            return f"{self.source_repository_url}/{encoded_name}/-/{package.name.split('/')[-1]}-{package.version}.tgz"
+        else:
+            # For regular packages: package -> package
+            return f"{self.source_repository_url}/{package.name}/-/{package.name}-{package.version}.tgz"

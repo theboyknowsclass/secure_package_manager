@@ -206,26 +206,16 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
             ):
                 return jsonify({"error": "Access denied"}), 403
 
-            # Get packages for this request with their creation context and scan
-            # results
-            logger.info(f"About to call get_packages_with_context_and_scans for request_id: {request_id}")
+            # Get packages for this request with their creation context and scan results
             package_ops = PackageOperations(db.session)
             packages_with_context = package_ops.get_packages_with_context_and_scans(request_id)
-            logger.info(f"get_packages_with_context_and_scans completed successfully")
 
-            # Debug: Log what we got back
-            logger.info(f"packages_with_context type: {type(packages_with_context)}")
-            logger.info(f"packages_with_context length: {len(packages_with_context) if packages_with_context else 'None'}")
-            if packages_with_context:
-                logger.info(f"First item type: {type(packages_with_context[0])}")
-                logger.info(f"First item: {packages_with_context[0]}")
-
-            # Get request status from status manager
+            # Get request status from status manager using the same session
             from services.package_request_status_manager import (
                 PackageRequestStatusManager,
             )
 
-            status_manager = PackageRequestStatusManager()
+            status_manager = PackageRequestStatusManager(db)
             status_summary = status_manager.get_request_status_summary(request_id)
 
             # Build packages list
