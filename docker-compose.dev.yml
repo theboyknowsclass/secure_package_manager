@@ -74,6 +74,8 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
       - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./pgadmin/pgpass:/pgpass:ro
+    entrypoint: /bin/sh -c "chmod 600 /pgpass; /entrypoint.sh"
     networks:
       - app-network
     depends_on:

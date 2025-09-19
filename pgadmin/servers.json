@@ -1,4 +1,4 @@
-﻿{
+{
   "Servers": {
     "1": {
       "Name": "Secure Package Manager DB",
@@ -7,6 +7,7 @@
       "Port": 5432,
       "MaintenanceDB": "secure_package_manager",
       "Username": "postgres",
+      "PassFile": "/pgpass",
       "SSLMode": "prefer",
       "Timeout": 10,
       "UseSSHTunnel": 0,
