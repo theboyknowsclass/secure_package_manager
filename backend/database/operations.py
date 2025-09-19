@@ -349,6 +349,7 @@ class DatabaseOperations:
                 return model_class.query.filter_by(username=username).first()
             else:
                 from sqlalchemy import select
+
                 session = self._get_session()
                 stmt = select(model_class).where(model_class.username == username)
                 return session.execute(stmt).scalar_one_or_none()
@@ -363,6 +364,7 @@ class DatabaseOperations:
                 return model_class.query.get(user_id)
             else:
                 from sqlalchemy import select
+
                 session = self._get_session()
                 stmt = select(model_class).where(model_class.id == user_id)
                 return session.execute(stmt).scalar_one_or_none()

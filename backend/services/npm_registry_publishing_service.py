@@ -9,13 +9,12 @@ import base64
 import json
 import logging
 import os
-import tempfile
 import tarfile
+import tempfile
 from typing import Optional
 from urllib.parse import quote
 
 import requests
-
 from config.constants import TARGET_REPOSITORY_URL
 from database.models import Package
 
@@ -31,10 +30,10 @@ class NpmRegistryPublishingService:
     def publish_to_secure_repo(self, package: Package) -> bool:
         """
         Publish package to secure repository using direct HTTP API
-        
+
         Args:
             package: Package object to publish
-            
+
         Returns:
             True if successful, False otherwise
         """
@@ -51,11 +50,11 @@ class NpmRegistryPublishingService:
 
             # Upload to registry
             success = self._upload_to_registry(package, tarball_path)
-            
+
             # Clean up temporary file
             if os.path.exists(tarball_path):
                 os.unlink(tarball_path)
-                
+
             return success
 
         except Exception as e:
@@ -65,10 +64,10 @@ class NpmRegistryPublishingService:
     def _create_package_tarball(self, package: Package) -> Optional[str]:
         """
         Create a tarball for the package
-        
+
         Args:
             package: Package object
-            
+
         Returns:
             Path to created tarball or None if failed
         """
@@ -90,7 +89,7 @@ class NpmRegistryPublishingService:
                 # Create tarball
                 safe_name = package.name.replace("@", "").replace("/", "-")
                 tarball_path = os.path.join(temp_dir, f"{safe_name}-{package.version}.tgz")
-                
+
                 with tarfile.open(tarball_path, "w:gz") as tar:
                     tar.add(
                         temp_dir,
@@ -101,7 +100,7 @@ class NpmRegistryPublishingService:
                 # Move tarball to a permanent location
                 permanent_path = os.path.join(temp_dir, f"{safe_name}-{package.version}.tgz")
                 os.rename(tarball_path, permanent_path)
-                
+
                 return permanent_path
 
         except Exception as e:
@@ -133,9 +132,7 @@ class NpmRegistryPublishingService:
             f.write("module.exports = {\n")
             f.write(f'  name: "{package.name}",\n')
             f.write(f'  version: "{package.version}",\n')
-            f.write(
-                '  description: "This package has been validated and approved by the Secure Package Manager"\n'
-            )
+            f.write('  description: "This package has been validated and approved by the Secure Package Manager"\n')
             f.write("};\n")
 
     def _create_readme(self, package: Package, temp_dir: str) -> None:
@@ -146,20 +143,18 @@ class NpmRegistryPublishingService:
             f.write(f"Version: {package.version}\n\n")
             f.write("This package has been validated and approved by the Secure Package Manager.\n\n")
             f.write("## Security Information\n\n")
-            f.write(
-                f'- Security Score: {package.package_status.security_score if package.package_status else "N/A"}\n'
-            )
+            f.write(f'- Security Score: {package.package_status.security_score if package.package_status else "N/A"}\n')
             f.write(f'- License: {package.license_identifier or "N/A"}\n')
             f.write(f"- Status: {package.package_status.status if package.package_status else 'N/A'}\n")
 
     def _upload_to_registry(self, package: Package, tarball_path: str) -> bool:
         """
         Upload package to npm registry using direct HTTP API
-        
+
         Args:
             package: Package object
             tarball_path: Path to the tarball file
-            
+
         Returns:
             True if successful, False otherwise
         """
@@ -184,7 +179,7 @@ class NpmRegistryPublishingService:
                 f"{registry_url}/{encoded_package_name}",
                 json=publish_payload,
                 headers={"Content-Type": "application/json"},
-                timeout=60
+                timeout=60,
             )
 
             if response.status_code in [200, 201]:
@@ -202,11 +197,11 @@ class NpmRegistryPublishingService:
         """Create the npm publish payload"""
         # Sanitize package name for filesystem (replace @ and / with -)
         safe_name = package.name.replace("@", "").replace("/", "-")
-        
+
         registry_url = self.target_repo_url.rstrip("/")
         if not registry_url.startswith("http"):
             registry_url = f"http://{registry_url}"
-            
+
         encoded_package_name = quote(package.name, safe="")
 
         return {

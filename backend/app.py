@@ -72,6 +72,7 @@ def health_check() -> Response:
 def wait_for_db(max_retries: int = 30, delay: int = 2) -> bool:
     """Wait for database to be ready"""
     import time
+
     from database.service import DatabaseService
 
     for attempt in range(max_retries):
@@ -79,7 +80,7 @@ def wait_for_db(max_retries: int = 30, delay: int = 2) -> bool:
             database_url = os.getenv("DATABASE_URL")
             if not database_url:
                 raise ValueError("DATABASE_URL environment variable is required")
-            
+
             db_service = DatabaseService(database_url)
             if db_service.test_connection():
                 logging.info("Database connection successful")
@@ -99,10 +100,10 @@ if __name__ == "__main__":
     wait_for_db()
 
     # Create database tables using pure SQLAlchemy
-    from database.service import DatabaseService
     from database.models import Base
+    from database.service import DatabaseService
     from sqlalchemy import create_engine
-    
+
     database_url = os.getenv("DATABASE_URL")
     if database_url:
         engine = create_engine(database_url)

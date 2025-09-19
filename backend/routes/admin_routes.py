@@ -1,12 +1,11 @@
 import logging
 
+from database.flask_utils import get_db_operations
 from database.models import AuditLog, Package, SupportedLicense
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from services.auth_service import AuthService
 from services.configuration_service import ConfigurationService
-
-from database.flask_utils import get_db_operations
 
 logger = logging.getLogger(__name__)
 

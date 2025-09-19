@@ -8,8 +8,8 @@ This service is used by both the API (for immediate processing) and workers (for
 import logging
 from typing import Any, Dict, List, Tuple
 
-from database.models import Package, PackageStatus, RequestPackage
 from database.flask_utils import get_db_operations
+from database.models import Package, PackageStatus, RequestPackage
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +20,11 @@ class PackageLockParsingService:
     def parse_package_lock(self, request_id: int, package_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Parse package-lock.json and extract all packages
-        
+
         Args:
             request_id: ID of the request this package-lock belongs to
             package_data: The parsed JSON data from package-lock.json
-            
+
         Returns:
             Dict with processing results
         """
@@ -81,7 +81,7 @@ class PackageLockParsingService:
     ) -> Tuple[List[Dict[str, Any]], List[Package]]:
         """
         Filter packages to find new ones that need processing
-        
+
         Returns:
             Tuple of (packages_to_process, existing_packages)
         """
@@ -99,10 +99,14 @@ class PackageLockParsingService:
 
             # Check if package already exists in database
             with get_db_operations() as ops:
-                existing_package = ops.query(Package).filter_by(
-                    name=package_name,
-                    version=package_version,
-                ).first()
+                existing_package = (
+                    ops.query(Package)
+                    .filter_by(
+                        name=package_name,
+                        version=package_version,
+                    )
+                    .first()
+                )
 
                 if existing_package:
                     # Link existing package to this request if not already linked
@@ -110,12 +114,14 @@ class PackageLockParsingService:
                     existing_packages.append(existing_package)
                 else:
                     # This is a new package that needs processing
-                    packages_to_process.append({
-                        "name": package_name,
-                        "version": package_version,
-                        "info": package_info,
-                        "request_id": request_id,
-                    })
+                    packages_to_process.append(
+                        {
+                            "name": package_name,
+                            "version": package_version,
+                            "info": package_info,
+                            "request_id": request_id,
+                        }
+                    )
 
         return packages_to_process, existing_packages
 
@@ -175,9 +181,9 @@ class PackageLockParsingService:
 
     def _link_existing_package_to_request(self, request_id: int, existing_package: Package, ops) -> None:
         """Link an existing package to a request if not already linked"""
-        existing_link = ops.query(RequestPackage).filter_by(
-            request_id=request_id, package_id=existing_package.id
-        ).first()
+        existing_link = (
+            ops.query(RequestPackage).filter_by(request_id=request_id, package_id=existing_package.id).first()
+        )
 
         if not existing_link:
             # Create link between request and existing package
@@ -192,7 +198,7 @@ class PackageLockParsingService:
     def _create_package_records(self, packages_to_process: List[Dict[str, Any]], request_id: int) -> List[Package]:
         """Create database records for new packages"""
         package_objects = []
-        
+
         for package_data in packages_to_process:
             package = self._create_package_object(
                 package_data["name"],
@@ -200,7 +206,7 @@ class PackageLockParsingService:
                 package_data["info"],
                 request_id,
             )
-            
+
             with get_db_operations() as ops:
                 ops.add(package)
                 ops.commit()  # Commit to get the package ID
@@ -214,11 +220,7 @@ class PackageLockParsingService:
                 ops.add(package_status)
 
                 # Create request-package link
-                request_package = RequestPackage(
-                    request_id=request_id, 
-                    package_id=package.id, 
-                    package_type="new"
-                )
+                request_package = RequestPackage(request_id=request_id, package_id=package.id, package_type="new")
                 ops.add(request_package)
                 ops.commit()
 

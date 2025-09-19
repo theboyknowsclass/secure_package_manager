@@ -3,13 +3,12 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, Union
 
+from database.flask_utils import get_db_operations
 from database.models import Package, PackageStatus, Request, RequestPackage, SecurityScan
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from services.auth_service import AuthService
 from services.trivy_service import TrivyService
-
-from database.flask_utils import get_db_operations
 
 logger = logging.getLogger(__name__)
 
@@ -284,8 +283,8 @@ def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
                         RequestPackage.package_id == package_id,
                         Request.requestor_id == request.user.id,
                     )
-                .first()
-            )
+                    .first()
+                )
 
             if not has_access:
                 return jsonify({"error": "Access denied"}), 403
@@ -333,8 +332,8 @@ def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
                         RequestPackage.package_id == package_id,
                         Request.requestor_id == request.user.id,
                     )
-                .first()
-            )
+                    .first()
+                )
 
             if not has_access:
                 return jsonify({"error": "Access denied"}), 403
@@ -385,8 +384,8 @@ def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
                         RequestPackage.package_id == package_id,
                         Request.requestor_id == request.user.id,
                     )
-                .first()
-            )
+                    .first()
+                )
 
             if not has_access:
                 return jsonify({"error": "Access denied"}), 403

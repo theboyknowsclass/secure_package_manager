@@ -1,12 +1,11 @@
 import logging
 
+from database.flask_utils import get_db_operations
 from database.models import AuditLog, Package, PackageStatus, Request, RequestPackage
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from services.auth_service import AuthService
 from services.npm_registry_publishing_service import NpmRegistryPublishingService
-
-from database.flask_utils import get_db_operations
 
 logger = logging.getLogger(__name__)
 
@@ -254,9 +253,7 @@ def get_validated_packages() -> ResponseReturnValue:
     """Get all packages ready for admin review (pending approval)"""
     try:
         with get_db_operations() as ops:
-            packages = (
-                ops.query(Package).join(PackageStatus).filter(PackageStatus.status == "Pending Approval").all()
-            )
+            packages = ops.query(Package).join(PackageStatus).filter(PackageStatus.status == "Pending Approval").all()
 
         # Handle case when no packages exist
         if not packages:

@@ -8,9 +8,8 @@ based on the states of individual packages within the request.
 import logging
 from typing import Any, Dict, List, Optional
 
-from database.models import Package, PackageStatus, Request, RequestPackage
-
 from database.flask_utils import get_db_operations
+from database.models import Package, PackageStatus, Request, RequestPackage
 
 logger = logging.getLogger(__name__)
 

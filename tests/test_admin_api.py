@@ -53,16 +53,12 @@ class AdminAPITester:
         print("\nTesting validated packages endpoint...")
         try:
             headers = {"Authorization": f"Bearer {self.token}"}
-            response = self.session.get(
-                f"{BASE_URL}/api/admin/packages/validated", headers=headers, timeout=10
-            )
+            response = self.session.get(f"{BASE_URL}/api/admin/packages/validated", headers=headers, timeout=10)
 
             if response.status_code == 200:
                 data = response.json()
                 packages = data.get("packages", [])
-                print(
-                    f"✅ Validated packages endpoint working - found {len(packages)} packages"
-                )
+                print(f"✅ Validated packages endpoint working - found {len(packages)} packages")
 
                 # Check if response has expected structure
                 if packages:
@@ -75,9 +71,7 @@ class AdminAPITester:
                         "license_score",
                         "license_identifier",
                     ]
-                    missing_fields = [
-                        field for field in required_fields if field not in first_pkg
-                    ]
+                    missing_fields = [field for field in required_fields if field not in first_pkg]
                     if missing_fields:
                         print(f"⚠️  Missing fields in package data: {missing_fields}")
                         return False
@@ -88,9 +82,7 @@ class AdminAPITester:
 
                 return True
             else:
-                print(
-                    f"❌ Validated packages endpoint failed: {response.status_code} - {response.text}"
-                )
+                print(f"❌ Validated packages endpoint failed: {response.status_code} - {response.text}")
                 return False
         except Exception as e:
             print(f"❌ Validated packages error: {str(e)}")
@@ -101,17 +93,13 @@ class AdminAPITester:
         print("\nTesting config endpoint...")
         try:
             headers = {"Authorization": f"Bearer {self.token}"}
-            response = self.session.get(
-                f"{BASE_URL}/api/admin/config", headers=headers, timeout=10
-            )
+            response = self.session.get(f"{BASE_URL}/api/admin/config", headers=headers, timeout=10)
 
             if response.status_code == 200:
                 data = response.json()
                 config = data.get("config", {})
                 status = data.get("status", {})
-                print(
-                    f"✅ Config endpoint working - config sections: {list(config.keys())}"
-                )
+                print(f"✅ Config endpoint working - config sections: {list(config.keys())}")
 
                 # Check if we have the expected config sections
                 expected_sections = {"repository", "services", "security", "trivy", "environment"}
@@ -130,9 +118,7 @@ class AdminAPITester:
 
                 return True
             else:
-                print(
-                    f"❌ Repository config endpoint failed: {response.status_code} - {response.text}"
-                )
+                print(f"❌ Repository config endpoint failed: {response.status_code} - {response.text}")
                 return False
         except Exception as e:
             print(f"❌ Repository config error: {str(e)}")
@@ -143,9 +129,7 @@ class AdminAPITester:
         print("\nTesting licenses endpoint...")
         try:
             headers = {"Authorization": f"Bearer {self.token}"}
-            response = self.session.get(
-                f"{BASE_URL}/api/admin/licenses", headers=headers, timeout=10
-            )
+            response = self.session.get(f"{BASE_URL}/api/admin/licenses", headers=headers, timeout=10)
 
             if response.status_code == 200:
                 data = response.json()
@@ -155,9 +139,7 @@ class AdminAPITester:
                 # Check if we have some expected licenses
                 if licenses:
                     expected_identifiers = {"MIT", "Apache-2.0", "GPL"}
-                    actual_identifiers = {
-                        license.get("identifier") for license in licenses
-                    }
+                    actual_identifiers = {license.get("identifier") for license in licenses}
                     if expected_identifiers.intersection(actual_identifiers):
                         print("✅ Licenses contain expected identifiers")
                     else:
@@ -167,14 +149,11 @@ class AdminAPITester:
 
                 return True
             else:
-                print(
-                    f"❌ Licenses endpoint failed: {response.status_code} - {response.text}"
-                )
+                print(f"❌ Licenses endpoint failed: {response.status_code} - {response.text}")
                 return False
         except Exception as e:
             print(f"❌ Licenses error: {str(e)}")
             return False
-
 
     def run_all_tests(self) -> bool:
         """Run all tests and return success status"""

@@ -112,6 +112,7 @@ class DatabaseService:
         try:
             with self.get_session() as session:
                 from sqlalchemy import text
+
                 session.execute(text("SELECT 1"))
             logger.info("Database connection test successful")
             return True

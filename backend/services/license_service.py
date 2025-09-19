@@ -2,9 +2,8 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from database.models import PackageStatus, SupportedLicense
-
 from database.flask_utils import get_db_operations
+from database.models import PackageStatus, SupportedLicense
 
 logger = logging.getLogger(__name__)
 

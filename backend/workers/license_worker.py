@@ -237,7 +237,9 @@ class LicenseWorker(BaseWorker):
             # Update failed packages status in batch
             if failed_packages:
                 failed_package_ids = [pkg.id for pkg, _ in failed_packages]
-                self.ops._get_session().query(PackageStatus).filter(PackageStatus.package_id.in_(failed_package_ids)).update(
+                self.ops._get_session().query(PackageStatus).filter(
+                    PackageStatus.package_id.in_(failed_package_ids)
+                ).update(
                     {
                         PackageStatus.status: "License Check Failed",
                         PackageStatus.updated_at: datetime.utcnow(),
@@ -357,7 +359,9 @@ class LicenseWorker(BaseWorker):
             # Update failed packages status in batch
             if failed_packages:
                 failed_package_ids = [pkg.id for pkg, _ in failed_packages]
-                self.ops._get_session().query(PackageStatus).filter(PackageStatus.package_id.in_(failed_package_ids)).update(
+                self.ops._get_session().query(PackageStatus).filter(
+                    PackageStatus.package_id.in_(failed_package_ids)
+                ).update(
                     {
                         PackageStatus.status: "License Check Failed",
                         PackageStatus.updated_at: datetime.utcnow(),
@@ -485,7 +489,13 @@ class LicenseWorker(BaseWorker):
                     "Licence Checked",
                     "License Check Failed",
                 ]:
-                    count = self.ops._get_session().query(Package).join(PackageStatus).filter(PackageStatus.status == status).count()
+                    count = (
+                        self.ops._get_session()
+                        .query(Package)
+                        .join(PackageStatus)
+                        .filter(PackageStatus.status == status)
+                        .count()
+                    )
                     status_counts[status] = count
 
                 return {
@@ -501,7 +511,8 @@ class LicenseWorker(BaseWorker):
         """Retry failed license check packages"""
         try:
             failed_packages = (
-                self.ops._get_session().query(Package)
+                self.ops._get_session()
+                .query(Package)
                 .join(PackageStatus)
                 .filter(PackageStatus.status == "License Check Failed")
                 .all()
@@ -536,7 +547,9 @@ class LicenseWorker(BaseWorker):
     def force_license_check(self, package_ids: List[int]) -> Dict[str, Any]:
         """Force license check for specific packages"""
         try:
-            packages = self.ops._get_session().query(Package).join(PackageStatus).filter(Package.id.in_(package_ids)).all()
+            packages = (
+                self.ops._get_session().query(Package).join(PackageStatus).filter(Package.id.in_(package_ids)).all()
+            )
 
             if not packages:
                 return {"message": "No packages found", "processed": 0}

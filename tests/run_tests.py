@@ -24,9 +24,7 @@ def run_tests():
     # Run admin API tests
     print("\n📋 Running Admin API Tests...")
     try:
-        result = subprocess.run(
-            [sys.executable, "tests/test_admin_api.py"], capture_output=False, text=True
-        )
+        result = subprocess.run([sys.executable, "tests/test_admin_api.py"], capture_output=False, text=True)
         if result.returncode != 0:
             all_passed = False
     except Exception as e:

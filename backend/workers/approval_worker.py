@@ -110,11 +110,17 @@ class ApprovalWorker(BaseWorker):
             with self.db_service.get_session() as session:
                 # Count packages by status
                 security_scanned_count = (
-                    session.query(Package).join(PackageStatus).filter(PackageStatus.status == "Security Scanned").count()
+                    session.query(Package)
+                    .join(PackageStatus)
+                    .filter(PackageStatus.status == "Security Scanned")
+                    .count()
                 )
 
                 pending_approval_count = (
-                    session.query(Package).join(PackageStatus).filter(PackageStatus.status == "Pending Approval").count()
+                    session.query(Package)
+                    .join(PackageStatus)
+                    .filter(PackageStatus.status == "Pending Approval")
+                    .count()
                 )
 
                 approved_count = (

@@ -10,9 +10,8 @@ from config.constants import (
     TRIVY_TIMEOUT,
     TRIVY_URL,
 )
-from database.models import Package, SecurityScan
-
 from database.flask_utils import get_db_operations
+from database.models import Package, SecurityScan
 
 logger = logging.getLogger(__name__)
 

@@ -9,9 +9,8 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from database.models import PackageStatus
-
 from database.flask_utils import get_db_operations
+from database.models import PackageStatus
 
 logger = logging.getLogger(__name__)
 
