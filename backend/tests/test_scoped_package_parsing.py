@@ -6,9 +6,10 @@ from package-lock.json paths, with special focus on scoped packages.
 
 import os
 import sys
+from unittest.mock import Mock
 
 import pytest
-from services.package_service import PackageService
+from services.package_lock_parsing_service import PackageLockParsingService
 
 # Add the backend directory to the Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -19,7 +20,10 @@ class TestScopedPackageParsing:
 
     def setup_method(self):
         """Set up test fixtures."""
-        self.package_service = PackageService()
+        self.package_service = PackageLockParsingService()
+        # Mock the operations that the service needs
+        self.package_service._package_ops = Mock()
+        self.package_service._package_ops.get_by_name_version.return_value = None
 
     def test_extract_regular_package_name(self):
         """Test extraction of regular (non-scoped) package names."""
@@ -278,7 +282,10 @@ class TestPackageLockProcessing:
 
     def setup_method(self):
         """Set up test fixtures."""
-        self.package_service = PackageService()
+        self.package_service = PackageLockParsingService()
+        # Mock the operations that the service needs
+        self.package_service._package_ops = Mock()
+        self.package_service._package_ops.get_by_name_version.return_value = None
 
     def test_process_scoped_package_lock(self):
         """Test processing a package-lock.json with scoped packages."""

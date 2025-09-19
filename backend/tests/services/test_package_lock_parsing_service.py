@@ -8,9 +8,13 @@ tests faster and more focused.
 
 import json
 import os
+import sys
 import unittest
 from typing import Any, Dict
 from unittest.mock import MagicMock, Mock
+
+# Add the backend directory to the Python path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from services.package_lock_parsing_service import (
     PackageLockParsingService,
@@ -38,12 +42,9 @@ class TestPackageLockParsingService(unittest.TestCase):
         self.service = PackageLockParsingService()
         self.mock_ops = self._create_mock_operations()
 
-    def _create_mock_operations(self) -> Dict[str, Any]:
+    def _create_mock_operations(self) -> Mock:
         """Create mock operations for testing."""
-        mock_ops = {
-            "package": Mock(),
-            "request_package": Mock(),
-        }
+        mock_ops = Mock()
 
         # Mock package operations
         mock_ops.package.get_by_name_version.return_value = (

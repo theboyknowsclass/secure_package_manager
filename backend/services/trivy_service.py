@@ -349,6 +349,88 @@ class TrivyService:
                 },
             }
 
+    def _parse_trivy_results(
+        self, trivy_response: Dict, package: Package
+    ) -> tuple[list, dict]:
+        """Parse Trivy JSON response to extract vulnerabilities and summary.
+
+        Args:
+            trivy_response: Raw JSON response from Trivy
+            package: Package object being scanned
+
+        Returns:
+            Tuple of (vulnerabilities_list, summary_dict)
+        """
+        try:
+            vulnerabilities = []
+            summary = {
+                "total": 0,
+                "critical": 0,
+                "high": 0,
+                "medium": 0,
+                "low": 0,
+                "info": 0,
+            }
+
+            # Trivy JSON structure: {"Results": [{"Target": "...", "Vulnerabilities": [...]}]}
+            results = trivy_response.get("Results", [])
+            
+            for result in results:
+                target = result.get("Target", "")
+                vulns = result.get("Vulnerabilities", [])
+                
+                for vuln in vulns:
+                    # Extract vulnerability information
+                    vulnerability = {
+                        "vulnerability_id": vuln.get("VulnerabilityID", ""),
+                        "pkg_name": vuln.get("PkgName", ""),
+                        "pkg_version": vuln.get("InstalledVersion", ""),
+                        "severity": vuln.get("Severity", "").lower(),
+                        "title": vuln.get("Title", ""),
+                        "description": vuln.get("Description", ""),
+                        "references": vuln.get("References", []),
+                        "target": target,
+                        "package_name": package.name,
+                        "package_version": package.version,
+                    }
+                    
+                    # Add CVSS scores if available
+                    if "CVSS" in vuln:
+                        cvss_data = vuln["CVSS"]
+                        vulnerability["cvss_score"] = cvss_data.get("nvd", {}).get("V3Score", 0)
+                        vulnerability["cvss_vector"] = cvss_data.get("nvd", {}).get("V3Vector", "")
+                    
+                    vulnerabilities.append(vulnerability)
+                    
+                    # Count by severity
+                    severity = vuln.get("Severity", "").upper()
+                    if severity == "CRITICAL":
+                        summary["critical"] += 1
+                    elif severity == "HIGH":
+                        summary["high"] += 1
+                    elif severity == "MEDIUM":
+                        summary["medium"] += 1
+                    elif severity == "LOW":
+                        summary["low"] += 1
+                    elif severity == "INFO":
+                        summary["info"] += 1
+                    
+                    summary["total"] += 1
+
+            return vulnerabilities, summary
+
+        except Exception as e:
+            logger.error(f"Error parsing Trivy results: {str(e)}")
+            # Return empty results on parsing error
+            return [], {
+                "total": 0,
+                "critical": 0,
+                "high": 0,
+                "medium": 0,
+                "low": 0,
+                "info": 0,
+            }
+
     def _get_trivy_version(self) -> str:
         """Get Trivy version from the binary.
 

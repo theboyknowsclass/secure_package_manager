@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 
 from database.models import Package, SupportedLicense
 from services.license_service import LicenseService
-from services.package_service import PackageService
+from services.package_lock_parsing_service import PackageLockParsingService
 
 # Add the parent directory to the path so we can import modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -23,7 +23,7 @@ class TestLicenseIntegration(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.license_service = LicenseService()
-        self.package_service = PackageService()
+        self.package_service = LicenseService()
 
         # Mock database models
         self.mock_package = Mock(spec=Package)
@@ -53,7 +53,7 @@ class TestLicenseIntegration(unittest.TestCase):
             self.package_service.license_service = self.license_service
 
             # Test the license validation method
-            result = self.package_service._validate_package_license(
+            result = self.package_service.validate_package_license(
                 self.mock_package
             )
 
@@ -67,7 +67,7 @@ class TestLicenseIntegration(unittest.TestCase):
 
         with patch.object(
             self.package_service,
-            "_validate_package_license",
+            "validate_package_license",
             return_value=mock_validation_result,
         ):
             with patch.object(
@@ -115,7 +115,7 @@ class TestLicenseIntegration(unittest.TestCase):
         ):
             self.package_service.license_service = self.license_service
 
-            result = self.package_service._validate_package_license(
+            result = self.package_service.validate_package_license(
                 self.mock_package
             )
 
@@ -133,7 +133,7 @@ class TestLicenseIntegration(unittest.TestCase):
         ):
             self.package_service.license_service = self.license_service
 
-            result = self.package_service._validate_package_license(
+            result = self.package_service.validate_package_license(
                 self.mock_package
             )
 
@@ -153,7 +153,7 @@ class TestLicenseIntegration(unittest.TestCase):
 
         with patch.object(
             self.package_service,
-            "_validate_package_license",
+            "validate_package_license",
             return_value=mock_validation_result,
         ):
             with patch.object(
@@ -200,7 +200,7 @@ class TestLicenseIntegration(unittest.TestCase):
         ):
             self.package_service.license_service = self.license_service
 
-            result = self.package_service._validate_package_license(
+            result = self.package_service.validate_package_license(
                 self.mock_package
             )
 
@@ -228,7 +228,7 @@ class TestLicenseIntegration(unittest.TestCase):
         ):
             self.package_service.license_service = self.license_service
 
-            result = self.package_service._validate_package_license(
+            result = self.package_service.validate_package_license(
                 self.mock_package
             )
 

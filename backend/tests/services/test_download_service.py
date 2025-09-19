@@ -1,12 +1,12 @@
 """Tests for DownloadService."""
 
 import os
+import sys
 import unittest
 from unittest.mock import Mock, patch
 
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+# Add the backend directory to the Python path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from services.download_service import DownloadService
 

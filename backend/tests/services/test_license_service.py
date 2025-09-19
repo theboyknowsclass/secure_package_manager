@@ -3,9 +3,14 @@
 Tests the business logic of license validation and management.
 """
 
+import os
+import sys
 import unittest
 from datetime import datetime
 from unittest.mock import MagicMock, Mock
+
+# Add the backend directory to the Python path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from services.license_service import LicenseService
 
@@ -20,11 +25,8 @@ class TestLicenseService(unittest.TestCase):
 
     def _create_mock_operations(self):
         """Create mock database operations."""
-        mock_ops = {
-            "supported_license": Mock(),
-            "package_status": Mock(),
-        }
-
+        mock_ops = Mock()
+        
         # Mock supported license operations
         mock_license = Mock()
         mock_license.name = "MIT"

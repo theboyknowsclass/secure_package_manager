@@ -575,37 +575,37 @@ class TestLicenseService(unittest.TestCase):
     def test_parse_license_expression(self):
         """Test parsing of license expressions."""
         # OR expression
-        licenses = self.license_service._parse_license_expression(
+        licenses = self.license_service._extract_individual_licenses(
             "MIT OR Apache-2.0"
         )
         self.assertEqual(licenses, ["MIT", "Apache-2.0"])
 
         # AND expression
-        licenses = self.license_service._parse_license_expression(
+        licenses = self.license_service._extract_individual_licenses(
             "MIT AND GPL-3.0"
         )
         self.assertEqual(licenses, ["MIT", "GPL-3.0"])
 
         # With parentheses
-        licenses = self.license_service._parse_license_expression(
+        licenses = self.license_service._extract_individual_licenses(
             "(MIT OR CC0-1.0)"
         )
         self.assertEqual(licenses, ["MIT", "CC0-1.0"])
 
         # Alternative syntax
-        licenses = self.license_service._parse_license_expression(
+        licenses = self.license_service._extract_individual_licenses(
             "MIT | Apache-2.0"
         )
         self.assertEqual(licenses, ["MIT", "Apache-2.0"])
 
         # Multiple OR
-        licenses = self.license_service._parse_license_expression(
+        licenses = self.license_service._extract_individual_licenses(
             "MIT OR CC0-1.0 OR Apache-2.0"
         )
         self.assertEqual(licenses, ["MIT", "CC0-1.0", "Apache-2.0"])
 
         # Single license
-        licenses = self.license_service._parse_license_expression("MIT")
+        licenses = self.license_service._extract_individual_licenses("MIT")
         self.assertEqual(licenses, ["MIT"])
 
     def test_validation_error_handling(self):
