@@ -127,35 +127,35 @@ class DownloadService:
         try:
             # Check if package is already downloaded
             if self._is_package_already_downloaded(package):
-                self._mark_package_downloaded(package)
+                self._mark_package_downloaded_with_session(package)
                 return {"success": True, "message": "Already downloaded"}
 
-            # Mark package as downloading
-            self._mark_package_downloading(package)
+            # Mark package as downloading with separate session
+            self._mark_package_downloading_with_session(package)
 
-            # Perform the actual download
+            # Perform the actual download (no database operations here)
             download_success = self._perform_download(package)
 
             if download_success:
                 # Double-check that the package is actually in the cache before marking as downloaded
                 if self._is_package_already_downloaded(package):
-                    self._mark_package_downloaded(package)
+                    self._mark_package_downloaded_with_session(package)
                     return {"success": True, "message": "Download completed"}
                 else:
                     self.logger.error(
                         f"Download reported success but package not found in cache: {package.name}@{package.version}"
                     )
-                    self._mark_package_download_failed(package)
+                    self._mark_package_download_failed_with_session(package)
                     return {"success": False, "error": "Download completed but file not found in cache"}
             else:
-                self._mark_package_download_failed(package)
+                self._mark_package_download_failed_with_session(package)
                 return {"success": False, "error": "Download failed"}
 
         except Exception as e:
             self.logger.error(
                 f"Error processing package {package.name}@{package.version}: {str(e)}"
             )
-            self._mark_package_download_failed(package)
+            self._mark_package_download_failed_with_session(package)
             return {"success": False, "error": str(e)}
 
     def _is_package_already_downloaded(self, package: Any) -> bool:
@@ -285,7 +285,13 @@ class DownloadService:
         """
         try:
             if package.package_status:
-                self._status_ops.go_to_next_stage(package.id)
+                old_status = package.package_status.status
+                # Set status directly to "Downloaded" instead of going through "Downloading"
+                success = self._status_ops.update_status(package.id, "Downloaded")
+                if success:
+                    self.logger.info(f"Marked package {package.name}@{package.version} as downloaded (was {old_status})")
+                else:
+                    self.logger.error(f"Failed to mark package {package.name}@{package.version} as downloaded (was {old_status})")
             else:
                 self.logger.warning(f"Package {package.name}@{package.version} has no package_status")
         except Exception as e:
@@ -299,3 +305,69 @@ class DownloadService:
         """
         if package.package_status:
             self._status_ops.update_status(package.id, "Download Failed")
+
+    def _mark_package_downloading_with_session(self, package: Any) -> None:
+        """Mark package as downloading using a separate database session.
+
+        Args:
+            package: Package to update
+        """
+        try:
+            with SessionHelper.get_session() as db:
+                status_ops = PackageStatusOperations(db.session)
+                if package.package_status:
+                    old_status = package.package_status.status
+                    success = status_ops.update_status(package.id, "Downloading")
+                    if success:
+                        db.commit()
+                        self.logger.info(f"Marked package {package.name}@{package.version} as downloading (was {old_status})")
+                    else:
+                        self.logger.error(f"Failed to mark package {package.name}@{package.version} as downloading (was {old_status})")
+                else:
+                    self.logger.warning(f"Package {package.name}@{package.version} has no package_status")
+        except Exception as e:
+            self.logger.error(f"Error updating status for package {package.name}@{package.version}: {str(e)}")
+
+    def _mark_package_downloaded_with_session(self, package: Any) -> None:
+        """Mark package as downloaded using a separate database session.
+
+        Args:
+            package: Package to update
+        """
+        try:
+            with SessionHelper.get_session() as db:
+                status_ops = PackageStatusOperations(db.session)
+                if package.package_status:
+                    old_status = package.package_status.status
+                    success = status_ops.update_status(package.id, "Downloaded")
+                    if success:
+                        db.commit()
+                        self.logger.info(f"Marked package {package.name}@{package.version} as downloaded (was {old_status})")
+                    else:
+                        self.logger.error(f"Failed to mark package {package.name}@{package.version} as downloaded (was {old_status})")
+                else:
+                    self.logger.warning(f"Package {package.name}@{package.version} has no package_status")
+        except Exception as e:
+            self.logger.error(f"Error updating status for package {package.name}@{package.version}: {str(e)}")
+
+    def _mark_package_download_failed_with_session(self, package: Any) -> None:
+        """Mark package as download failed using a separate database session.
+
+        Args:
+            package: Package to update
+        """
+        try:
+            with SessionHelper.get_session() as db:
+                status_ops = PackageStatusOperations(db.session)
+                if package.package_status:
+                    old_status = package.package_status.status
+                    success = status_ops.update_status(package.id, "Download Failed")
+                    if success:
+                        db.commit()
+                        self.logger.info(f"Marked package {package.name}@{package.version} as download failed (was {old_status})")
+                    else:
+                        self.logger.error(f"Failed to mark package {package.name}@{package.version} as download failed (was {old_status})")
+                else:
+                    self.logger.warning(f"Package {package.name}@{package.version} has no package_status")
+        except Exception as e:
+            self.logger.error(f"Error updating status for package {package.name}@{package.version}: {str(e)}")

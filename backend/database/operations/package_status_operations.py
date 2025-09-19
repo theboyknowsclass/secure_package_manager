@@ -44,6 +44,7 @@ class PackageStatusOperations(BaseOperations):
         if not status:
             return False
 
+        old_status = status.status
         status.status = new_status
         status.updated_at = datetime.utcnow()
 
