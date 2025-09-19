@@ -1,25 +1,31 @@
 """Download Worker.
 
 Transitions packages from Licence Checked to Downloaded (via
-Downloading).
+Downloading) using entity-based operations and delegates business logic to services while maintaining logging and coordination.
 """
 
 import logging
 import os
 from datetime import datetime, timedelta
+from typing import Any, Dict, List
 
-from database.models import Package, PackageStatus
 from database.operations import OperationsFactory
 from database.service import DatabaseService
-from services.download_service import DownloadService
-from services.queue_interface import QueueInterface
+from services.download_processing_service import DownloadProcessingService
 from workers.base_worker import BaseWorker
 
 logger = logging.getLogger(__name__)
 
 
 class DownloadWorker(BaseWorker):
-    """Background worker for downloading packages."""
+    """Background worker for downloading packages.
+
+    This worker coordinates the download process by:
+    1. Finding packages that need downloading
+    2. Handling stuck packages
+    3. Delegating download logic to DownloadProcessingService
+    4. Handling results and logging progress
+    """
 
     WORKER_TYPE = "download_worker"
 
@@ -30,16 +36,15 @@ class DownloadWorker(BaseWorker):
 
     def __init__(self, sleep_interval: int = 10):
         super().__init__("DownloadWorker", sleep_interval)
+        self.download_service = None
+        self.db_service = None
         self.max_packages_per_cycle = 10
         self.stuck_package_timeout = timedelta(minutes=30)
-        self.download_service: DownloadService | None = None
-        self.db_service = None
-        self.ops = None
-        self.queue = QueueInterface()
 
     def initialize(self) -> None:
-        logger.info("Initializing DownloadWorker...")
-        self.download_service = DownloadService()
+        """Initialize services."""
+        logger.info("Initializing DownloadWorker services...")
+        self.download_service = DownloadProcessingService()
 
         # Initialize database service
         database_url = os.getenv("DATABASE_URL")
@@ -47,96 +52,71 @@ class DownloadWorker(BaseWorker):
             raise ValueError("DATABASE_URL environment variable is required")
 
         self.db_service = DatabaseService(database_url)
+        logger.info("DownloadWorker services initialized")
 
     def process_cycle(self) -> None:
+        """Process one cycle of downloading."""
         try:
             with self.db_service.get_session() as session:
-                self.ops = OperationsFactory.create_all_operations(session)
-                self._handle_stuck_packages()
-                self._process_ready_packages()
+                ops = OperationsFactory.create_all_operations(session)
+
+                # Handle stuck packages first
+                self._handle_stuck_packages(ops)
+
+                # Find packages that need downloading
+                ready_packages = ops["package"].get_by_status("Licence Checked")
+                
+                # Limit the number of packages processed per cycle
+                limited_packages = ready_packages[:self.max_packages_per_cycle]
+
+                if not limited_packages:
+                    logger.info(
+                        "DownloadWorker heartbeat: No packages found for downloading"
+                    )
+                    return
+
+                logger.info(f"Downloading {len(limited_packages)} packages")
+
+                # Process packages using the service
+                result = self.download_service.process_package_batch(
+                    limited_packages, ops
+                )
+
+                if result["success"]:
+                    logger.info(
+                        f"Download complete: {result['successful_downloads']} successful, "
+                        f"{result['failed_downloads']} failed"
+                    )
+                else:
+                    logger.error(
+                        f"Error in download batch: {result['error']}"
+                    )
+
+                # Commit the session
+                session.commit()
+
         except Exception as e:
             logger.error(f"Download cycle error: {str(e)}", exc_info=True)
 
-    def _handle_stuck_packages(self) -> None:
+    def _handle_stuck_packages(self, ops: Dict[str, Any]) -> None:
+        """Handle packages that have been stuck in Downloading state too long."""
         try:
             stuck_threshold = datetime.utcnow() - self.stuck_package_timeout
-            stuck_statuses = ["Downloading"]
-            stuck_packages = self.ops["package"].get_packages_by_statuses(
-                stuck_statuses
+            stuck_packages = self.download_service.get_stuck_packages(
+                stuck_threshold, ops
             )
-            stuck_packages = [
-                p
-                for p in stuck_packages
-                if p.package_status
-                and p.package_status.updated_at < stuck_threshold
-            ]
 
-            if not stuck_packages:
-                return
-            logger.warning(
-                f"Found {len(stuck_packages)} stuck downloads; resetting to Licence Checked"
-            )
-            for package in stuck_packages:
-                if package.package_status:
-                    self.ops["package_status"].update_package_status(
-                        package.id, "Licence Checked"
-                    )
-        except Exception:
-            logger.exception("Error handling stuck downloads")
-
-    def _process_ready_packages(self) -> None:
-        packages = self.ops["package"].get_packages_by_status(
-            "Licence Checked"
-        )
-        packages = packages[: self.max_packages_per_cycle]
-
-        if not packages:
-            logger.info(
-                "DownloadWorker heartbeat: No packages found for downloading"
-            )
-            return
-
-        logger.info(f"Downloading {len(packages)} packages")
-        for package in packages:
-            try:
-                self._download_single(package)
-            except Exception as e:
-                logger.error(
-                    f"Download failed for {package.name}@{package.version}: {str(e)}",
-                    exc_info=True,
+            if stuck_packages:
+                logger.warning(
+                    f"Found {len(stuck_packages)} stuck downloads; resetting to Licence Checked"
                 )
-                self._mark_failed(package)
+                self.download_service.reset_stuck_packages(stuck_packages, ops)
 
-    def _download_single(self, package: Package) -> None:
-        if not self.download_service or not package.package_status:
-            return
-
-        # Already downloaded
-        if self.download_service.is_package_downloaded(package):
-            self.ops["package_status"].update_package_status(
-                package.id, "Downloaded"
+        except Exception as e:
+            logger.error(
+                f"Error handling stuck packages: {str(e)}", exc_info=True
             )
-            return
 
-        # Mark downloading
-        self.ops["package_status"].update_package_status(
-            package.id, "Downloading"
-        )
-
-        if not self.download_service.download_package(package):
-            raise RuntimeError("download failed")
-
-        self.ops["package_status"].update_package_status(
-            package.id, "Downloaded"
-        )
-
-    def _mark_failed(self, package: Package) -> None:
-        try:
-            if package.package_status:
-                self.ops["package_status"].update_package_status(
-                    package.id, "Rejected"
-                )
-        except Exception:
-            logger.exception(
-                "Error marking package as rejected in DownloadWorker"
-            )
+    def get_required_env_vars(self) -> List[str]:
+        """Get list of required environment variables."""
+        return ["DATABASE_URL", "SOURCE_REPOSITORY_URL"]

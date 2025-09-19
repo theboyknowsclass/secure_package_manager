@@ -127,3 +127,109 @@ class PackageStatusOperations(BaseOperations):
             List of all package statuses
         """
         return super().get_all(PackageStatus)
+
+    def update_package_publish_status(self, package_id: int, publish_status: str) -> bool:
+        """Update package publish status.
+
+        Args:
+            package_id: The ID of the package
+            publish_status: The new publish status
+
+        Returns:
+            True if update was successful, False otherwise
+        """
+        status = self.get_by_package_id(package_id)
+        if not status:
+            return False
+
+        status.publish_status = publish_status
+        status.updated_at = datetime.utcnow()
+        return True
+
+    def mark_package_published(self, package_id: int) -> bool:
+        """Mark package as published successfully.
+
+        Args:
+            package_id: The ID of the package
+
+        Returns:
+            True if update was successful, False otherwise
+        """
+        status = self.get_by_package_id(package_id)
+        if not status:
+            return False
+
+        status.publish_status = "published"
+        status.published_at = datetime.utcnow()
+        status.updated_at = datetime.utcnow()
+        return True
+
+    def mark_package_publish_failed(self, package_id: int, error_message: str) -> bool:
+        """Mark package as publish failed.
+
+        Args:
+            package_id: The ID of the package
+            error_message: Error message
+
+        Returns:
+            True if update was successful, False otherwise
+        """
+        status = self.get_by_package_id(package_id)
+        if not status:
+            return False
+
+        status.publish_status = "failed"
+        status.updated_at = datetime.utcnow()
+        return True
+
+    def refresh_package_timestamp(self, package_id: int) -> bool:
+        """Refresh package timestamp to avoid constant reprocessing.
+
+        Args:
+            package_id: The ID of the package
+
+        Returns:
+            True if update was successful, False otherwise
+        """
+        status = self.get_by_package_id(package_id)
+        if not status:
+            return False
+
+        status.updated_at = datetime.utcnow()
+        return True
+
+    def update_security_scan_status(self, package_id: int, scan_status: str) -> bool:
+        """Update package security scan status.
+
+        Args:
+            package_id: The ID of the package
+            scan_status: The new security scan status
+
+        Returns:
+            True if update was successful, False otherwise
+        """
+        status = self.get_by_package_id(package_id)
+        if not status:
+            return False
+
+        status.security_scan_status = scan_status
+        status.updated_at = datetime.utcnow()
+        return True
+
+    def update_security_score(self, package_id: int, security_score: float) -> bool:
+        """Update package security score.
+
+        Args:
+            package_id: The ID of the package
+            security_score: The new security score
+
+        Returns:
+            True if update was successful, False otherwise
+        """
+        status = self.get_by_package_id(package_id)
+        if not status:
+            return False
+
+        status.security_score = security_score
+        status.updated_at = datetime.utcnow()
+        return True

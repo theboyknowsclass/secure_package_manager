@@ -156,3 +156,195 @@ class PackageOperations(BaseOperations):
             The package if found, None otherwise
         """
         return super().get_by_id(Package, package_id)
+
+    def get_packages_needing_publishing(self, limit: int = 3) -> List[Package]:
+        """Get packages that need publishing.
+
+        Args:
+            limit: Maximum number of packages to return
+
+        Returns:
+            List of packages that need publishing
+        """
+        stmt = (
+            select(Package)
+            .join(PackageStatus)
+            .where(
+                and_(
+                    PackageStatus.status == "Approved",
+                    PackageStatus.publish_status == "pending"
+                )
+            )
+            .limit(limit)
+        )
+        return list(self.session.execute(stmt).scalars().all())
+
+    def get_stuck_packages_in_publishing(self, stuck_threshold) -> List[Package]:
+        """Get packages stuck in publishing state.
+
+        Args:
+            stuck_threshold: DateTime threshold for considering packages stuck
+
+        Returns:
+            List of stuck packages
+        """
+        stmt = (
+            select(Package)
+            .join(PackageStatus)
+            .where(
+                and_(
+                    PackageStatus.publish_status.in_(["publishing", "failed"]),
+                    PackageStatus.updated_at < stuck_threshold
+                )
+            )
+        )
+        return list(self.session.execute(stmt).scalars().all())
+
+    def get_packages_by_publish_status(self, publish_status: str) -> List[Package]:
+        """Get packages by publish status.
+
+        Args:
+            publish_status: The publish status to filter by
+
+        Returns:
+            List of packages with the specified publish status
+        """
+        stmt = (
+            select(Package)
+            .join(PackageStatus)
+            .where(PackageStatus.publish_status == publish_status)
+        )
+        return list(self.session.execute(stmt).scalars().all())
+
+    def count_packages_by_publish_status(self, publish_status: str) -> int:
+        """Count packages by publish status.
+
+        Args:
+            publish_status: The publish status to count
+
+        Returns:
+            Number of packages with the specified publish status
+        """
+        stmt = (
+            select(Package)
+            .join(PackageStatus)
+            .where(PackageStatus.publish_status == publish_status)
+        )
+        return self.session.execute(stmt).scalars().count()
+
+    def count_packages_by_status(self, status: str) -> int:
+        """Count packages by status.
+
+        Args:
+            status: The status to count
+
+        Returns:
+            Number of packages with the specified status
+        """
+        stmt = (
+            select(Package)
+            .join(PackageStatus)
+            .where(PackageStatus.status == status)
+        )
+        return self.session.execute(stmt).scalars().count()
+
+    def get_stuck_packages_in_security_scanned(self, stuck_threshold) -> List[Package]:
+        """Get packages stuck in Security Scanned state.
+
+        Args:
+            stuck_threshold: DateTime threshold for considering packages stuck
+
+        Returns:
+            List of stuck packages
+        """
+        stmt = (
+            select(Package)
+            .join(PackageStatus)
+            .where(
+                and_(
+                    PackageStatus.status == "Security Scanned",
+                    PackageStatus.updated_at < stuck_threshold
+                )
+            )
+        )
+        return list(self.session.execute(stmt).scalars().all())
+
+    def get_stuck_packages_in_security_scanning(self, stuck_threshold) -> List[Package]:
+        """Get packages stuck in Security Scanning state.
+
+        Args:
+            stuck_threshold: DateTime threshold for considering packages stuck
+
+        Returns:
+            List of stuck packages
+        """
+        stmt = (
+            select(Package)
+            .join(PackageStatus)
+            .where(
+                and_(
+                    PackageStatus.status == "Security Scanning",
+                    PackageStatus.updated_at < stuck_threshold
+                )
+            )
+        )
+        return list(self.session.execute(stmt).scalars().all())
+
+    def get_stuck_packages_in_downloading(self, stuck_threshold) -> List[Package]:
+        """Get packages stuck in Downloading state.
+
+        Args:
+            stuck_threshold: DateTime threshold for considering packages stuck
+
+        Returns:
+            List of stuck packages
+        """
+        stmt = (
+            select(Package)
+            .join(PackageStatus)
+            .where(
+                and_(
+                    PackageStatus.status == "Downloading",
+                    PackageStatus.updated_at < stuck_threshold
+                )
+            )
+        )
+        return list(self.session.execute(stmt).scalars().all())
+
+    def get_packages_needing_license_check(self, limit: int = 50) -> List[Package]:
+        """Get packages that need license checking.
+
+        Args:
+            limit: Maximum number of packages to return
+
+        Returns:
+            List of packages that need license checking
+        """
+        stmt = (
+            select(Package)
+            .join(PackageStatus)
+            .where(PackageStatus.status == "Checking Licence")
+            .limit(limit)
+        )
+        return list(self.session.execute(stmt).scalars().all())
+
+    def get_stuck_packages_in_license_checking(self, stuck_threshold) -> List[Package]:
+        """Get packages stuck in license checking state.
+
+        Args:
+            stuck_threshold: DateTime threshold for considering packages stuck
+
+        Returns:
+            List of stuck packages in license checking
+        """
+        stmt = (
+            select(Package)
+            .join(PackageStatus)
+            .where(
+                and_(
+                    PackageStatus.status == "Checking Licence",
+                    PackageStatus.updated_at < stuck_threshold
+                )
+            )
+        )
+        return list(self.session.execute(stmt).scalars().all())
