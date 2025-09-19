@@ -46,16 +46,16 @@ class TestPackageLockParsingService(unittest.TestCase):
         }
 
         # Mock package operations
-        mock_ops["package"].get_by_name_version.return_value = (
+        mock_ops.package.get_by_name_version.return_value = (
             None  # No existing packages
         )
-        mock_ops["package"].create_with_status.return_value = Mock(
+        mock_ops.package.create_with_status.return_value = Mock(
             id=1, name="test", version="1.0.0"
         )
 
         # Mock request_package operations
-        mock_ops["request_package"].link_exists.return_value = False
-        mock_ops["request_package"].create_link.return_value = Mock()
+        mock_ops.request_package.link_exists.return_value = False
+        mock_ops.request_package.create_link.return_value = Mock()
 
         return mock_ops
 
@@ -144,9 +144,9 @@ class TestPackageLockParsingService(unittest.TestCase):
         self.assertEqual(result["total_packages"], 1)
 
         # Verify that package operations were called
-        self.mock_ops["package"].get_by_name_version.assert_called()
-        self.mock_ops["package"].create_with_status.assert_called()
-        self.mock_ops["request_package"].create_link.assert_called()
+        self.mock_ops.package.get_by_name_version.assert_called()
+        self.mock_ops.package.create_with_status.assert_called()
+        self.mock_ops.request_package.create_link.assert_called()
 
     def test_parse_package_lock_with_existing_packages(self):
         """Test parsing with existing packages."""
@@ -154,7 +154,7 @@ class TestPackageLockParsingService(unittest.TestCase):
 
         # Mock existing package
         existing_package = Mock(id=1, name="lodash", version="4.17.21")
-        self.mock_ops["package"].get_by_name_version.return_value = (
+        self.mock_ops.package.get_by_name_version.return_value = (
             existing_package
         )
 
@@ -168,7 +168,7 @@ class TestPackageLockParsingService(unittest.TestCase):
         self.assertEqual(result["total_packages"], 1)
 
         # Verify that link was created for existing package
-        self.mock_ops["request_package"].create_link.assert_called_with(
+        self.mock_ops.request_package.create_link.assert_called_with(
             1, 1, "existing"
         )
 

@@ -29,12 +29,12 @@ class TestLicenseService(unittest.TestCase):
         mock_license = Mock()
         mock_license.name = "MIT"
         mock_license.tier = "Approved"
-        mock_ops["supported_license"].get_by_name.return_value = mock_license
-        mock_ops["supported_license"].get_all.return_value = [mock_license]
+        mock_ops.supported_license.get_by_name.return_value = mock_license
+        mock_ops.supported_license.get_all.return_value = [mock_license]
 
         # Mock package status operations
-        mock_ops["package_status"].PackageStatus = Mock()
-        mock_ops["package_status"].update_package_status.return_value = None
+        mock_ops.package_status.PackageStatus = Mock()
+        mock_ops.package_status.update_package_status.return_value = None
 
         return mock_ops
 
@@ -81,7 +81,7 @@ class TestLicenseService(unittest.TestCase):
         }
 
         # Mock unknown license
-        self.mock_ops["supported_license"].get_by_name.return_value = None
+        self.mock_ops.supported_license.get_by_name.return_value = None
 
         result = self.service.validate_package_license(
             package_data, self.mock_ops
@@ -118,7 +118,7 @@ class TestLicenseService(unittest.TestCase):
                 return apache_license
             return None
 
-        self.mock_ops["supported_license"].get_by_name.side_effect = (
+        self.mock_ops.supported_license.get_by_name.side_effect = (
             mock_get_by_name
         )
 
@@ -189,7 +189,7 @@ class TestLicenseService(unittest.TestCase):
 
         # Verify package status updates were called
         self.assertEqual(
-            self.mock_ops["package_status"].update_package_status.call_count, 2
+            self.mock_ops.package_status.update_package_status.call_count, 2
         )
 
     def test_process_license_group_failure(self):
@@ -204,7 +204,7 @@ class TestLicenseService(unittest.TestCase):
         packages = [package]
 
         # Mock unknown license
-        self.mock_ops["supported_license"].get_by_name.return_value = None
+        self.mock_ops.supported_license.get_by_name.return_value = None
 
         successful, failed = self.service.process_license_group(
             "Invalid-License", packages, self.mock_ops
@@ -264,7 +264,7 @@ class TestLicenseService(unittest.TestCase):
                 return mock_license
             return None
 
-        self.mock_ops["supported_license"].get_by_name.side_effect = (
+        self.mock_ops.supported_license.get_by_name.side_effect = (
             mock_get_by_name
         )
 

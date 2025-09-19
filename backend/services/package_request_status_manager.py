@@ -7,7 +7,7 @@ statuses based on the states of individual packages within the request.
 import logging
 from typing import Any, Dict, List, Optional
 
-from database.flask_utils import get_db_operations
+from database.operations.composite_operations import CompositeOperations
 from database.models import Package, PackageStatus, Request, RequestPackage
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ class PackageRequestStatusManager:
         Returns:
             The new status if updated, None if no change needed
         """
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             request = (
                 ops.query(Request).filter(Request.id == request_id).first()
             )
@@ -105,7 +105,7 @@ class PackageRequestStatusManager:
         """
         # Get all packages for this request through the many-to-many
         # relationship
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             packages = (
                 ops.query(Package)
                 .join(RequestPackage)
@@ -151,7 +151,7 @@ class PackageRequestStatusManager:
         Returns:
             Dictionary with status summary information
         """
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             request = (
                 ops.query(Request).filter(Request.id == request_id).first()
             )
@@ -207,7 +207,7 @@ class PackageRequestStatusManager:
         Returns:
             List of packages with the specified status
         """
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             packages = (
                 ops.query(Package)
                 .join(RequestPackage)
@@ -244,7 +244,7 @@ class PackageRequestStatusManager:
         Returns:
             List of packages with the specified security scan status
         """
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             packages = (
                 ops.query(Package)
                 .join(RequestPackage)

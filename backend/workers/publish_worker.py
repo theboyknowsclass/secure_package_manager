@@ -10,7 +10,7 @@ import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
-from database.operations import OperationsFactory
+from database.operations.composite_operations import CompositeOperations
 from database.service import DatabaseService
 from services.publishing_service import PublishingService
 from workers.base_worker import BaseWorker
@@ -62,14 +62,12 @@ class PublishWorker(BaseWorker):
     def process_cycle(self) -> None:
         """Process one cycle of package publishing."""
         try:
-            with self.db_service.get_session() as session:
-                ops = OperationsFactory.create_all_operations(session)
-
+            with CompositeOperations.get_operations() as ops:
                 # Handle stuck packages first
                 self._handle_stuck_packages(ops)
 
                 # Find packages that need publishing
-                pending_packages = ops["package"].get_packages_needing_publishing(
+                pending_packages = ops.package.get_packages_needing_publishing(
                     self.max_packages_per_cycle
                 )
 
@@ -145,8 +143,7 @@ class PublishWorker(BaseWorker):
     def get_publishing_stats(self) -> Dict[str, Any]:
         """Get current publishing statistics."""
         try:
-            with self.db_service.get_session() as session:
-                ops = OperationsFactory.create_all_operations(session)
+            with CompositeOperations.get_operations() as ops:
                 stats = self.publishing_service.get_publishing_statistics(ops)
                 stats["worker_status"] = self.get_worker_status()
                 return stats
@@ -157,8 +154,7 @@ class PublishWorker(BaseWorker):
     def retry_failed_publishing(self) -> Dict[str, Any]:
         """Retry failed publishing packages."""
         try:
-            with self.db_service.get_session() as session:
-                ops = OperationsFactory.create_all_operations(session)
+            with CompositeOperations.get_operations() as ops:
                 result = self.publishing_service.retry_failed_packages(ops)
                 
                 if "retried" in result and result["retried"] > 0:

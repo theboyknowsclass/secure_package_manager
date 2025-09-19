@@ -1,6 +1,6 @@
 import logging
 
-from database.flask_utils import get_db_operations
+from database.operations.composite_operations import CompositeOperations
 from database.models import (
     AuditLog,
     Package,
@@ -34,7 +34,7 @@ publishing_service = NpmRegistryPublishingService()
 def publish_package(package_id: int) -> ResponseReturnValue:
     """Publish an approved package to the secure repository."""
     try:
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             package = (
                 ops.query(Package).filter(Package.id == package_id).first()
             )
@@ -67,7 +67,7 @@ def publish_package(package_id: int) -> ResponseReturnValue:
                     f"secure repo"
                 ),
             )
-            with get_db_operations() as ops:
+            with CompositeOperations.get_operations() as ops:
                 ops.add(audit_log)
                 ops.commit()
 
@@ -122,7 +122,7 @@ def batch_approve_packages() -> ResponseReturnValue:
                 f"{list(package_ids)}. Reason: {reason}"
             ),
         )
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             ops.add(summary_audit_log)
             ops.commit()
 
@@ -157,7 +157,7 @@ def batch_approve_packages() -> ResponseReturnValue:
 
     except Exception as e:
         logger.error(f"Batch approve packages error: {str(e)}")
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             ops.rollback()
         return jsonify({"error": "Internal server error"}), 500
 
@@ -205,7 +205,7 @@ def batch_reject_packages() -> ResponseReturnValue:
                 f"{request.user.username}. Package IDs: {list(package_ids)}. Reason: {reason}"
             ),
         )
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             ops.add(summary_audit_log)
             ops.commit()
 
@@ -224,7 +224,7 @@ def batch_reject_packages() -> ResponseReturnValue:
 
     except Exception as e:
         logger.error(f"Batch reject packages error: {str(e)}")
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             ops.rollback()
         return jsonify({"error": "Internal server error"}), 500
 
@@ -236,7 +236,7 @@ def batch_reject_packages() -> ResponseReturnValue:
 def get_validated_packages() -> ResponseReturnValue:
     """Get all packages ready for admin review (pending approval)"""
     try:
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             packages = (
                 ops.query(Package)
                 .join(PackageStatus)
@@ -253,7 +253,7 @@ def get_validated_packages() -> ResponseReturnValue:
         for pkg in packages:
             try:
                 # Get request information for this package
-                with get_db_operations() as ops:
+                with CompositeOperations.get_operations() as ops:
                     request_package = (
                         ops.query(RequestPackage)
                         .filter_by(package_id=pkg.id)
@@ -320,7 +320,7 @@ def _process_package_approval(package_id: int, user, reason: str) -> dict:
         dict: {"success": bool, "error": dict or None}
     """
     try:
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             package = (
                 ops.query(Package).filter(Package.id == package_id).first()
             )
@@ -364,8 +364,9 @@ def _process_package_approval(package_id: int, user, reason: str) -> dict:
                 f"{reason}"
             ),
         )
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             ops.add(audit_log)
+            ops.commit()
 
         return {"success": True, "error": None}
 
@@ -384,7 +385,7 @@ def _process_package_rejection(package_id: int, user, reason: str) -> dict:
         dict: {"success": bool, "error": dict or None}
     """
     try:
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             package = (
                 ops.query(Package).filter(Package.id == package_id).first()
             )
@@ -428,8 +429,9 @@ def _process_package_rejection(package_id: int, user, reason: str) -> dict:
                 f"{reason}"
             ),
         )
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             ops.add(audit_log)
+            ops.commit()
 
         return {"success": True, "error": None}
 

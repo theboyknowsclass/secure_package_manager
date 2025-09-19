@@ -299,14 +299,14 @@ class LicenseService:
             return self._license_cache[license_identifier]
 
         # Look up in database
-        license_obj = ops["supported_license"].get_by_name(license_identifier)
+        license_obj = ops.supported_license.get_by_name(license_identifier)
         self._license_cache[license_identifier] = license_obj
         return license_obj
 
     def _load_license_cache(self, ops: Dict[str, Any]) -> None:
         """Load all supported licenses into cache."""
         try:
-            licenses = ops["supported_license"].get_all()
+            licenses = ops.supported_license.get_all()
             for license_obj in licenses:
                 self._license_cache[license_obj.name] = license_obj
         except Exception as e:
@@ -380,10 +380,10 @@ class LicenseService:
         """Process a single package with pre-validated license."""
         try:
             # Update package status
-            ops["package_status"].update_package_status(
+            ops.package_status.update_package_status(
                 package.id,
                 "Licence Checked",
-                ops["package_status"].PackageStatus,
+                ops.package_status.PackageStatus,
             )
 
             # Update package with license information
@@ -431,10 +431,10 @@ class LicenseService:
                 }
 
             # Update package status
-            ops["package_status"].update_package_status(
+            ops.package_status.update_package_status(
                 package.id,
                 "Licence Checked",
-                ops["package_status"].PackageStatus,
+                ops.package_status.PackageStatus,
             )
 
             # Update package with license information

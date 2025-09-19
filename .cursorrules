@@ -1,0 +1,267 @@
+# Cursor Rules for Secure Package Manager
+
+## Project Overview
+This is a secure package management system with a Flask backend, React frontend, and PostgreSQL database. The system processes package-lock.json files through a multi-stage validation pipeline with background workers.
+
+## Technology Stack
+- **Backend**: Flask 3.1.2, SQLAlchemy 2.0.40, PostgreSQL, Python 3.11+
+- **Frontend**: React 18, TypeScript, Material-UI, Vite, Zustand
+- **Workers**: Background workers for package processing pipeline
+- **Security**: Trivy vulnerability scanning, JWT authentication
+- **Infrastructure**: Docker, Docker Compose
+
+## Code Style & Conventions
+
+### Python Backend
+- **Line Length**: 79 characters (Black configuration)
+- **Import Style**: Use `isort` with Black profile
+- **Type Hints**: Required for all functions (mypy strict mode)
+- **Docstrings**: Use triple quotes with proper formatting
+- **Error Handling**: Use specific exception types, log errors with context
+- **Logging**: Use module-level loggers: `logger = logging.getLogger(__name__)`
+
+### TypeScript Frontend
+- **Strict Mode**: TypeScript strict mode enabled
+- **ESLint**: Use provided ESLint configuration with TypeScript rules
+- **Prettier**: Code formatting with Prettier
+- **React**: Functional components with hooks, TypeScript interfaces for props
+- **Material-UI**: Use MUI components and theming system
+
+## Architecture Patterns
+
+### Backend Architecture
+```
+API Layer (routes/) → Service Layer (services/) → Database Layer (database/)
+                                    ↓
+                            Worker Layer (workers/)
+```
+
+### Service Pattern
+- Services contain business logic and work with database operations
+- Services are stateless and can be used by both API and workers
+- Use dependency injection for database operations
+- Example: `LicenseService`, `PackageService`, `TrivyService`
+
+### Worker Pattern
+- All workers inherit from `BaseWorker`
+- Workers have specific `WORKER_TYPE` constants
+- Implement `initialize()`, `process_cycle()`, and optionally `cleanup()`
+- Use proper signal handling for graceful shutdown
+- Example: `LicenseWorker`, `PackageWorker`, `PublishWorker`
+
+### Database Pattern
+- Use entity-based operations in `database/operations/`
+- Separate models from operations for better testability
+- Use both Flask-SQLAlchemy and pure SQLAlchemy patterns
+- Database service provides connection management
+
+## File Organization
+
+### Backend Structure
+```
+backend/
+├── app.py                    # Flask application entry point
+├── worker.py                 # Worker entry point
+├── config/                   # Configuration management
+├── database/                 # Database layer
+│   ├── models/              # SQLAlchemy models
+│   └── operations/          # Database operations
+├── routes/                  # API endpoints
+├── services/                # Business logic
+├── workers/                 # Background workers
+└── tests/                   # Test suite
+```
+
+### Frontend Structure
+```
+frontend/src/
+├── components/              # React components
+│   ├── atoms/              # Basic UI components
+│   ├── molecules/          # Composite components
+│   └── organisms/          # Complex components
+├── pages/                  # Page components
+├── services/               # API services
+├── stores/                 # Zustand state management
+├── types/                  # TypeScript type definitions
+├── hooks/                  # Custom React hooks
+└── utils/                  # Utility functions
+```
+
+## Naming Conventions
+
+### Python
+- **Classes**: PascalCase (`PackageService`, `BaseWorker`)
+- **Functions/Variables**: snake_case (`process_package_batch`)
+- **Constants**: UPPER_SNAKE_CASE (`WORKER_TYPE`, `DATABASE_URL`)
+- **Private Methods**: Leading underscore (`_validate_required_env_vars`)
+
+### TypeScript
+- **Components**: PascalCase (`PackageUpload`, `Dashboard`)
+- **Functions/Variables**: camelCase (`processPackageBatch`)
+- **Types/Interfaces**: PascalCase (`PackageRequest`, `AuthUser`)
+- **Constants**: UPPER_SNAKE_CASE (`API_BASE_URL`)
+
+## Database Conventions
+- **Tables**: snake_case (`package_status`, `security_scans`)
+- **Columns**: snake_case (`created_at`, `updated_at`)
+- **Foreign Keys**: `{table}_id` (`package_id`, `request_id`)
+- **Indexes**: `idx_{table}_{column}` or descriptive names
+
+## API Conventions
+- **Routes**: RESTful with `/api/` prefix
+- **HTTP Methods**: GET, POST, PUT, DELETE as appropriate
+- **Response Format**: JSON with consistent structure
+- **Error Handling**: HTTP status codes with error messages
+- **Authentication**: JWT Bearer tokens
+
+## Package Processing Pipeline
+The system processes packages through these stages:
+1. **Submitted** → Parse package-lock.json
+2. **Parsed** → License validation
+3. **License Checked** → Package download
+4. **Downloaded** → Security scanning
+5. **Security Scanned** → Manual approval
+6. **Approved** → Publishing to secure repository
+7. **Published** → Complete
+
+## Security Considerations
+- Always validate input data
+- Use parameterized queries (SQLAlchemy ORM)
+- Implement proper authentication and authorization
+- Log security-relevant events
+- Use HTTPS in production
+- Validate JWT tokens properly
+
+## Testing Guidelines
+- Write unit tests for services and utilities
+- Write integration tests for API endpoints
+- Test worker functionality with mock data
+- Use pytest for Python tests
+- Maintain test coverage above 80%
+
+## Docker & Deployment
+- Use multi-stage Docker builds
+- Separate development and production configurations
+- Use environment variables for configuration
+- Implement health checks for all services
+- Use Docker Compose for local development
+
+## Performance Considerations
+- Use batch processing for license validation (5-10x improvement)
+- Implement caching for frequently accessed data
+- Use database indexes for query optimization
+- Monitor worker performance and stuck packages
+- Use connection pooling for database connections
+
+## Error Handling
+- Use specific exception types
+- Log errors with sufficient context
+- Implement retry mechanisms for transient failures
+- Provide meaningful error messages to users
+- Handle worker failures gracefully
+
+## Code Quality
+- Run linting before commits (`flake8`, `black`, `isort`, `mypy`)
+- Use type hints for all Python functions
+- Write comprehensive docstrings
+- Follow the existing code patterns
+- Keep functions small and focused
+
+## Common Patterns
+
+### Service Class Pattern
+```python
+class ExampleService:
+    """Service for handling example operations."""
+    
+    def __init__(self) -> None:
+        """Initialize the service."""
+        self.logger = logging.getLogger(__name__)
+    
+    def process_batch(self, items: List[Any], ops: Dict[str, Any]) -> Dict[str, Any]:
+        """Process a batch of items."""
+        # Implementation here
+```
+
+### Worker Class Pattern
+```python
+class ExampleWorker(BaseWorker):
+    """Background worker for example processing."""
+    
+    WORKER_TYPE = "example_worker"
+    
+    def __init__(self, sleep_interval: int = 10):
+        super().__init__("ExampleWorker", sleep_interval)
+    
+    def initialize(self) -> None:
+        """Initialize the worker."""
+        # Setup code here
+    
+    def process_cycle(self) -> None:
+        """Process one cycle of work."""
+        # Processing logic here
+```
+
+### React Component Pattern
+```typescript
+interface ComponentProps {
+  // Props interface
+}
+
+export default function Component({ prop1, prop2 }: ComponentProps) {
+  // Component logic
+  return (
+    // JSX
+  );
+}
+```
+
+## Environment Configuration
+- Use `.env` files for local development
+- Use environment variables for production
+- Validate required environment variables at startup
+- Use different configurations for dev/prod
+
+## Monitoring & Logging
+- Use structured logging with appropriate levels
+- Log worker status and performance metrics
+- Monitor database connection health
+- Track package processing statistics
+- Implement health check endpoints
+
+## License Management
+- Use 4-tier license system: always_allowed, allowed, avoid, blocked
+- Support complex license expressions (MIT OR Apache-2.0)
+- Implement license caching for performance
+- Handle license variations (MIT, mit, MIT License)
+
+## When Making Changes
+1. Follow existing patterns and conventions
+2. Update tests for new functionality
+3. Update documentation if needed
+4. Run linting and type checking
+5. Test with both development and production configurations
+6. Consider impact on background workers
+7. Ensure proper error handling and logging
+8. Validate security implications
+
+## Common Commands
+```bash
+# Backend development
+cd backend
+python -m black . && python -m isort . && python -m flake8 . && python -m mypy .
+
+# Frontend development
+cd frontend
+npm run lint && npm run format
+
+# Docker development
+./scripts/dev-start.sh
+./scripts/dev-stop.sh
+
+# Testing
+python -m pytest tests/
+npm test
+```
+
+Remember: This is a security-critical application handling package validation and approval workflows. Always prioritize security, data integrity, and proper error handling in your implementations.

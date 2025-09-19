@@ -121,7 +121,7 @@ class PackageLockParsingService:
             package_info = package_data["info"]
 
             # Check if package already exists in database
-            existing_package = ops["package"].get_by_name_version(
+            existing_package = ops.package.get_by_name_version(
                 package_name, package_version
             )
 
@@ -214,11 +214,11 @@ class PackageLockParsingService:
     ) -> None:
         """Link an existing package to a request if not already linked."""
         # Check if link already exists
-        if not ops["request_package"].link_exists(
+        if not ops.request_package.link_exists(
             request_id, existing_package.id
         ):
             # Create link between request and existing package
-            ops["request_package"].create_link(
+            ops.request_package.create_link(
                 request_id, existing_package.id, "existing"
             )
 
@@ -243,12 +243,12 @@ class PackageLockParsingService:
             }
 
             # Create package with initial status
-            package = ops["package"].create_with_status(
+            package = ops.package.create_with_status(
                 package_record_data, status="Submitted"
             )
 
             # Create request-package link
-            ops["request_package"].create_link(request_id, package.id, "new")
+            ops.request_package.create_link(request_id, package.id, "new")
 
             created_packages.append(package)
             logger.info(

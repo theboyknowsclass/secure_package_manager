@@ -9,7 +9,7 @@ import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
-from database.operations import OperationsFactory
+from database.operations.composite_operations import CompositeOperations
 from database.service import DatabaseService
 from services.download_processing_service import DownloadProcessingService
 from workers.base_worker import BaseWorker
@@ -57,14 +57,12 @@ class DownloadWorker(BaseWorker):
     def process_cycle(self) -> None:
         """Process one cycle of downloading."""
         try:
-            with self.db_service.get_session() as session:
-                ops = OperationsFactory.create_all_operations(session)
-
+            with CompositeOperations.get_operations() as ops:
                 # Handle stuck packages first
                 self._handle_stuck_packages(ops)
 
                 # Find packages that need downloading
-                ready_packages = ops["package"].get_by_status("Licence Checked")
+                ready_packages = ops.package.get_by_status("Licence Checked")
                 
                 # Limit the number of packages processed per cycle
                 limited_packages = ready_packages[:self.max_packages_per_cycle]
@@ -91,9 +89,6 @@ class DownloadWorker(BaseWorker):
                     logger.error(
                         f"Error in download batch: {result['error']}"
                     )
-
-                # Commit the session
-                session.commit()
 
         except Exception as e:
             logger.error(f"Download cycle error: {str(e)}", exc_info=True)

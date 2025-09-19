@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from .audit_log_operations import AuditLogOperations
 from .base_operations import BaseOperations
+from .composite_operations import CompositeOperations
 from .package_operations import PackageOperations
 from .package_status_operations import PackageStatusOperations
 from .request_operations import RequestOperations
@@ -45,15 +46,6 @@ class OperationsFactory:
 
         return cls._operations_classes[entity_type](session)
 
-    @classmethod
-    def create_all_operations(
-        cls, session: Session
-    ) -> Dict[str, BaseOperations]:
-        """Create all operations instances."""
-        return {
-            entity_type: cls.create_operations(entity_type, session)
-            for entity_type in cls._operations_classes.keys()
-        }
 
 
 # Convenience imports
@@ -67,5 +59,6 @@ __all__ = [
     "AuditLogOperations",
     "SecurityScanOperations",
     "SupportedLicenseOperations",
+    "CompositeOperations",
     "OperationsFactory",
 ]

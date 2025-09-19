@@ -71,7 +71,7 @@ class ApprovalService:
         """
         try:
             # Use operations to get stuck packages
-            stuck_packages = ops["package"].get_stuck_packages_in_security_scanned(
+            stuck_packages = ops.package.get_stuck_packages_in_security_scanned(
                 stuck_threshold
             )
             return stuck_packages
@@ -91,7 +91,7 @@ class ApprovalService:
         for package in stuck_packages:
             try:
                 if package.package_status:
-                    ops["package_status"].refresh_package_timestamp(package.id)
+                    ops.package_status.refresh_package_timestamp(package.id)
                     self.logger.debug(
                         f"Refreshed timestamp for stuck package {package.name}@{package.version}"
                     )
@@ -111,9 +111,9 @@ class ApprovalService:
         """
         try:
             # Get package counts by status
-            security_scanned_count = ops["package"].count_packages_by_status("Security Scanned")
-            pending_approval_count = ops["package"].count_packages_by_status("Pending Approval")
-            approved_count = ops["package"].count_packages_by_status("Approved")
+            security_scanned_count = ops.package.count_packages_by_status("Security Scanned")
+            pending_approval_count = ops.package.count_packages_by_status("Pending Approval")
+            approved_count = ops.package.count_packages_by_status("Approved")
 
             return {
                 "security_scanned_packages": security_scanned_count,
@@ -139,7 +139,7 @@ class ApprovalService:
         """
         try:
             if package.package_status and package.package_status.status == "Security Scanned":
-                ops["package_status"].update_status(
+                ops.package_status.update_status(
                     package.id, "Pending Approval"
                 )
                 self.logger.debug(

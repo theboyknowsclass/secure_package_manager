@@ -1,6 +1,6 @@
 import logging
 
-from database.flask_utils import get_db_operations
+from database.operations.composite_operations import CompositeOperations
 from database.models import User
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
@@ -38,7 +38,7 @@ def login() -> ResponseReturnValue:
         # Authentication - validates against mock-idp in dev, ADFS in
         # production
         if username == "admin" and password == "admin":
-            with get_db_operations() as ops:
+            with CompositeOperations.get_operations() as ops:
                 user = ops.get_user_by_username(username, User)
             if not user:
                 user_data = {
@@ -47,7 +47,7 @@ def login() -> ResponseReturnValue:
                     "full_name": "Admin User",
                     "role": "admin",
                 }
-                with get_db_operations() as ops:
+                with CompositeOperations.get_operations() as ops:
                     user = ops.create_user(user_data, User)
 
             logger.info("Generating token...")

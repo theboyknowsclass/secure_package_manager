@@ -14,7 +14,7 @@ import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from database.operations import OperationsFactory
+from database.operations.composite_operations import CompositeOperations
 from database.service import DatabaseService
 from services.package_lock_parsing_service import PackageLockParsingService
 from workers.base_worker import BaseWorker
@@ -60,8 +60,7 @@ class ParseWorker(BaseWorker):
     def process_cycle(self) -> None:
         """Process one cycle of parsing work."""
         try:
-            with self.db_service.get_session() as session:
-                ops = OperationsFactory.create_all_operations(session)
+            with CompositeOperations.get_operations() as ops:
 
                 # Handle stuck requests first
                 self._handle_stuck_requests(ops)
@@ -78,7 +77,7 @@ class ParseWorker(BaseWorker):
             stuck_threshold = datetime.utcnow() - self.stuck_request_timeout
 
             # Get all requests and check for stuck ones
-            all_requests = ops["request"].get_all()
+            all_requests = ops.request.get_all()
             stuck_requests = [
                 r for r in all_requests if r.created_at < stuck_threshold
             ]
@@ -99,7 +98,7 @@ class ParseWorker(BaseWorker):
         """Process requests that need package extraction."""
         try:
             # Find requests that need parsing
-            requests_to_process = ops["request"].get_needing_parsing()
+            requests_to_process = ops.request.get_needing_parsing()
 
             # Limit the number of requests processed per cycle
             requests_to_process = requests_to_process[
@@ -187,28 +186,27 @@ class ParseWorker(BaseWorker):
     def get_worker_stats(self) -> Dict[str, Any]:
         """Get current worker statistics."""
         try:
-            with self.db_service.get_session() as session:
-                ops = OperationsFactory.create_all_operations(session)
+            with CompositeOperations.get_operations() as ops:
 
                 # Get request statistics
-                all_requests = ops["request"].get_all()
+                all_requests = ops.request.get_all()
                 requests_with_packages = len(
                     [
                         r
                         for r in all_requests
-                        if ops["request_package"].get_by_request_id(r.id)
+                        if ops.request_package.get_by_request_id(r.id)
                     ]
                 )
 
                 # Get package statistics
-                all_packages = ops["package"].get_all()
+                all_packages = ops.package.get_all()
 
                 return {
                     "worker_status": self.get_worker_status(),
                     "total_requests": len(all_requests),
                     "requests_with_packages": requests_with_packages,
                     "requests_needing_parsing": len(
-                        ops["request"].get_needing_parsing()
+                        ops.request.get_needing_parsing()
                     ),
                     "total_packages": len(all_packages),
                     "timestamp": datetime.utcnow().isoformat(),

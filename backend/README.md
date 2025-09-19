@@ -28,11 +28,11 @@ backend/
 │
 ├── database/                       # Database layer
 │   ├── __init__.py                 # Flask-SQLAlchemy setup
-│   ├── models.py                   # Pure SQLAlchemy models
 │   ├── service.py                  # Database service (pure SQLAlchemy)
-│   ├── operations.py               # Shared database operations
+│   ├── operations/                 # Database operations (no flask_utils needed)
 │   ├── example_usage.py            # Usage examples
-│   └── models/                     # Individual model files
+│   ├── models/                     # Individual model files
+│   └── operations/                 # Entity-specific database operations
 │       ├── user.py                 # User model
 │       ├── package.py              # Package model
 │       ├── request.py              # Package request model

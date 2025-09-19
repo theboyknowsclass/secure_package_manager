@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, Union
 
-from database.flask_utils import get_db_operations
+from database.operations.composite_operations import CompositeOperations
 from database.models import (
     AuditLog,
     Package,
@@ -108,7 +108,7 @@ def _create_request_with_blob(package_data: Dict[str, Any]) -> Request:
         requestor_id=request.user.id,
         raw_request_blob=json.dumps(package_data),  # Store raw JSON blob
     )
-    with get_db_operations() as ops:
+    with CompositeOperations.get_operations() as ops:
         ops.add(request_record)
         ops.commit()
 
@@ -156,7 +156,7 @@ def _create_success_response(
 def get_package_request(request_id: int) -> ResponseReturnValue:
     """Get package request details."""
     try:
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             request_record = (
                 ops.query(Request).filter(Request.id == request_id).first()
             )
@@ -172,7 +172,7 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
 
         # Get packages for this request with their creation context and scan
         # results
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             packages_with_context = (
                 ops.query(Package, RequestPackage, SecurityScan)
                 .join(RequestPackage)
@@ -285,7 +285,7 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
 def list_package_requests() -> ResponseReturnValue:
     """List package requests for the user."""
     try:
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             if request.user.is_admin():
                 requests = ops.query(Request).all()
             else:
@@ -340,7 +340,7 @@ def list_package_requests() -> ResponseReturnValue:
 def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
     """Get security scan status for a package."""
     try:
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             package = (
                 ops.query(Package).filter(Package.id == package_id).first()
             )
@@ -350,7 +350,7 @@ def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
         # Check if user has access to this package
         if not request.user.is_admin():
             # Check if user has access through any request
-            with get_db_operations() as ops:
+            with CompositeOperations.get_operations() as ops:
                 has_access = (
                     ops.query(RequestPackage)
                     .join(Request)
@@ -396,7 +396,7 @@ def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
 def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
     """Get detailed security scan report for a package."""
     try:
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             package = (
                 ops.query(Package).filter(Package.id == package_id).first()
             )
@@ -406,7 +406,7 @@ def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
         # Check if user has access to this package
         if not request.user.is_admin():
             # Check if user has access through any request
-            with get_db_operations() as ops:
+            with CompositeOperations.get_operations() as ops:
                 has_access = (
                     ops.query(RequestPackage)
                     .join(Request)
@@ -454,7 +454,7 @@ def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
 def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
     """Trigger a new security scan for a package."""
     try:
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             package = (
                 ops.query(Package).filter(Package.id == package_id).first()
             )
@@ -464,7 +464,7 @@ def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
         # Check if user has access to this package
         if not request.user.is_admin():
             # Check if user has access through any request
-            with get_db_operations() as ops:
+            with CompositeOperations.get_operations() as ops:
                 has_access = (
                     ops.query(RequestPackage)
                     .join(Request)
@@ -514,7 +514,7 @@ def get_processing_status() -> ResponseReturnValue:
             "Pending Approval",
             "Rejected",
         ]:
-            with get_db_operations() as ops:
+            with CompositeOperations.get_operations() as ops:
                 count = (
                     ops.query(Package)
                     .join(PackageStatus)
@@ -524,7 +524,7 @@ def get_processing_status() -> ResponseReturnValue:
             status_counts[status] = count
 
         # Count total requests
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             total_requests = ops.query(Request).count()
 
             # Get recent activity (last 10 packages processed)
@@ -582,7 +582,7 @@ def retry_failed_packages() -> ResponseReturnValue:
             return jsonify({"error": "Admin access required"}), 403
 
         # Build query for failed packages
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             query = (
                 ops.query(Package)
                 .join(PackageStatus)
@@ -609,7 +609,7 @@ def retry_failed_packages() -> ResponseReturnValue:
                 package.package_status.updated_at = datetime.utcnow()
                 retried_count += 1
 
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             ops.commit()
 
         logger.info(f"Retried {retried_count} failed packages")
@@ -626,6 +626,6 @@ def retry_failed_packages() -> ResponseReturnValue:
 
     except Exception as e:
         logger.error(f"Retry failed packages error: {str(e)}")
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             ops.rollback()
         return jsonify({"error": "Internal server error"}), 500

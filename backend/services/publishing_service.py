@@ -114,7 +114,7 @@ class PublishingService:
         """
         try:
             # Use operations to get stuck packages
-            stuck_packages = ops["package"].get_stuck_packages_in_publishing(
+            stuck_packages = ops.package.get_stuck_packages_in_publishing(
                 stuck_threshold
             )
             return stuck_packages
@@ -157,11 +157,11 @@ class PublishingService:
             # Get package counts by publish status
             publish_status_counts = {}
             for status in ["pending", "publishing", "published", "failed"]:
-                count = ops["package"].count_packages_by_publish_status(status)
+                count = ops.package.count_packages_by_publish_status(status)
                 publish_status_counts[status] = count
 
             # Get approved packages count
-            approved_count = ops["package"].count_packages_by_status("Approved")
+            approved_count = ops.package.count_packages_by_status("Approved")
 
             return {
                 "approved_packages": approved_count,
@@ -182,7 +182,7 @@ class PublishingService:
             Dict with retry results
         """
         try:
-            failed_packages = ops["package"].get_packages_by_publish_status("failed")
+            failed_packages = ops.package.get_packages_by_publish_status("failed")
             
             if not failed_packages:
                 return {
@@ -242,7 +242,7 @@ class PublishingService:
             ops: Dictionary of database operations instances
         """
         if package.package_status:
-            ops["package_status"].update_package_publish_status(
+            ops.package_status.update_package_publish_status(
                 package.id, status
             )
 
@@ -254,7 +254,7 @@ class PublishingService:
             ops: Dictionary of database operations instances
         """
         if package.package_status:
-            ops["package_status"].mark_package_published(package.id)
+            ops.package_status.mark_package_published(package.id)
 
     def _mark_package_publish_failed(
         self, package: Any, error_message: str, ops: Dict[str, Any]
@@ -267,6 +267,6 @@ class PublishingService:
             ops: Dictionary of database operations instances
         """
         if package.package_status:
-            ops["package_status"].mark_package_publish_failed(
+            ops.package_status.mark_package_publish_failed(
                 package.id, error_message
             )

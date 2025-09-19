@@ -3,7 +3,7 @@ from typing import Any, Callable, Dict, Optional
 
 import jwt
 from config.constants import JWT_SECRET, OAUTH_AUDIENCE, OAUTH_ISSUER
-from database.flask_utils import get_db_operations
+from database.operations.composite_operations import CompositeOperations
 from database.models import User
 from flask import jsonify, request
 
@@ -109,8 +109,8 @@ class AuthService:
             logger.error("No username found in OAuth2 token payload")
             return None
 
-        with get_db_operations() as ops:
-            user = ops.get_user_by_username(username, User)
+        with CompositeOperations.get_operations() as ops:
+            user = ops.user.get_by_username(username)
             if not user:
                 user = self._create_user_from_oauth2_payload(
                     payload, username, ops
@@ -136,8 +136,8 @@ class AuthService:
             logger.error("No user_id found in legacy token payload")
             return None
 
-        with get_db_operations() as ops:
-            user = ops.get_user_by_id(user_id, User)
+        with CompositeOperations.get_operations() as ops:
+            user = ops.user.get_by_id(user_id)
             if user:
                 logger.info(
                     f"Found user by ID: {user.username} with role: {user.role}"
@@ -158,13 +158,13 @@ class AuthService:
         logger.info(
             f"User {username} not found in database, creating new user"
         )
-        user_data = {
-            "username": username,
-            "email": payload.get("email", f"{username}@example.com"),
-            "full_name": payload.get("full_name", username),
-            "role": payload.get("role", "user"),
-        }
-        user = ops.create_user(user_data, User)
+        user = User(
+            username=username,
+            email=payload.get("email", f"{username}@example.com"),
+            full_name=payload.get("full_name", username),
+            role=payload.get("role", "user"),
+        )
+        user = ops.user.create(user)
         if user:
             logger.info(
                 f"Created new user: {user.username} with role: {user.role}"
@@ -183,15 +183,14 @@ class AuthService:
             f"Found existing user: {user.username} with role: {user.role}"
         )
         # Update existing user with fresh OAuth2 token data
-        update_data = {
-            "email": payload.get("email", user.email),
-            "full_name": payload.get("full_name", user.full_name),
-            "role": payload.get("role", user.role),
-        }
-        if ops.update_user(user, update_data):
-            logger.info(
-                f"Updated existing user: {user.username} with role: {user.role}"
-            )
+        user.email = payload.get("email", user.email)
+        user.full_name = payload.get("full_name", user.full_name)
+        user.role = payload.get("role", user.role)
+        
+        user = ops.user.update(user)
+        logger.info(
+            f"Updated existing user: {user.username} with role: {user.role}"
+        )
         return user
 
     def require_auth(self, f: Callable[..., Any]) -> Callable[..., Any]:

@@ -116,7 +116,7 @@ class DownloadProcessingService:
         """
         try:
             # Use operations to get stuck packages
-            stuck_packages = ops["package"].get_stuck_packages_in_downloading(
+            stuck_packages = ops.package.get_stuck_packages_in_downloading(
                 stuck_threshold
             )
             return stuck_packages
@@ -135,7 +135,7 @@ class DownloadProcessingService:
         """
         for package in stuck_packages:
             try:
-                ops["package_status"].update_status(
+                ops.package_status.update_status(
                     package.id, "Licence Checked"
                 )
                 self.logger.info(
@@ -192,7 +192,7 @@ class DownloadProcessingService:
             ops: Dictionary of database operations instances
         """
         if package.package_status:
-            ops["package_status"].update_status(
+            ops.package_status.update_status(
                 package.id, "Downloading"
             )
 
@@ -204,7 +204,7 @@ class DownloadProcessingService:
             ops: Dictionary of database operations instances
         """
         if package.package_status:
-            ops["package_status"].update_status(
+            ops.package_status.update_status(
                 package.id, "Downloaded"
             )
 
@@ -216,6 +216,6 @@ class DownloadProcessingService:
             ops: Dictionary of database operations instances
         """
         if package.package_status:
-            ops["package_status"].update_status(
+            ops.package_status.update_status(
                 package.id, "Rejected"
             )

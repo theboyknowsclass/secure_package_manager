@@ -9,7 +9,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from database.flask_utils import get_db_operations
+from database.operations.composite_operations import CompositeOperations
 from database.models import PackageStatus
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ class QueueInterface:
 
     def advance_status(self, package_id: int, next_status: str) -> bool:
         try:
-            with get_db_operations() as ops:
+            with CompositeOperations.get_operations() as ops:
                 status: Optional[PackageStatus] = (
                     ops.query(PackageStatus)
                     .filter_by(package_id=package_id)
@@ -46,6 +46,6 @@ class QueueInterface:
                 f"advance_status failed for package_id={package_id}: {str(e)}",
                 exc_info=True,
             )
-            with get_db_operations() as ops:
+            with CompositeOperations.get_operations() as ops:
                 ops.rollback()
             return False

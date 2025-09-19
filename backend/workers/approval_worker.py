@@ -10,7 +10,7 @@ import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
-from database.operations import OperationsFactory
+from database.operations.composite_operations import CompositeOperations
 from database.service import DatabaseService
 from services.approval_service import ApprovalService
 from workers.base_worker import BaseWorker
@@ -57,14 +57,12 @@ class ApprovalWorker(BaseWorker):
     def process_cycle(self) -> None:
         """Process one cycle of approval work."""
         try:
-            with self.db_service.get_session() as session:
-                ops = OperationsFactory.create_all_operations(session)
-
+            with CompositeOperations.get_operations() as ops:
                 # Handle stuck packages first
                 self._handle_stuck_packages(ops)
 
                 # Find packages that need approval transitions
-                security_scanned_packages = ops["package"].get_by_status("Security Scanned")
+                security_scanned_packages = ops.package.get_by_status("Security Scanned")
                 
                 # Limit the number of packages processed per cycle
                 limited_packages = security_scanned_packages[:self.max_packages_per_cycle]
@@ -93,13 +91,10 @@ class ApprovalWorker(BaseWorker):
                         f"Error processing security scanned packages: {result['error']}"
                     )
 
-                # Commit the session
-                session.commit()
-
         except Exception as e:
             logger.error(f"Approval cycle error: {str(e)}", exc_info=True)
 
-    def _handle_stuck_packages(self, ops: Dict[str, Any]) -> None:
+    def _handle_stuck_packages(self, ops) -> None:
         """Handle packages that have been stuck in Security Scanned state too long."""
         try:
             stuck_threshold = datetime.utcnow() - self.stuck_package_timeout
@@ -122,8 +117,7 @@ class ApprovalWorker(BaseWorker):
     def get_approval_stats(self) -> Dict[str, Any]:
         """Get current approval statistics."""
         try:
-            with self.db_service.get_session() as session:
-                ops = OperationsFactory.create_all_operations(session)
+            with CompositeOperations.get_operations() as ops:
                 stats = self.approval_service.get_approval_statistics(ops)
                 stats["worker_status"] = self.get_worker_status()
                 return stats

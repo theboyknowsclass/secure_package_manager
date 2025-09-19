@@ -1,6 +1,6 @@
 import logging
 
-from database.flask_utils import get_db_operations
+from database.operations.composite_operations import CompositeOperations
 from database.models import AuditLog, Package, SupportedLicense
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
@@ -55,7 +55,7 @@ def create_supported_license() -> ResponseReturnValue:
             return jsonify({"error": "Name and identifier are required"}), 400
 
         # Check if identifier already exists
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             existing = (
                 ops.query(SupportedLicense)
                 .filter_by(identifier=data["identifier"])
@@ -72,7 +72,7 @@ def create_supported_license() -> ResponseReturnValue:
             created_by=request.user.id,
         )
 
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             ops.add(license)
             ops.commit()
 
@@ -99,7 +99,7 @@ def create_supported_license() -> ResponseReturnValue:
 
     except Exception as e:
         logger.error(f"Create license error: {str(e)}")
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             ops.rollback()
         return jsonify({"error": "Internal server error"}), 500
 
@@ -114,7 +114,7 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
         if not request.user.is_admin():
             return jsonify({"error": "Admin access required"}), 403
 
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             license = (
                 ops.query(SupportedLicense)
                 .filter(SupportedLicense.id == license_id)
@@ -130,7 +130,7 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
         if "status" in data:
             license.status = data["status"]
 
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             ops.commit()
 
             # Log the action
@@ -152,7 +152,7 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
         )
     except Exception as e:
         logger.error(f"Update license error: {str(e)}")
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             ops.rollback()
         return jsonify({"error": "Internal server error"}), 500
 
@@ -167,7 +167,7 @@ def delete_supported_license(license_id: int) -> ResponseReturnValue:
         if not request.user.is_admin():
             return jsonify({"error": "Admin access required"}), 403
 
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             license = (
                 ops.query(SupportedLicense)
                 .filter(SupportedLicense.id == license_id)
@@ -177,7 +177,7 @@ def delete_supported_license(license_id: int) -> ResponseReturnValue:
                 return jsonify({"error": "License not found"}), 404
 
         # Check if license is being used by any packages
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             package_count = (
                 ops.query(Package)
                 .filter_by(license_identifier=license.identifier)
@@ -196,7 +196,7 @@ def delete_supported_license(license_id: int) -> ResponseReturnValue:
                 400,
             )
 
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             ops.delete(license)
             ops.commit()
 
@@ -214,7 +214,7 @@ def delete_supported_license(license_id: int) -> ResponseReturnValue:
         return jsonify({"message": "License deleted successfully"})
     except Exception as e:
         logger.error(f"Delete license error: {str(e)}")
-        with get_db_operations() as ops:
+        with CompositeOperations.get_operations() as ops:
             ops.rollback()
         return jsonify({"error": "Internal server error"}), 500
 

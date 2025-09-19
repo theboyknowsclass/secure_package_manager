@@ -26,13 +26,13 @@ class SecurityService:
         self.logger = logger
 
     def process_package_batch(
-        self, packages: List[Any], ops: Dict[str, Any]
+        self, packages: List[Any], ops
     ) -> Dict[str, Any]:
         """Process a batch of packages for security scanning.
 
         Args:
             packages: List of packages to process
-            ops: Dictionary of database operations instances
+            ops: Composite operations instance
 
         Returns:
             Dict with processing results
@@ -65,13 +65,13 @@ class SecurityService:
             }
 
     def scan_single_package(
-        self, package: Any, ops: Dict[str, Any]
+        self, package: Any, ops
     ) -> Dict[str, Any]:
         """Scan a single package for security vulnerabilities.
 
         Args:
             package: Package to scan
-            ops: Dictionary of database operations instances
+            ops: Composite operations instance
 
         Returns:
             Dict with scan results
@@ -112,7 +112,7 @@ class SecurityService:
         """
         try:
             # Use operations to get stuck packages
-            stuck_packages = ops["package"].get_stuck_packages_in_security_scanning(
+            stuck_packages = ops.package.get_stuck_packages_in_security_scanning(
                 stuck_threshold
             )
             return stuck_packages
@@ -131,7 +131,7 @@ class SecurityService:
         """
         for package in stuck_packages:
             try:
-                ops["package_status"].update_status(
+                ops.package_status.update_status(
                     package.id, "Downloaded"
                 )
                 self.logger.info(
@@ -171,10 +171,10 @@ class SecurityService:
             ops: Dictionary of database operations instances
         """
         if package.package_status:
-            ops["package_status"].update_status(
+            ops.package_status.update_status(
                 package.id, "Security Scanning"
             )
-            ops["package_status"].update_security_scan_status(
+            ops.package_status.update_security_scan_status(
                 package.id, "running"
             )
 
@@ -189,20 +189,20 @@ class SecurityService:
             ops: Dictionary of database operations instances
         """
         if package.package_status:
-            ops["package_status"].update_status(
+            ops.package_status.update_status(
                 package.id, "Security Scanned"
             )
-            ops["package_status"].update_security_scan_status(
+            ops.package_status.update_security_scan_status(
                 package.id, "completed"
             )
             
             # Update security score if available
             if "security_score" in scan_result:
-                ops["package_status"].update_security_score(
+                ops.package_status.update_security_score(
                     package.id, scan_result["security_score"]
                 )
 
-    def _mark_scan_failed(self, package: Any, ops: Dict[str, Any]) -> None:
+    def _mark_scan_failed(self, package: Any, ops) -> None:
         """Mark package scan as failed.
 
         Args:
@@ -210,9 +210,9 @@ class SecurityService:
             ops: Dictionary of database operations instances
         """
         if package.package_status:
-            ops["package_status"].update_status(
+            ops.package_status.update_status(
                 package.id, "Security Scanned"
             )
-            ops["package_status"].update_security_scan_status(
+            ops.package_status.update_security_scan_status(
                 package.id, "failed"
             )

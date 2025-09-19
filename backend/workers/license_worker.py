@@ -10,7 +10,7 @@ import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
-from database.operations import OperationsFactory
+from database.operations.composite_operations import CompositeOperations
 from database.service import DatabaseService
 from services.license_service import LicenseService
 from workers.base_worker import BaseWorker
@@ -57,8 +57,7 @@ class LicenseWorker(BaseWorker):
     def process_cycle(self) -> None:
         """Process one cycle of license checking."""
         try:
-            with self.db_service.get_session() as session:
-                ops = OperationsFactory.create_all_operations(session)
+            with CompositeOperations.get_operations() as ops:
 
                 # Handle stuck packages first
                 self._handle_stuck_packages(ops)
@@ -178,10 +177,10 @@ class LicenseWorker(BaseWorker):
 
                 for package in stuck_packages:
                     if package.package_status:
-                        ops["package_status"].update_package_status(
+                        ops.package_status.update_package_status(
                             package.id,
                             "Submitted",
-                            ops["package_status"].PackageStatus,
+                            ops.package_status.PackageStatus,
                         )
 
         except Exception as e:
@@ -213,10 +212,10 @@ class LicenseWorker(BaseWorker):
 
             try:
                 # Update package status to indicate failure
-                ops["package_status"].update_package_status(
+                ops.package_status.update_package_status(
                     package.id,
                     "Licence Check Failed",
-                    ops["package_status"].PackageStatus,
+                    ops.package_status.PackageStatus,
                 )
 
                 # Log the failure

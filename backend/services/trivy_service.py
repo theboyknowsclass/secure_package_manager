@@ -10,7 +10,7 @@ from config.constants import (
     TRIVY_TIMEOUT,
     TRIVY_URL,
 )
-from database.flask_utils import get_db_operations
+from database.operations.composite_operations import CompositeOperations
 from database.models import Package, SecurityScan
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ class TrivyService:
             Dict containing scan results and status
         """
         try:
-            with get_db_operations() as ops:
+            with CompositeOperations.get_operations() as ops:
                 # Create security scan record
                 security_scan = SecurityScan(
                     package_id=package.id, scan_type="trivy"
@@ -436,7 +436,7 @@ class TrivyService:
                 )
                 package.package_status.updated_at = datetime.utcnow()
 
-            with get_db_operations() as ops:
+            with CompositeOperations.get_operations() as ops:
                 ops.commit()
 
             total_vulnerabilities = security_scan.get_total_vulnerabilities()
@@ -527,7 +527,7 @@ class TrivyService:
                 package.package_status.security_scan_status = "failed"
                 package.package_status.updated_at = datetime.utcnow()
 
-            with get_db_operations() as ops:
+            with CompositeOperations.get_operations() as ops:
                 ops.commit()
 
             logger.error(

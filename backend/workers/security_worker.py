@@ -9,7 +9,7 @@ import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
-from database.operations import OperationsFactory
+from database.operations.composite_operations import CompositeOperations
 from database.service import DatabaseService
 from services.security_service import SecurityService
 from workers.base_worker import BaseWorker
@@ -59,14 +59,12 @@ class SecurityWorker(BaseWorker):
     def process_cycle(self) -> None:
         """Process one cycle of security scanning."""
         try:
-            with self.db_service.get_session() as session:
-                ops = OperationsFactory.create_all_operations(session)
-
+            with CompositeOperations.get_operations() as ops:
                 # Handle stuck packages first
                 self._handle_stuck_packages(ops)
 
                 # Find packages that need security scanning
-                downloaded_packages = ops["package"].get_by_status("Downloaded")
+                downloaded_packages = ops.package.get_by_status("Downloaded")
                 
                 # Limit the number of packages processed per cycle
                 limited_packages = downloaded_packages[:self.max_packages_per_cycle]
@@ -94,13 +92,10 @@ class SecurityWorker(BaseWorker):
                         f"Error in security scanning batch: {result['error']}"
                     )
 
-                # Commit the session
-                session.commit()
-
         except Exception as e:
             logger.error(f"Security cycle error: {str(e)}", exc_info=True)
 
-    def _handle_stuck_packages(self, ops: Dict[str, Any]) -> None:
+    def _handle_stuck_packages(self, ops) -> None:
         """Handle packages that have been stuck in Security Scanning state too long."""
         try:
             stuck_threshold = datetime.utcnow() - self.stuck_package_timeout
