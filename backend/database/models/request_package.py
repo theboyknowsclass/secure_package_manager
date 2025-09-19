@@ -3,6 +3,7 @@
 from typing import Any
 
 from sqlalchemy import Column, ForeignKey, Integer, String
+from sqlalchemy.orm import relationship
 
 from .base import Base
 
@@ -13,6 +14,10 @@ class RequestPackage(Base):
     request_id = Column(Integer, ForeignKey("requests.id"), primary_key=True)
     package_id = Column(Integer, ForeignKey("packages.id"), primary_key=True)
     package_type = Column(String(20), default="new", nullable=False)
+    
+    # Relationships
+    request = relationship("Request", back_populates="request_packages")
+    package = relationship("Package", back_populates="request_packages")
 
     def to_dict(self) -> dict[str, Any]:
         return {

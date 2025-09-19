@@ -24,7 +24,7 @@ class Package(Base):
 
     # Relationships
     request_packages = relationship(
-        "RequestPackage", backref="package", lazy=True
+        "RequestPackage", back_populates="package", lazy=True
     )
     package_status = relationship(
         "PackageStatus", backref="package", uselist=False, lazy=True

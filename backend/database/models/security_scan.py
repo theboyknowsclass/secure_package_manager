@@ -19,6 +19,7 @@ class SecurityScan(Base):
         String(50), default="trivy", nullable=False
     )  # trivy, snyk, npm_audit
     scan_result = Column(JSON)  # Store the full Trivy scan result
+    vulnerability_count = Column(Integer, default=0)
     critical_count = Column(Integer, default=0)
     high_count = Column(Integer, default=0)
     medium_count = Column(Integer, default=0)
@@ -27,6 +28,7 @@ class SecurityScan(Base):
     scan_duration_ms = Column(Integer)  # Scan duration in milliseconds
     trivy_version = Column(String(50))  # Version of Trivy used for the scan
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = Column(DateTime)
 
     def get_total_vulnerabilities(self) -> int:
@@ -45,8 +47,7 @@ class SecurityScan(Base):
             "package_id": self.package_id,
             "scan_type": self.scan_type,
             "scan_result": self.scan_result,
-            # Calculate from granular counts
-            "vulnerability_count": self.get_total_vulnerabilities(),
+            "vulnerability_count": self.vulnerability_count,
             "critical_count": self.critical_count,
             "high_count": self.high_count,
             "medium_count": self.medium_count,
@@ -56,6 +57,9 @@ class SecurityScan(Base):
             "trivy_version": self.trivy_version,
             "created_at": (
                 self.created_at.isoformat() if self.created_at else None
+            ),
+            "updated_at": (
+                self.updated_at.isoformat() if self.updated_at else None
             ),
             "completed_at": (
                 self.completed_at.isoformat() if self.completed_at else None

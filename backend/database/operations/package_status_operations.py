@@ -234,6 +234,26 @@ class PackageStatusOperations(BaseOperations):
         status.updated_at = datetime.utcnow()
         return True
 
+    def update_license_info(self, package_id: int, license_score: int, license_tier: str) -> bool:
+        """Update package license information.
+
+        Args:
+            package_id: The ID of the package
+            license_score: The license score (0-100)
+            license_tier: The license tier (e.g., 'Approved', 'Conditional', 'Restricted', 'Prohibited')
+
+        Returns:
+            True if update was successful, False otherwise
+        """
+        status = self.get_by_package_id(package_id)
+        if not status:
+            return False
+
+        status.license_score = license_score
+        status.license_status = license_tier  # Use exact value to match database constraints
+        status.updated_at = datetime.utcnow()
+        return True
+
     def go_to_next_stage(self, package_id: int, **kwargs) -> bool:
         """Advance package to the next stage in the workflow.
 

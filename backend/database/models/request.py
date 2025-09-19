@@ -16,12 +16,12 @@ class Request(Base):
     application_name = Column(String(255), nullable=False)
     version = Column(String(100), nullable=False)
     requestor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    raw_request_blob = Column(Text, nullable=False)
+    raw_request_blob = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     request_packages = relationship(
-        "RequestPackage", backref="request", lazy=True
+        "RequestPackage", back_populates="request", lazy=True
     )
 
     def to_dict(self) -> dict[str, Any]:
