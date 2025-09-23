@@ -8,7 +8,6 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
-from database.session_helper import SessionHelper
 from services.approval_service import ApprovalService
 from workers.base_worker import BaseWorker
 
@@ -42,25 +41,24 @@ class ApprovalWorker(BaseWorker):
     def process_cycle(self) -> None:
         """Process one cycle of approval work."""
         try:
-            with SessionHelper.get_session() as db:
-                # Process packages using the service
-                result = self.approval_service.process_security_scanned_packages(
-                    self.max_packages_per_cycle
-                )
+            # Process packages using the service (service manages its own database sessions)
+            result = self.approval_service.process_security_scanned_packages(
+                self.max_packages_per_cycle
+            )
 
-                if result["success"]:
-                    if result["processed_count"] > 0:
-                        logger.info(
-                            f"Successfully transitioned {result['processed_count']} packages to Pending Approval"
-                        )
-                    else:
-                        logger.info(
-                            "ApprovalWorker heartbeat: No packages found for approval transition"
-                        )
-                else:
-                    logger.error(
-                        f"Error processing security scanned packages: {result['error']}"
+            if result["success"]:
+                if result["processed_count"] > 0:
+                    logger.info(
+                        f"Successfully transitioned {result['processed_count']} packages to Pending Approval"
                     )
+                else:
+                    logger.info(
+                        "ApprovalWorker heartbeat: No packages found for approval transition"
+                    )
+            else:
+                logger.error(
+                    f"Error processing security scanned packages: {result['error']}"
+                )
 
         except Exception as e:
             logger.error(f"Approval cycle error: {str(e)}", exc_info=True)
@@ -68,10 +66,10 @@ class ApprovalWorker(BaseWorker):
     def get_approval_stats(self) -> Dict[str, Any]:
         """Get current approval statistics."""
         try:
-            with SessionHelper.get_session() as db:
-                stats = self.approval_service.get_approval_statistics()
-                stats["worker_status"] = self.get_worker_status()
-                return stats
+            # Service manages its own database sessions
+            stats = self.approval_service.get_approval_statistics()
+            stats["worker_status"] = self.get_worker_status()
+            return stats
         except Exception as e:
             logger.error(f"Error getting approval stats: {str(e)}")
             return {"error": str(e)}

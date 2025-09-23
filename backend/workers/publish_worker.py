@@ -7,7 +7,6 @@ repository. This worker delegates all business logic to PublishingService.
 import logging
 from typing import Any, Dict, List
 
-from database.session_helper import SessionHelper
 from services.publishing_service import PublishingService
 from workers.base_worker import BaseWorker
 
@@ -45,26 +44,25 @@ class PublishWorker(BaseWorker):
     def process_cycle(self) -> None:
         """Process one cycle of package publishing."""
         try:
-            with SessionHelper.get_session() as db:
-                # Process packages using the service
-                result = self.publishing_service.process_package_batch(
-                    self.max_packages_per_cycle
-                )
+            # Process packages using the service (service manages its own database sessions)
+            result = self.publishing_service.process_package_batch(
+                self.max_packages_per_cycle
+            )
 
-                if result["success"]:
-                    if result["processed_count"] > 0:
-                        logger.info(
-                            f"Publishing complete: {result['successful_packages']} successful, "
-                            f"{result['failed_packages']} failed"
-                        )
-                    else:
-                        logger.info(
-                            "PublishWorker heartbeat: No packages found for publishing"
-                        )
-                else:
-                    logger.error(
-                        f"Error in publishing batch: {result['error']}"
+            if result["success"]:
+                if result["processed_count"] > 0:
+                    logger.info(
+                        f"Publishing complete: {result['successful_packages']} successful, "
+                        f"{result['failed_packages']} failed"
                     )
+                else:
+                    logger.info(
+                        "PublishWorker heartbeat: No packages found for publishing"
+                    )
+            else:
+                logger.error(
+                    f"Error in publishing batch: {result['error']}"
+                )
 
         except Exception as e:
             logger.error(
@@ -75,10 +73,10 @@ class PublishWorker(BaseWorker):
     def get_publishing_stats(self) -> Dict[str, Any]:
         """Get current publishing statistics."""
         try:
-            with SessionHelper.get_session() as db:
-                stats = self.publishing_service.get_publishing_statistics()
-                stats["worker_status"] = self.get_worker_status()
-                return stats
+            # Service manages its own database sessions
+            stats = self.publishing_service.get_publishing_statistics()
+            stats["worker_status"] = self.get_worker_status()
+            return stats
         except Exception as e:
             logger.error(f"Error getting publishing stats: {str(e)}")
             return {"error": str(e)}
@@ -86,15 +84,15 @@ class PublishWorker(BaseWorker):
     def retry_failed_publishing(self) -> Dict[str, Any]:
         """Retry failed publishing packages."""
         try:
-            with SessionHelper.get_session() as db:
-                result = self.publishing_service.retry_failed_packages()
-                
-                if "retried" in result and result["retried"] > 0:
-                    logger.info(
-                        f"Retried {result['retried']} failed publishing packages"
-                    )
-                
-                return result
+            # Service manages its own database sessions
+            result = self.publishing_service.retry_failed_packages()
+            
+            if "retried" in result and result["retried"] > 0:
+                logger.info(
+                    f"Retried {result['retried']} failed publishing packages"
+                )
+            
+            return result
         except Exception as e:
             logger.error(
                 f"Error retrying failed publishing packages: {str(e)}"

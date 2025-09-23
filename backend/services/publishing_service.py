@@ -1,7 +1,7 @@
 """Publishing Service.
 
-Handles publishing packages to the secure repository. This service manages its own database sessions
-and operations, following the service-first architecture pattern.
+Handles publishing packages to the secure repository. This service separates database operations 
+from I/O work for optimal performance.
 """
 
 import logging
@@ -18,8 +18,7 @@ logger = logging.getLogger(__name__)
 class PublishingService:
     """Service for publishing packages to secure repository.
 
-    This service manages its own database sessions and operations,
-    following the service-first architecture pattern.
+    This service separates database operations from I/O work to minimize database session time.
     """
 
     def __init__(self) -> None:
@@ -31,6 +30,11 @@ class PublishingService:
     ) -> Dict[str, Any]:
         """Process a batch of packages for publishing.
 
+        This method separates database operations from I/O work:
+        1. Get packages that need publishing (short DB session)
+        2. Perform publishing (no DB session)
+        3. Update database with results (short DB session)
+
         Args:
             max_packages: Maximum number of packages to process
 
@@ -38,52 +42,22 @@ class PublishingService:
             Dict with processing results
         """
         try:
-            with SessionHelper.get_session() as db:
-                # Initialize operations
-                package_ops = PackageOperations(db.session)
-                status_ops = PackageStatusOperations(db.session)
-                
-                # Find packages that need publishing
-                pending_packages = package_ops.get_packages_needing_publishing(max_packages)
-
-                if not pending_packages:
-                    return {
-                        "success": True,
-                        "processed_count": 0,
-                        "successful_packages": 0,
-                        "failed_packages": 0
-                    }
-
-                successful_packages = []
-                failed_packages = []
-
-                for package in pending_packages:
-                    try:
-                        result = self.process_single_package(package, status_ops)
-                        if result["success"]:
-                            successful_packages.append(package)
-                        else:
-                            failed_packages.append({
-                                "package": package,
-                                "error": result["error"]
-                            })
-                    except Exception as e:
-                        self.logger.error(
-                            f"Error processing package {package.name}@{package.version}: {str(e)}"
-                        )
-                        failed_packages.append({
-                            "package": package,
-                            "error": str(e)
-                        })
-
-                db.commit()
-
+            # Phase 1: Get package data (short DB session)
+            packages_to_process = self._get_packages_for_publishing(max_packages)
+            if not packages_to_process:
                 return {
                     "success": True,
-                    "processed_count": len(successful_packages) + len(failed_packages),
-                    "successful_packages": len(successful_packages),
-                    "failed_packages": len(failed_packages)
+                    "processed_count": 0,
+                    "successful_packages": 0,
+                    "failed_packages": 0
                 }
+
+            # Phase 2: Perform publishing (no DB session)
+            publish_results = self._perform_publish_batch(packages_to_process)
+
+            # Phase 3: Update database (short DB session)
+            return self._update_publish_results(publish_results)
+
         except Exception as e:
             self.logger.error(f"Error processing publishing batch: {str(e)}")
             return {
@@ -94,44 +68,104 @@ class PublishingService:
                 "failed_packages": 0
             }
 
-    def process_single_package(
-        self, package: Any, status_ops: PackageStatusOperations
-    ) -> Dict[str, Any]:
-        """Process a single package for publishing.
+    def _get_packages_for_publishing(self, max_packages: int) -> List[Any]:
+        """Get packages that need publishing (short DB session).
 
         Args:
-            package: Package to process
-            status_ops: Package status operations instance
+            max_packages: Maximum number of packages to retrieve
 
         Returns:
-            Dict with success status and any error message
+            List of packages that need publishing
+        """
+        with SessionHelper.get_session() as db:
+            package_ops = PackageOperations(db.session)
+            return package_ops.get_packages_needing_publishing(max_packages)
+
+    def _perform_publish_batch(self, packages: List[Any]) -> List[Tuple[Any, Dict[str, Any]]]:
+        """Perform publishing without database sessions.
+
+        Args:
+            packages: List of packages to publish
+
+        Returns:
+            List of tuples (package, result_dict)
+        """
+        results = []
+        for package in packages:
+            result = self._perform_publish_work(package)
+            results.append((package, result))
+        return results
+
+    def _perform_publish_work(self, package: Any) -> Dict[str, Any]:
+        """Pure I/O work - no database operations.
+
+        Args:
+            package: Package to publish
+
+        Returns:
+            Dict with publish result
         """
         try:
-            # Update package status to "publishing"
-            self._update_package_publish_status(
-                package, "publishing", status_ops
-            )
-
             # Attempt to publish the package
-            # Note: This would call the actual publishing service
-            # For now, we'll simulate the publishing logic
             success = self._publish_package_to_repository(package)
 
             if success:
-                # Mark as published successfully
-                self._mark_package_published(package, status_ops)
-                return {"success": True, "error": None}
+                return {"status": "success", "message": "Published successfully"}
             else:
-                # Mark as publish failed
-                self._mark_package_publish_failed(package, "Publishing failed", status_ops)
-                return {"success": False, "error": "Publishing failed"}
+                return {"status": "failed", "error": "Publishing failed"}
 
         except Exception as e:
-            self.logger.error(
-                f"Error processing package {package.name}@{package.version}: {str(e)}"
+            self.logger.error(f"Error publishing package {package.name}@{package.version}: {str(e)}")
+            return {"status": "failed", "error": str(e)}
+
+    def _update_publish_results(self, publish_results: List[Tuple[Any, Dict[str, Any]]]) -> Dict[str, Any]:
+        """Update database with publish results (short DB session).
+
+        Args:
+            publish_results: List of tuples (package, result_dict)
+
+        Returns:
+            Dict with processing results
+        """
+        successful_count = 0
+        failed_count = 0
+
+        with SessionHelper.get_session() as db:
+            package_ops = PackageOperations(db.session)
+            status_ops = PackageStatusOperations(db.session)
+
+            for package, result in publish_results:
+                try:
+                    # Verify package still needs processing (race condition protection)
+                    current_package = package_ops.get_by_id(package.id)
+                    if not current_package or not current_package.package_status or current_package.package_status.status != "Approved":
+                        continue  # Skip if status changed
+
+                    if result["status"] == "success":
+                        status_ops.update_status(package.id, "Published")
+                        successful_count += 1
+                    else:  # failed
+                        status_ops.update_status(package.id, "Publish Failed")
+                        failed_count += 1
+
+                except Exception as e:
+                    self.logger.error(f"Error updating package {package.name}@{package.version}: {str(e)}")
+                    failed_count += 1
+
+            db.commit()
+
+        # Log batch summary
+        if successful_count > 0 or failed_count > 0:
+            self.logger.info(
+                f"Publishing batch complete: {successful_count} successful, {failed_count} failed"
             )
-            self._mark_package_publish_failed(package, str(e), status_ops)
-            return {"success": False, "error": str(e)}
+
+        return {
+            "success": True,
+            "processed_count": len(publish_results),
+            "successful_packages": successful_count,
+            "failed_packages": failed_count
+        }
 
     def get_publishing_statistics(self) -> Dict[str, Any]:
         """Get current publishing statistics.
@@ -207,50 +241,6 @@ class PublishingService:
                 "retried": 0
             }
 
-    def get_stuck_packages(
-        self, stuck_threshold: datetime, package_ops: PackageOperations
-    ) -> List[Any]:
-        """Get packages that have been stuck in publishing state too long.
-
-        Args:
-            stuck_threshold: DateTime threshold for considering packages stuck
-            package_ops: Package operations instance
-
-        Returns:
-            List of stuck packages
-        """
-        try:
-            # Use operations to get stuck packages
-            stuck_packages = package_ops.get_stuck_packages_in_publishing(
-                stuck_threshold
-            )
-            return stuck_packages
-        except Exception as e:
-            self.logger.error(f"Error getting stuck packages: {str(e)}")
-            return []
-
-    def reset_stuck_packages(
-        self, stuck_packages: List[Any], status_ops: PackageStatusOperations
-    ) -> None:
-        """Reset stuck packages to pending status.
-
-        Args:
-            stuck_packages: List of stuck packages to reset
-            status_ops: Package status operations instance
-        """
-        for package in stuck_packages:
-            try:
-                self._update_package_publish_status(
-                    package, "pending", status_ops
-                )
-                self.logger.info(
-                    f"Reset stuck package {package.name}@{package.version} publish status to pending"
-                )
-            except Exception as e:
-                self.logger.error(
-                    f"Error resetting stuck package {package.name}@{package.version}: {str(e)}"
-                )
-
     def _publish_package_to_repository(self, package: Any) -> bool:
         """Publish package to the secure repository.
 
@@ -271,39 +261,3 @@ class PublishingService:
         except Exception as e:
             self.logger.error(f"Error publishing package to repository: {str(e)}")
             return False
-
-    def _update_package_publish_status(
-        self, package: Any, status: str, status_ops: PackageStatusOperations
-    ) -> None:
-        """Update package publish status.
-
-        Args:
-            package: Package to update
-            status: New publish status
-            status_ops: Package status operations instance
-        """
-        if package.package_status:
-            status_ops.update_status(package.id, status)
-
-    def _mark_package_published(self, package: Any, status_ops: PackageStatusOperations) -> None:
-        """Mark package as published successfully.
-
-        Args:
-            package: Package to mark as published
-            status_ops: Package status operations instance
-        """
-        if package.package_status:
-            status_ops.go_to_next_stage(package.id)
-
-    def _mark_package_publish_failed(
-        self, package: Any, error_message: str, status_ops: PackageStatusOperations
-    ) -> None:
-        """Mark package as publish failed.
-
-        Args:
-            package: Package to mark as failed
-            error_message: Error message
-            status_ops: Package status operations instance
-        """
-        if package.package_status:
-            status_ops.update_status(package.id, "Publish Failed")

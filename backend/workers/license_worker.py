@@ -7,7 +7,6 @@ all business logic to LicenseService.
 import logging
 from typing import List
 
-from database.session_helper import SessionHelper
 from services.license_service import LicenseService
 from workers.base_worker import BaseWorker
 
@@ -40,26 +39,25 @@ class LicenseWorker(BaseWorker):
     def process_cycle(self) -> None:
         """Process one cycle of license checking."""
         try:
-            with SessionHelper.get_session() as db:
-                # Process packages using the service
-                result = self.license_service.process_license_groups(
-                    self.max_license_groups_per_cycle
-                )
+            # Process packages using the service (service manages its own database sessions)
+            result = self.license_service.process_license_groups(
+                self.max_license_groups_per_cycle
+            )
 
-                if result["success"]:
-                    if result["processed_count"] > 0:
-                        logger.info(
-                            f"License processing complete: {result['successful_packages']} successful, "
-                            f"{result['failed_packages']} failed across {result['license_groups_processed']} license groups"
-                        )
-                    else:
-                        logger.info(
-                            "LicenseWorker heartbeat: No packages found needing license checking"
-                        )
-                else:
-                    logger.error(
-                        f"Error in license processing: {result['error']}"
+            if result["success"]:
+                if result["processed_count"] > 0:
+                    logger.info(
+                        f"License processing complete: {result['successful_packages']} successful, "
+                        f"{result['failed_packages']} failed across {result['license_groups_processed']} license groups"
                     )
+                else:
+                    logger.info(
+                        "LicenseWorker heartbeat: No packages found needing license checking"
+                    )
+            else:
+                logger.error(
+                    f"Error in license processing: {result['error']}"
+                )
 
         except Exception as e:
             logger.error(

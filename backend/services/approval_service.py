@@ -1,12 +1,12 @@
 """Approval Service.
 
-Handles approval workflow for packages. This service manages its own database sessions
-and operations, following the service-first architecture pattern.
+Handles approval workflow for packages. This service separates database operations 
+from I/O work for optimal performance.
 """
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from database.operations.package_operations import PackageOperations
 from database.operations.package_status_operations import PackageStatusOperations
@@ -18,8 +18,7 @@ logger = logging.getLogger(__name__)
 class ApprovalService:
     """Service for handling package approval workflow.
 
-    This service manages its own database sessions and operations,
-    following the service-first architecture pattern.
+    This service separates database operations from I/O work to minimize database session time.
     """
 
     def __init__(self) -> None:
@@ -31,6 +30,11 @@ class ApprovalService:
     ) -> Dict[str, Any]:
         """Process packages that are Security Scanned and ready for approval.
 
+        This method separates database operations from I/O work:
+        1. Get packages that need approval transitions (short DB session)
+        2. Process approval logic (no DB session)
+        3. Update database with results (short DB session)
+
         Args:
             max_packages: Maximum number of packages to process
 
@@ -38,36 +42,21 @@ class ApprovalService:
             Dict with processing results
         """
         try:
-            with SessionHelper.get_session() as db:
-                # Initialize operations
-                package_ops = PackageOperations(db.session)
-                status_ops = PackageStatusOperations(db.session)
-                
-                # Find packages that need approval transitions
-                security_scanned_packages = package_ops.get_by_status("Security Scanned")
-                
-                # Limit the number of packages processed
-                limited_packages = security_scanned_packages[:max_packages]
-
-                if not limited_packages:
-                    return {
-                        "success": True,
-                        "processed_count": 0,
-                        "total_packages": 0
-                    }
-
-                processed_count = 0
-                for package in limited_packages:
-                    if self._transition_to_pending_approval(package, status_ops):
-                        processed_count += 1
-
-                db.commit()
-
+            # Phase 1: Get package data (short DB session)
+            packages_to_process = self._get_packages_for_approval(max_packages)
+            if not packages_to_process:
                 return {
                     "success": True,
-                    "processed_count": processed_count,
-                    "total_packages": len(limited_packages)
+                    "processed_count": 0,
+                    "total_packages": 0
                 }
+
+            # Phase 2: Process approval logic (no DB session)
+            approval_results = self._perform_approval_batch(packages_to_process)
+
+            # Phase 3: Update database (short DB session)
+            return self._update_approval_results(approval_results)
+
         except Exception as e:
             self.logger.error(f"Error processing security scanned packages: {str(e)}")
             return {
@@ -127,3 +116,47 @@ class ApprovalService:
                 f"Error transitioning package {package.name}@{package.version}: {str(e)}"
             )
             return False
+
+    def _get_packages_for_approval(self, max_packages: int) -> List[Any]:
+        """Get packages that need approval transitions (short DB session)."""
+        with SessionHelper.get_session() as db:
+            package_ops = PackageOperations(db.session)
+            return package_ops.get_by_status("Security Scanned")[:max_packages]
+
+    def _perform_approval_batch(self, packages: List[Any]) -> List[Tuple[Any, Dict[str, Any]]]:
+        """Process approval logic without database sessions."""
+        results = []
+        for package in packages:
+            # Simple approval logic - just mark as ready for approval
+            results.append((package, {"status": "success", "action": "transition_to_pending_approval"}))
+        return results
+
+    def _update_approval_results(self, approval_results: List[Tuple[Any, Dict[str, Any]]]) -> Dict[str, Any]:
+        """Update database with approval results (short DB session)."""
+        processed_count = 0
+
+        with SessionHelper.get_session() as db:
+            package_ops = PackageOperations(db.session)
+            status_ops = PackageStatusOperations(db.session)
+
+            for package, result in approval_results:
+                try:
+                    # Verify package still needs processing (race condition protection)
+                    current_package = package_ops.get_by_id(package.id)
+                    if not current_package or not current_package.package_status or current_package.package_status.status != "Security Scanned":
+                        continue
+
+                    if result["status"] == "success":
+                        status_ops.update_status(package.id, "Pending Approval")
+                        processed_count += 1
+
+                except Exception as e:
+                    self.logger.error(f"Error updating package {package.name}@{package.version}: {str(e)}")
+
+            db.commit()
+
+        return {
+            "success": True,
+            "processed_count": processed_count,
+            "total_packages": len(approval_results)
+        }
