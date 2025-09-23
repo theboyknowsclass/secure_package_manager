@@ -69,7 +69,7 @@ class DownloadService:
             # Phase 3: Update database (short DB session)
             return self._update_download_results(download_results)
 
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError) as e:
             self.logger.error(f"Error processing download batch: {str(e)}")
             return {
                 "success": False,
@@ -309,7 +309,7 @@ class DownloadService:
                 f"Network error downloading package {package.name}@{package.version}: {str(e)}"
             )
             return None
-        except Exception as e:
+        except (OSError, IOError, ValueError) as e:
             self.logger.error(
                 f"Unexpected error downloading package {package.name}@{package.version}: {str(e)}"
             )

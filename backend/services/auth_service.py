@@ -59,9 +59,6 @@ class AuthService:
 
     def _decode_jwt_token(self, token: str) -> Optional[Dict[str, Any]]:
         """Decode and validate JWT token."""
-        import logging
-
-        logger = logging.getLogger(__name__)
 
         # For OAuth2 tokens, we need to validate audience and issuer
         payload = jwt.decode(

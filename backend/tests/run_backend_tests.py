@@ -5,16 +5,19 @@ Run this to verify all backend functionality including services,
 workers, and integrations.
 """
 
+import logging
 import os
 import subprocess
 import sys
 import unittest
 
+logger = logging.getLogger(__name__)
+
 
 def run_backend_tests():
     """Run all backend tests."""
-    print("🚀 Starting Backend Tests...")
-    print("=" * 50)
+    logger.info("🚀 Starting Backend Tests...")
+    logger.info("=" * 50)
 
     # Get the directory containing this script
     test_dir = os.path.dirname(os.path.abspath(__file__))
@@ -29,12 +32,12 @@ def run_backend_tests():
     result = runner.run(suite)
 
     # Print summary
-    print("\n" + "=" * 50)
+    logger.info("\n" + "=" * 50)
     if result.wasSuccessful():
-        print("🎉 All backend tests passed!")
+        logger.info("🎉 All backend tests passed!")
         return True
     else:
-        print(
+        logger.error(
             f"❌ {len(result.failures)} test(s) failed, {len(result.errors)} error(s)"
         )
         return False
@@ -42,15 +45,15 @@ def run_backend_tests():
 
 def run_specific_test(test_file):
     """Run a specific test file."""
-    print(f"🚀 Running {test_file}...")
-    print("=" * 50)
+    logger.info(f"🚀 Running {test_file}...")
+    logger.info("=" * 50)
 
     # Get the directory containing this script
     test_dir = os.path.dirname(os.path.abspath(__file__))
     test_path = os.path.join(test_dir, test_file)
 
     if not os.path.exists(test_path):
-        print(f"❌ Test file not found: {test_path}")
+        logger.error(f"❌ Test file not found: {test_path}")
         return False
 
     # Run the specific test
@@ -59,10 +62,10 @@ def run_specific_test(test_file):
     )
 
     if result.returncode == 0:
-        print(f"\n🎉 {test_file} passed!")
+        logger.info(f"\n🎉 {test_file} passed!")
         return True
     else:
-        print(f"\n❌ {test_file} failed!")
+        logger.error(f"\n❌ {test_file} failed!")
         return False
 
 

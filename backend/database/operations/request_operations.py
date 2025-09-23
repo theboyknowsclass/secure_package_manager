@@ -52,7 +52,7 @@ class RequestOperations(BaseOperations):
         stmt = select(Request).where(Request.id == request_id)
         return self.session.execute(stmt).scalar_one_or_none()
 
-    def get_all(self, model_class: Type[Request]) -> List[Request]:
+    def get_all(self) -> List[Request]:
         """Get all requests.
 
         Returns:

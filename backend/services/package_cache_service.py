@@ -8,6 +8,7 @@ import io
 import logging
 import os
 import tarfile
+from pathlib import Path
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -71,8 +72,8 @@ class PackageCacheService:
         Returns:
             True if package exists in cache, False otherwise
         """
-        package_dir = self._get_package_cache_path(package)
-        return os.path.exists(package_dir) and os.path.isdir(package_dir)
+        package_dir = Path(self._get_package_cache_path(package))
+        return package_dir.exists() and package_dir.is_dir()
 
     def get_package_path(self, package) -> Optional[str]:
         """Get the local path to cached package.
@@ -84,11 +85,11 @@ class PackageCacheService:
             Path to package directory or None if not cached
         """
         if self.is_package_cached(package):
-            package_dir = self._get_package_cache_path(package)
+            package_dir = Path(self._get_package_cache_path(package))
 
             # All npm tarballs extract to a "package" directory
             # Both scoped and regular packages use the same structure
-            return os.path.join(package_dir, "package")
+            return str(package_dir / "package")
         return None
 
     def remove_package(self, package) -> bool:

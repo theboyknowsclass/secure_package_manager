@@ -4,9 +4,12 @@
 Runs all unit tests in the workers test package.
 """
 
+import logging
 import os
 import sys
 import unittest
+
+logger = logging.getLogger(__name__)
 
 # Add the parent directory to the path so we can import modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -14,8 +17,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 def run_worker_tests():
     """Run all worker unit tests."""
-    print("🚀 Starting Worker Unit Tests...")
-    print("=" * 50)
+    logger.info("🚀 Starting Worker Unit Tests...")
+    logger.info("=" * 50)
 
     # Discover and run all tests in the workers test package
     loader = unittest.TestLoader()
@@ -26,12 +29,12 @@ def run_worker_tests():
     result = runner.run(suite)
 
     # Print summary
-    print("\n" + "=" * 50)
+    logger.info("\n" + "=" * 50)
     if result.wasSuccessful():
-        print("🎉 All worker unit tests passed!")
+        logger.info("🎉 All worker unit tests passed!")
         return True
     else:
-        print(
+        logger.error(
             f"❌ {len(result.failures)} test(s) failed, {len(result.errors)} error(s)"
         )
         return False

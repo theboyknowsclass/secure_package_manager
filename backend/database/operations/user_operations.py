@@ -57,7 +57,7 @@ class UserOperations(BaseOperations):
         stmt = select(User).where(User.role.in_(["approver", "admin"]))
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_all(self, model_class: Type[User]) -> List[User]:
+    def get_all(self) -> List[User]:
         """Get all users.
 
         Returns:

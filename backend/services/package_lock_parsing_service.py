@@ -9,7 +9,6 @@ proper separation of concerns.
 """
 
 import logging
-import os
 from typing import Any, Dict, List, Optional, Tuple
 
 from database.operations import (

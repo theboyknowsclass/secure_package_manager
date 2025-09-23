@@ -56,9 +56,7 @@ class SupportedLicenseOperations(BaseOperations):
         """
         return self.get_by_status("blocked")
 
-    def get_all(
-        self, model_class: Type[SupportedLicense]
-    ) -> List[SupportedLicense]:
+    def get_all(self) -> List[SupportedLicense]:
         """Get all supported licenses.
 
         Returns:

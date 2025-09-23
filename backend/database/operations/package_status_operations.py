@@ -121,7 +121,7 @@ class PackageStatusOperations(BaseOperations):
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_all(self, model_class: Type[PackageStatus]) -> List[PackageStatus]:
+    def get_all(self) -> List[PackageStatus]:
         """Get all package statuses.
 
         Returns:

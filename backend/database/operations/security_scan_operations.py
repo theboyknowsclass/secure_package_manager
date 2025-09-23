@@ -58,7 +58,7 @@ class SecurityScanOperations(BaseOperations):
         # requirements
         return []
 
-    def get_all(self, model_class: Type[SecurityScan]) -> List[SecurityScan]:
+    def get_all(self) -> List[SecurityScan]:
         """Get all security scans.
 
         Returns:

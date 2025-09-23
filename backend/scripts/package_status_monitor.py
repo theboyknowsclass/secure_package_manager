@@ -181,16 +181,16 @@ class PackageStatusMonitor:
 
         if format_type == "json":
             report = {"timestamp": timestamp, "package_counts": counts}
-            print(json.dumps(report, indent=2))
+            logger.info(json.dumps(report, indent=2))
 
         elif format_type == "csv":
-            print(f"timestamp,status,count")
+            logger.info(f"timestamp,status,count")
             for status, count in counts.items():
-                print(f"{timestamp},{status},{count}")
+                logger.info(f"{timestamp},{status},{count}")
 
         else:  # table format
-            print(f"\n📊 Package Status Report - {timestamp}")
-            print("=" * 50)
+            logger.info(f"\n📊 Package Status Report - {timestamp}")
+            logger.info("=" * 50)
 
             # Sort by count (descending) but put TOTAL at the end
             sorted_items = sorted(
@@ -205,9 +205,9 @@ class PackageStatusMonitor:
             for status, count in sorted_items:
                 # Add emoji indicators for different statuses
                 emoji = self._get_status_emoji(status)
-                print(f"{emoji} {status:<20} {count:>8}")
+                logger.info(f"{emoji} {status:<20} {count:>8}")
 
-            print("=" * 50)
+            logger.info("=" * 50)
 
     def _get_status_emoji(self, status: str) -> str:
         """Get emoji for status display."""
@@ -255,7 +255,7 @@ class PackageStatusMonitor:
                 self.run_once(format_type)
 
                 if format_type == "table":
-                    print(
+                    logger.info(
                         f"\n⏰ Next update in {interval} seconds... (Ctrl+C to stop)"
                     )
 
@@ -330,28 +330,28 @@ Examples:
             breakdown = monitor.get_detailed_status_breakdown()
             if breakdown:
                 if args.output == "json":
-                    print(json.dumps(breakdown, indent=2))
+                    logger.info(json.dumps(breakdown, indent=2))
                 else:
-                    print(
+                    logger.info(
                         f"\n📊 Detailed Package Status Report - {breakdown['timestamp']}"
                     )
-                    print("=" * 60)
-                    print(f"Total Packages: {breakdown['total_packages']}")
-                    print(
+                    logger.info("=" * 60)
+                    logger.info(f"Total Packages: {breakdown['total_packages']}")
+                    logger.info(
                         f"Status Types: {breakdown['summary']['total_statuses']}"
                     )
-                    print(
+                    logger.info(
                         f"Stuck Packages: {breakdown['summary']['stuck_count']}"
                     )
-                    print("\nStatus Breakdown:")
+                    logger.info("\nStatus Breakdown:")
                     for status, info in breakdown["status_breakdown"].items():
                         emoji = monitor._get_status_emoji(status)
-                        print(f"{emoji} {status:<20} {info['count']:>8}")
+                        logger.info(f"{emoji} {status:<20} {info['count']:>8}")
                         if info["oldest_created"]:
-                            print(f"   Oldest: {info['oldest_created']}")
+                            logger.info(f"   Oldest: {info['oldest_created']}")
                         if info["newest_updated"]:
-                            print(f"   Newest: {info['newest_updated']}")
-                        print()
+                            logger.info(f"   Newest: {info['newest_updated']}")
+                        logger.info("")
         else:
             # Regular status counts
             if args.continuous:
