@@ -51,24 +51,21 @@ const getPackageStatusLabel = (status: PackageStatus): string => {
   }
 };
 
-export const PackageStatusChip: React.FC<PackageStatusChipProps> = React.memo(({
-  status,
-  showTooltip = true,
-  size = "small",
-  variant = "filled",
-}) => {
-  const color = getPackageStatusColor(status);
-  const label = getPackageStatusLabel(status);
+export const PackageStatusChip: React.FC<PackageStatusChipProps> = React.memo(
+  ({ status, showTooltip = true, size = "small", variant = "filled" }) => {
+    const color = getPackageStatusColor(status);
+    const label = getPackageStatusLabel(status);
 
-  const chip = (
-    <Chip label={label} color={color} size={size} variant={variant} />
-  );
+    const chip = (
+      <Chip label={label} color={color} size={size} variant={variant} />
+    );
 
-  if (showTooltip) {
-    return <Tooltip title={`Status: ${label}`}>{chip}</Tooltip>;
+    if (showTooltip) {
+      return <Tooltip title={`Status: ${label}`}>{chip}</Tooltip>;
+    }
+
+    return chip;
   }
-
-  return chip;
-});
+);
 
 export default PackageStatusChip;

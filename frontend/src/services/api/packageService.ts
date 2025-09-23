@@ -1,6 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import { api, endpoints } from "../api";
-import { PackageRequest, DetailedRequestResponse, AuditDataItem } from "../../types/package";
+import {
+  PackageRequest,
+  DetailedRequestResponse,
+  AuditDataItem,
+} from "../../types/package";
 
 // Package Request Queries
 export const usePackageRequests = (options?: { refetchInterval?: number }) => {

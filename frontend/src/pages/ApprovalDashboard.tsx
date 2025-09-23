@@ -40,23 +40,25 @@ interface ApprovalRequestRowData {
 }
 
 // Memoized cell components for better performance
-const SelectCell = React.memo(({ 
-  selected, 
-  onSelectChange 
-}: { 
-  selected: boolean; 
-  onSelectChange?: (selected: boolean) => void;
-}) => (
-  <input
-    type="checkbox"
-    checked={selected}
-    onChange={e => {
-      if (onSelectChange) {
-        onSelectChange(e.target.checked);
-      }
-    }}
-  />
-));
+const SelectCell = React.memo(
+  ({
+    selected,
+    onSelectChange,
+  }: {
+    selected: boolean;
+    onSelectChange?: (selected: boolean) => void;
+  }) => (
+    <input
+      type="checkbox"
+      checked={selected}
+      onChange={e => {
+        if (onSelectChange) {
+          onSelectChange(e.target.checked);
+        }
+      }}
+    />
+  )
+);
 
 const PackageNameCell = React.memo(({ name }: { name: string }) => (
   <Typography variant="body2" sx={{ fontWeight: "medium" }}>
@@ -85,40 +87,42 @@ const parseLicenseExpression = (expression: string): string[] => {
     .filter(license => license.length > 0);
 };
 
-const LicenseCell = React.memo(({ licenseIdentifier }: { licenseIdentifier: string | null }) => {
-  if (!licenseIdentifier) {
-    return (
-      <Typography variant="body2" color="textSecondary">
-        Unknown
-      </Typography>
-    );
-  }
+const LicenseCell = React.memo(
+  ({ licenseIdentifier }: { licenseIdentifier: string | null }) => {
+    if (!licenseIdentifier) {
+      return (
+        <Typography variant="body2" color="textSecondary">
+          Unknown
+        </Typography>
+      );
+    }
 
-  const licenses = parseLicenseExpression(licenseIdentifier);
+    const licenses = parseLicenseExpression(licenseIdentifier);
 
-  if (licenses.length === 1) {
-    return (
-      <Chip
-        label={licenses[0]}
-        color={getLicenseStatusColor(licenses[0])}
-        size="small"
-      />
-    );
-  }
-
-  return (
-    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-      {licenses.map((license, index) => (
+    if (licenses.length === 1) {
+      return (
         <Chip
-          key={index}
-          label={license}
-          color={getLicenseStatusColor(license)}
+          label={licenses[0]}
+          color={getLicenseStatusColor(licenses[0])}
           size="small"
         />
-      ))}
-    </Box>
-  );
-});
+      );
+    }
+
+    return (
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+        {licenses.map((license, index) => (
+          <Chip
+            key={index}
+            label={license}
+            color={getLicenseStatusColor(license)}
+            size="small"
+          />
+        ))}
+      </Box>
+    );
+  }
+);
 
 // Define columns for package details table
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -130,7 +134,7 @@ const packageColumns: MRT_ColumnDef<
     header: "Select",
     size: 60,
     Cell: ({ row }) => (
-      <SelectCell 
+      <SelectCell
         selected={row.original.selected || false}
         onSelectChange={row.original.onSelectChange}
       />
@@ -158,7 +162,9 @@ const packageColumns: MRT_ColumnDef<
     accessorKey: "license_identifier",
     header: "License",
     size: 150,
-    Cell: ({ row }) => <LicenseCell licenseIdentifier={row.original.license_identifier} />,
+    Cell: ({ row }) => (
+      <LicenseCell licenseIdentifier={row.original.license_identifier} />
+    ),
   },
   {
     accessorKey: "security_score",
@@ -510,7 +516,7 @@ export default function ApprovalDashboard() {
           enableSorting
           enableColumnResizing
           enablePagination={false}
-          enableVirtualization={tableData.length > 50}
+          enableRowVirtualization={tableData.length > 50}
           muiTableProps={{
             sx: {
               tableLayout: "fixed",

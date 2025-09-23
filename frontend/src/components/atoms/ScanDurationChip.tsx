@@ -13,58 +13,60 @@ export interface ScanDurationChipProps {
   variant?: "filled" | "outlined";
 }
 
-export const ScanDurationChip: React.FC<ScanDurationChipProps> = React.memo(({
-  scanResult,
-  showTooltip = true,
-  size = "small",
-  variant = "outlined",
-}) => {
-  if (!scanResult || scanResult.scan_duration_ms === null) {
-    return (
-      <Chip label="Pending" color="default" size={size} variant={variant} />
+export const ScanDurationChip: React.FC<ScanDurationChipProps> = React.memo(
+  ({
+    scanResult,
+    showTooltip = true,
+    size = "small",
+    variant = "outlined",
+  }) => {
+    if (!scanResult || scanResult.scan_duration_ms === null) {
+      return (
+        <Chip label="Pending" color="default" size={size} variant={variant} />
+      );
+    }
+
+    const duration = formatScanDuration(scanResult.scan_duration_ms);
+    const chip = (
+      <Chip label={duration} color="info" size={size} variant={variant} />
     );
-  }
 
-  const duration = formatScanDuration(scanResult.scan_duration_ms);
-  const chip = (
-    <Chip label={duration} color="info" size={size} variant={variant} />
-  );
-
-  if (showTooltip) {
-    const tooltipContent = (
-      <div>
+    if (showTooltip) {
+      const tooltipContent = (
         <div>
-          <strong>Scan Duration:</strong> {duration}
-        </div>
-        <div>
-          <strong>Scanner:</strong> {scanResult.scan_type}
-        </div>
-        {scanResult.trivy_version && (
           <div>
-            <strong>Version:</strong> {scanResult.trivy_version}
+            <strong>Scan Duration:</strong> {duration}
           </div>
-        )}
-        <div>
-          <strong>Vulnerabilities:</strong>{" "}
-          {getVulnerabilityBreakdown(scanResult)}
-        </div>
-        {scanResult.completed_at && (
           <div>
-            <strong>Completed:</strong>{" "}
-            {new Date(scanResult.completed_at).toLocaleString()}
+            <strong>Scanner:</strong> {scanResult.scan_type}
           </div>
-        )}
-      </div>
-    );
+          {scanResult.trivy_version && (
+            <div>
+              <strong>Version:</strong> {scanResult.trivy_version}
+            </div>
+          )}
+          <div>
+            <strong>Vulnerabilities:</strong>{" "}
+            {getVulnerabilityBreakdown(scanResult)}
+          </div>
+          {scanResult.completed_at && (
+            <div>
+              <strong>Completed:</strong>{" "}
+              {new Date(scanResult.completed_at).toLocaleString()}
+            </div>
+          )}
+        </div>
+      );
 
-    return (
-      <Tooltip title={tooltipContent} arrow>
-        {chip}
-      </Tooltip>
-    );
+      return (
+        <Tooltip title={tooltipContent} arrow>
+          {chip}
+        </Tooltip>
+      );
+    }
+
+    return chip;
   }
-
-  return chip;
-});
+);
 
 export default ScanDurationChip;

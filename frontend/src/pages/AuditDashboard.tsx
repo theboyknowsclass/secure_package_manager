@@ -1,21 +1,11 @@
 import React, { useMemo } from "react";
-import {
-  Box,
-  Typography,
-  Chip,
-  Alert,
-  CircularProgress,
-} from "@mui/material";
+import { Box, Typography, Chip, Alert, CircularProgress } from "@mui/material";
 import { MaterialReactTable, type MRT_ColumnDef } from "material-react-table";
 import { useAuditData } from "../services/api/packageService";
 import { AuditDataItem } from "../types/package";
 
 export default function AuditDashboard() {
-  const {
-    data: auditData,
-    isLoading,
-    error,
-  } = useAuditData();
+  const { data: auditData, isLoading, error } = useAuditData();
 
   // Memoized cell components to prevent re-renders
   const PackageNameCell = React.memo(({ value }: { value: string }) => (
@@ -38,11 +28,7 @@ export default function AuditDashboard() {
     }
 
     return (
-      <Chip
-        label={value}
-        color={getLicenseStatusColor(value)}
-        size="small"
-      />
+      <Chip label={value} color={getLicenseStatusColor(value)} size="small" />
     );
   });
 
@@ -53,7 +39,9 @@ export default function AuditDashboard() {
         accessorKey: "package.name",
         header: "Package Name",
         size: 200,
-        Cell: ({ row }) => <PackageNameCell value={row.original.package.name} />,
+        Cell: ({ row }) => (
+          <PackageNameCell value={row.original.package.name} />
+        ),
       },
       {
         accessorKey: "package.version",
@@ -65,7 +53,9 @@ export default function AuditDashboard() {
         accessorKey: "package.license_identifier",
         header: "License",
         size: 150,
-        Cell: ({ row }) => <LicenseCell value={row.original.package.license_identifier} />,
+        Cell: ({ row }) => (
+          <LicenseCell value={row.original.package.license_identifier} />
+        ),
       },
       {
         accessorKey: "approval.approver",
@@ -198,7 +188,7 @@ export default function AuditDashboard() {
         },
       },
     ],
-    []
+    [LicenseCell, PackageNameCell, VersionCell]
   );
 
   if (isLoading) {
@@ -231,7 +221,8 @@ export default function AuditDashboard() {
         Audit Dashboard
       </Typography>
       <Typography variant="body1" color="textSecondary" paragraph>
-        View all approved packages with their approval history and original request information.
+        View all approved packages with their approval history and original
+        request information.
       </Typography>
 
       {auditData && auditData.length > 0 ? (
@@ -243,7 +234,7 @@ export default function AuditDashboard() {
           enableSorting
           enableColumnResizing
           enablePagination
-          enableVirtualization={auditData.length > 100}
+          enableRowVirtualization={auditData.length > 100}
           muiTableProps={{
             sx: {
               tableLayout: "fixed",
@@ -259,6 +250,7 @@ export default function AuditDashboard() {
             showColumnFilters: true,
             sorting: [{ id: "approval.approved_at", desc: true }], // Sort by newest approvals first
             pagination: {
+              pageIndex: 0,
               pageSize: 25,
             },
           }}
@@ -269,7 +261,8 @@ export default function AuditDashboard() {
             No approved packages found
           </Typography>
           <Typography variant="body2" color="textSecondary">
-            Approved packages will appear here once they have been approved by an approver.
+            Approved packages will appear here once they have been approved by
+            an approver.
           </Typography>
         </Box>
       )}

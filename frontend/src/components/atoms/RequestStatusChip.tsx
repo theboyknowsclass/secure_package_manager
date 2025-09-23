@@ -38,24 +38,21 @@ const getRequestStatusLabel = (status: string): string => {
   }
 };
 
-export const RequestStatusChip: React.FC<RequestStatusChipProps> = React.memo(({
-  status,
-  showTooltip = true,
-  size = "small",
-  variant = "filled",
-}) => {
-  const color = getRequestStatusColor(status);
-  const label = getRequestStatusLabel(status);
+export const RequestStatusChip: React.FC<RequestStatusChipProps> = React.memo(
+  ({ status, showTooltip = true, size = "small", variant = "filled" }) => {
+    const color = getRequestStatusColor(status);
+    const label = getRequestStatusLabel(status);
 
-  const chip = (
-    <Chip label={label} color={color} size={size} variant={variant} />
-  );
+    const chip = (
+      <Chip label={label} color={color} size={size} variant={variant} />
+    );
 
-  if (showTooltip) {
-    return <Tooltip title={`Request Status: ${label}`}>{chip}</Tooltip>;
+    if (showTooltip) {
+      return <Tooltip title={`Request Status: ${label}`}>{chip}</Tooltip>;
+    }
+
+    return chip;
   }
-
-  return chip;
-});
+);
 
 export default RequestStatusChip;

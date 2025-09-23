@@ -4,7 +4,6 @@ import {
   Typography,
   Card,
   CardContent,
-  Grid,
   Chip,
   Alert,
   CircularProgress,
@@ -179,9 +178,9 @@ export default function RepositoryConfig() {
       </Alert>
 
       {/* Configuration Details */}
-      <Grid container spacing={3}>
+      <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
         {/* Repository Configuration */}
-        <Grid item xs={12} md={6}>
+        <Box sx={{ flex: "1 1 300px", minWidth: 0 }}>
           <Card>
             <CardContent>
               <Box display="flex" alignItems="center" mb={2}>
@@ -212,10 +211,10 @@ export default function RepositoryConfig() {
               </List>
             </CardContent>
           </Card>
-        </Grid>
+        </Box>
 
         {/* Services Configuration */}
-        <Grid item xs={12} md={6}>
+        <Box sx={{ flex: "1 1 300px", minWidth: 0 }}>
           <Card>
             <CardContent>
               <Box display="flex" alignItems="center" mb={2}>
@@ -261,10 +260,10 @@ export default function RepositoryConfig() {
               </List>
             </CardContent>
           </Card>
-        </Grid>
+        </Box>
 
         {/* Security Configuration */}
-        <Grid item xs={12} md={6}>
+        <Box sx={{ flex: "1 1 300px", minWidth: 0 }}>
           <Card>
             <CardContent>
               <Box display="flex" alignItems="center" mb={2}>
@@ -311,10 +310,10 @@ export default function RepositoryConfig() {
               </List>
             </CardContent>
           </Card>
-        </Grid>
+        </Box>
 
         {/* Advanced Configuration */}
-        <Grid item xs={12} md={6}>
+        <Box sx={{ flex: "1 1 300px", minWidth: 0 }}>
           <Card>
             <CardContent>
               <Box display="flex" alignItems="center" mb={2}>
@@ -383,8 +382,8 @@ export default function RepositoryConfig() {
               </Accordion>
             </CardContent>
           </Card>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
 
       {/* Information Alert */}
       <Alert severity="info" sx={{ mt: 3 }} icon={<InfoIcon />}>

@@ -2,7 +2,6 @@ import React from "react";
 import {
   Box,
   Typography,
-  Grid,
   Card,
   CardContent,
   Paper,
@@ -50,8 +49,8 @@ export default function Dashboard() {
       </Typography>
 
       {/* Statistics Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={4}>
+      <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap", mb: 4 }}>
+        <Box sx={{ flex: "1 1 200px", minWidth: 0 }}>
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
@@ -62,9 +61,9 @@ export default function Dashboard() {
               </Typography>
             </CardContent>
           </Card>
-        </Grid>
+        </Box>
 
-        <Grid item xs={12} sm={4}>
+        <Box sx={{ flex: "1 1 200px", minWidth: 0 }}>
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
@@ -75,9 +74,9 @@ export default function Dashboard() {
               </Typography>
             </CardContent>
           </Card>
-        </Grid>
+        </Box>
 
-        <Grid item xs={12} sm={4}>
+        <Box sx={{ flex: "1 1 200px", minWidth: 0 }}>
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
@@ -88,8 +87,8 @@ export default function Dashboard() {
               </Typography>
             </CardContent>
           </Card>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
 
       {/* Recent Requests */}
       <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>
@@ -97,9 +96,9 @@ export default function Dashboard() {
       </Typography>
 
       {requests && requests.length > 0 ? (
-        <Grid container spacing={2}>
+        <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
           {requests.slice(0, 6).map((request: PackageRequest) => (
-            <Grid item xs={12} md={6} key={request.id}>
+            <Box sx={{ flex: "1 1 300px", minWidth: 0 }} key={request.id}>
               <Paper sx={{ p: 2 }}>
                 <Box
                   display="flex"
@@ -130,9 +129,9 @@ export default function Dashboard() {
                   Created: {new Date(request.created_at).toLocaleDateString()}
                 </Typography>
               </Paper>
-            </Grid>
+            </Box>
           ))}
-        </Grid>
+        </Box>
       ) : (
         <Paper sx={{ p: 3, textAlign: "center" }}>
           <Typography variant="h6" color="textSecondary">

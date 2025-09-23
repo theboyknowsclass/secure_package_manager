@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -11,7 +11,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Grid,
   Card,
   CardContent,
 } from "@mui/material";
@@ -35,30 +34,32 @@ interface ApprovalDetailDialogProps {
 }
 
 // Memoized cell components for better performance
-const SelectCell = React.memo(({ 
-  selected, 
-  isPendingApproval, 
-  onSelectChange 
-}: { 
-  selected: boolean; 
-  isPendingApproval: boolean;
-  onSelectChange?: (selected: boolean) => void;
-}) => (
-  <input
-    type="checkbox"
-    checked={selected}
-    disabled={!isPendingApproval}
-    onChange={e => {
-      if (onSelectChange && isPendingApproval) {
-        onSelectChange(e.target.checked);
-      }
-    }}
-    style={{
-      opacity: isPendingApproval ? 1 : 0.5,
-      cursor: isPendingApproval ? "pointer" : "not-allowed",
-    }}
-  />
-));
+const SelectCell = React.memo(
+  ({
+    selected,
+    isPendingApproval,
+    onSelectChange,
+  }: {
+    selected: boolean;
+    isPendingApproval: boolean;
+    onSelectChange?: (selected: boolean) => void;
+  }) => (
+    <input
+      type="checkbox"
+      checked={selected}
+      disabled={!isPendingApproval}
+      onChange={e => {
+        if (onSelectChange && isPendingApproval) {
+          onSelectChange(e.target.checked);
+        }
+      }}
+      style={{
+        opacity: isPendingApproval ? 1 : 0.5,
+        cursor: isPendingApproval ? "pointer" : "not-allowed",
+      }}
+    />
+  )
+);
 
 const PackageNameCell = React.memo(({ name }: { name: string }) => (
   <Typography variant="body2" sx={{ fontWeight: "medium" }}>
@@ -87,46 +88,48 @@ const parseLicenseExpression = (expression: string): string[] => {
     .filter(license => license.length > 0);
 };
 
-const LicenseCell = React.memo(({ 
-  licenseIdentifier, 
-  licenseStatus 
-}: { 
-  licenseIdentifier: string | null; 
-  licenseStatus?: string;
-}) => {
-  if (!licenseIdentifier) {
-    return (
-      <Typography variant="body2" color="textSecondary">
-        Unknown
-      </Typography>
-    );
-  }
+const LicenseCell = React.memo(
+  ({
+    licenseIdentifier,
+    licenseStatus,
+  }: {
+    licenseIdentifier: string | null;
+    licenseStatus?: string;
+  }) => {
+    if (!licenseIdentifier) {
+      return (
+        <Typography variant="body2" color="textSecondary">
+          Unknown
+        </Typography>
+      );
+    }
 
-  const licenses = parseLicenseExpression(licenseIdentifier);
+    const licenses = parseLicenseExpression(licenseIdentifier);
 
-  if (licenses.length === 1) {
-    return (
-      <Chip
-        label={licenses[0]}
-        color={getLicenseStatusColor(licenses[0], licenseStatus)}
-        size="small"
-      />
-    );
-  }
-
-  return (
-    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-      {licenses.map((license, index) => (
+    if (licenses.length === 1) {
+      return (
         <Chip
-          key={index}
-          label={license}
-          color={getLicenseStatusColor(license, licenseStatus)}
+          label={licenses[0]}
+          color={getLicenseStatusColor(licenses[0], licenseStatus)}
           size="small"
         />
-      ))}
-    </Box>
-  );
-});
+      );
+    }
+
+    return (
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+        {licenses.map((license, index) => (
+          <Chip
+            key={index}
+            label={license}
+            color={getLicenseStatusColor(license, licenseStatus)}
+            size="small"
+          />
+        ))}
+      </Box>
+    );
+  }
+);
 
 // Define columns for package details table with selection
 const packageColumns: MRT_ColumnDef<
@@ -137,9 +140,11 @@ const packageColumns: MRT_ColumnDef<
     header: "Select",
     size: 60,
     Cell: ({ row }) => (
-      <SelectCell 
+      <SelectCell
         selected={row.original.selected || false}
-        isPendingApproval={row.original.status === PACKAGE_STATUS.PENDING_APPROVAL}
+        isPendingApproval={
+          row.original.status === PACKAGE_STATUS.PENDING_APPROVAL
+        }
         onSelectChange={row.original.onSelectChange}
       />
     ),
@@ -167,9 +172,9 @@ const packageColumns: MRT_ColumnDef<
     header: "License",
     size: 150,
     Cell: ({ row }) => (
-      <LicenseCell 
+      <LicenseCell
         licenseIdentifier={row.original.license_identifier}
-        licenseStatus={row.original.license_status}
+        licenseStatus={row.original.license_status || undefined}
       />
     ),
   },
@@ -354,19 +359,18 @@ export default function ApprovalDetailDialog({
     onClose();
   };
 
-  // Helper function to get only pending approval packages from selected packages
-  const getSelectedPendingPackages = () => {
+  // Memoized helper functions to prevent recalculation on every render
+  const selectedPendingPackages = useMemo(() => {
     if (!selectedRequest) return [];
     return Array.from(selectedPackages).filter(packageId => {
       const pkg = selectedRequest.packages.find(p => p.id === packageId);
       return pkg && pkg.status === PACKAGE_STATUS.PENDING_APPROVAL;
     });
-  };
+  }, [selectedPackages, selectedRequest]);
 
-  // Helper function to check if any pending approval packages are selected
-  const hasSelectedPendingPackages = () => {
-    return getSelectedPendingPackages().length > 0;
-  };
+  const hasSelectedPendingPackages = useMemo(() => {
+    return selectedPendingPackages.length > 0;
+  }, [selectedPendingPackages]);
 
   const getLicenseSummary = (packages: Package[]) => {
     const licenseCounts: { [key: string]: number } = {};
@@ -413,8 +417,8 @@ export default function ApprovalDetailDialog({
               <Typography variant="h6" gutterBottom>
                 Request Summary
               </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={4}>
+              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                <Box sx={{ flex: "1 1 200px", minWidth: 0 }}>
                   <Typography variant="caption" color="textSecondary">
                     Application
                   </Typography>
@@ -422,8 +426,8 @@ export default function ApprovalDetailDialog({
                     {selectedRequest.request.application_name} v
                     {selectedRequest.request.version}
                   </Typography>
-                </Grid>
-                <Grid item xs={4}>
+                </Box>
+                <Box sx={{ flex: "1 1 200px", minWidth: 0 }}>
                   <Typography variant="caption" color="textSecondary">
                     Requestor
                   </Typography>
@@ -431,8 +435,8 @@ export default function ApprovalDetailDialog({
                     {selectedRequest.request.requestor.full_name} (@
                     {selectedRequest.request.requestor.username})
                   </Typography>
-                </Grid>
-                <Grid item xs={4}>
+                </Box>
+                <Box sx={{ flex: "1 1 200px", minWidth: 0 }}>
                   <Typography variant="caption" color="textSecondary">
                     Created
                   </Typography>
@@ -441,8 +445,8 @@ export default function ApprovalDetailDialog({
                       selectedRequest.request.created_at
                     ).toLocaleString()}
                   </Typography>
-                </Grid>
-              </Grid>
+                </Box>
+              </Box>
             </Box>
 
             {/* License Summary */}
@@ -456,9 +460,11 @@ export default function ApprovalDetailDialog({
                 );
 
                 return (
-                  <Grid container spacing={2}>
+                  <Box
+                    sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+                  >
                     {/* License Status Summary */}
-                    <Grid item xs={12}>
+                    <Box>
                       <Typography variant="subtitle2" gutterBottom>
                         License Status Summary
                       </Typography>
@@ -475,10 +481,10 @@ export default function ApprovalDetailDialog({
                           />
                         ))}
                       </Box>
-                    </Grid>
+                    </Box>
 
                     {/* Individual License Summary */}
-                    <Grid item xs={12}>
+                    <Box>
                       <Typography
                         variant="subtitle2"
                         gutterBottom
@@ -498,8 +504,8 @@ export default function ApprovalDetailDialog({
                           )
                         )}
                       </Box>
-                    </Grid>
-                  </Grid>
+                    </Box>
+                  </Box>
                 );
               })()}
             </Box>
@@ -517,7 +523,7 @@ export default function ApprovalDetailDialog({
                 <Typography variant="h6">Approval Actions</Typography>
                 <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
                   <Typography variant="body2" color="textSecondary">
-                    {getSelectedPendingPackages().length} of{" "}
+                    {selectedPendingPackages.length} of{" "}
                     {
                       selectedRequest.packages.filter(
                         p => p.status === PACKAGE_STATUS.PENDING_APPROVAL
@@ -546,8 +552,8 @@ export default function ApprovalDetailDialog({
                   </Button>
                 </Box>
               </Box>
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
+              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                <Box sx={{ flex: "1 1 300px", minWidth: 0 }}>
                   <Card
                     sx={{ border: "1px solid", borderColor: "success.main" }}
                   >
@@ -573,15 +579,15 @@ export default function ApprovalDetailDialog({
                         color="success"
                         startIcon={<CheckCircle />}
                         onClick={handleApproveRequest}
-                        disabled={isProcessing || !hasSelectedPendingPackages()}
+                        disabled={isProcessing || !hasSelectedPendingPackages}
                         sx={{ mt: 2 }}
                       >
-                        Approve Selected ({getSelectedPendingPackages().length})
+                        Approve Selected ({selectedPendingPackages.length})
                       </Button>
                     </CardContent>
                   </Card>
-                </Grid>
-                <Grid item xs={6}>
+                </Box>
+                <Box sx={{ flex: "1 1 300px", minWidth: 0 }}>
                   <Card sx={{ border: "1px solid", borderColor: "error.main" }}>
                     <CardContent>
                       <Box display="flex" alignItems="center" mb={2}>
@@ -609,16 +615,16 @@ export default function ApprovalDetailDialog({
                         disabled={
                           isProcessing ||
                           !rejectionReason.trim() ||
-                          !hasSelectedPendingPackages()
+                          !hasSelectedPendingPackages
                         }
                         sx={{ mt: 2 }}
                       >
-                        Reject Selected ({getSelectedPendingPackages().length})
+                        Reject Selected ({selectedPendingPackages.length})
                       </Button>
                     </CardContent>
                   </Card>
-                </Grid>
-              </Grid>
+                </Box>
+              </Box>
             </Box>
 
             {/* Packages Table */}
@@ -655,7 +661,7 @@ export default function ApprovalDetailDialog({
               enableTopToolbar={false}
               enableBottomToolbar={false}
               enableColumnFilterModes={false}
-              enableVirtualization={selectedRequest.packages.length > 50}
+              enableRowVirtualization={selectedRequest.packages.length > 50}
               muiTableProps={{
                 sx: {
                   tableLayout: "fixed",

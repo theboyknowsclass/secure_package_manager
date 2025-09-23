@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from "react";
+import React, { useCallback } from "react";
 import {
   Box,
   Typography,
@@ -24,6 +24,7 @@ import {
 } from "../atoms";
 import { RequestSummary } from "../molecules";
 import { type SecurityScanStatus } from "../../types/securityStatus";
+import { type PackageStatus } from "../../types/packageStatus";
 
 interface RequestDetailDialogProps {
   open: boolean;
@@ -34,42 +35,46 @@ interface RequestDetailDialogProps {
 
 // Memoized cell components to prevent re-renders
 const StatusCell = React.memo(({ status }: { status: string }) => (
-  <PackageStatusChip status={status} />
+  <PackageStatusChip status={status as PackageStatus} />
 ));
 
-const LicenseCell = React.memo(({ 
-  identifier, 
-  score 
-}: { 
-  identifier: string | null; 
-  score: number | null;
-}) => (
-  <LicenseChip identifier={identifier} score={score} />
-));
+const LicenseCell = React.memo(
+  ({
+    identifier,
+    score,
+  }: {
+    identifier: string | null;
+    score: number | null;
+  }) => <LicenseChip identifier={identifier} score={score} />
+);
 
 const LicenseScoreCell = React.memo(({ score }: { score: number | null }) => (
   <LicenseScoreChip score={score} />
 ));
 
-const SecurityScoreCell = React.memo(({ 
-  score, 
-  scanStatus, 
-  scanResult 
-}: { 
-  score: number | null; 
-  scanStatus: SecurityScanStatus; 
-  scanResult: any;
-}) => (
-  <SecurityScoreChip
-    score={score}
-    scanStatus={scanStatus}
-    scanResult={scanResult}
-  />
-));
+const SecurityScoreCell = React.memo(
+  ({
+    score,
+    scanStatus,
+    scanResult,
+  }: {
+    score: number | null;
+    scanStatus: SecurityScanStatus;
+    scanResult: unknown;
+  }) => (
+    <SecurityScoreChip
+      score={score}
+      scanStatus={scanStatus}
+      scanResult={scanResult}
+    />
+  )
+);
 
-const VulnerabilityCell = React.memo(({ scanResult }: { scanResult: any }) => (
-  <VulnerabilityChip scanResult={scanResult} />
-));
+const VulnerabilityCell = React.memo(
+  ({ scanResult }: { scanResult: unknown }) => (
+    <VulnerabilityChip scanResult={scanResult} />
+  )
+);
 
 const TypeCell = React.memo(({ type }: { type: string }) => (
   <PackageTypeChip type={type === "existing" ? "existing" : "new"} />
@@ -91,7 +96,7 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     accessorKey: "status",
     header: "Status",
     size: 120,
-    Cell: ({ row }: { row: any }) => (
+    Cell: ({ row }: { row: { original: Package } }) => (
       <StatusCell status={row.original.status} />
     ),
   },
@@ -99,8 +104,8 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     accessorKey: "license_identifier",
     header: "License",
     size: 120,
-    Cell: ({ row }: { row: any }) => (
-      <LicenseCell 
+    Cell: ({ row }: { row: { original: Package } }) => (
+      <LicenseCell
         identifier={row.original.license_identifier}
         score={row.original.license_score}
       />
@@ -110,7 +115,7 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     accessorKey: "license_score",
     header: "License Score",
     size: 120,
-    Cell: ({ row }: { row: any }) => (
+    Cell: ({ row }: { row: { original: Package } }) => (
       <LicenseScoreCell score={row.original.license_score} />
     ),
   },
@@ -125,7 +130,7 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
         },
       },
     },
-    Cell: ({ row }: { row: any }) => (
+    Cell: ({ row }: { row: { original: Package } }) => (
       <SecurityScoreCell
         score={row.original.security_score}
         scanStatus={row.original.security_scan_status as SecurityScanStatus}
@@ -137,7 +142,7 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     accessorKey: "scan_result",
     header: "Vulnerabilities",
     size: 120,
-    Cell: ({ row }: { row: any }) => (
+    Cell: ({ row }: { row: { original: Package } }) => (
       <VulnerabilityCell scanResult={row.original.scan_result} />
     ),
   },
@@ -145,9 +150,7 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     accessorKey: "type",
     header: "Type",
     size: 80,
-    Cell: ({ row }: { row: any }) => (
-      <TypeCell type={row.original.type} />
-    ),
+    Cell: ({ row }: { row: any }) => <TypeCell type={row.original.type} />,
   },
 ];
 
@@ -168,11 +171,6 @@ export default function RequestDetailDialog({
   const handleClose = useCallback(() => {
     onClose();
   }, [onClose]);
-
-  // Memoize the packages data to prevent unnecessary re-renders
-  const memoizedPackages = useMemo(() => {
-    return selectedRequest?.packages || [];
-  }, [selectedRequest?.packages]);
 
   return (
     <Dialog
@@ -214,7 +212,7 @@ export default function RequestDetailDialog({
               enableColumnFilterModes={false}
               enableRowActions={false}
               enableRowSelection={false}
-              enableVirtualization={selectedRequest.packages.length > 50}
+              enableRowVirtualization={selectedRequest.packages.length > 50}
               muiTableProps={{
                 sx: {
                   tableLayout: "fixed",

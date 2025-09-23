@@ -101,6 +101,10 @@ export const getStatusDisplayName = (status: PackageStatus): string => {
     [PACKAGE_STATUS.PENDING_APPROVAL]: "Pending Approval",
     [PACKAGE_STATUS.APPROVED]: "Approved",
     [PACKAGE_STATUS.REJECTED]: "Rejected",
+    [PACKAGE_STATUS.PARSE_FAILED]: "Parse Failed",
+    [PACKAGE_STATUS.LICENCE_CHECK_FAILED]: "License Check Failed",
+    [PACKAGE_STATUS.DOWNLOAD_FAILED]: "Download Failed",
+    [PACKAGE_STATUS.SECURITY_SCAN_FAILED]: "Security Scan Failed",
   };
   return displayNames[status] || status;
 };
