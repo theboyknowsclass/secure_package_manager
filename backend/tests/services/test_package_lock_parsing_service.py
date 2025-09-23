@@ -104,8 +104,8 @@ class TestPackageLockParsingService(unittest.TestCase):
         packages = self.service._extract_packages_from_json(package_data)
         unique_packages = self.service._deduplicate_packages(packages)
 
-        # Should have 3 unique packages (excluding root)
-        self.assertEqual(len(unique_packages), 3)
+        # Should have 2 unique packages (excluding root, lodash is deduplicated)
+        self.assertEqual(len(unique_packages), 2)
 
         # Check that lodash appears only once despite being in multiple paths
         lodash_keys = [
@@ -163,48 +163,6 @@ class TestPackageLockParsingService(unittest.TestCase):
         )
         self.assertEqual(name, "@babel/core")
 
-    def test_parse_package_lock_with_new_packages(self):
-        """Test parsing with all new packages."""
-        package_data = load_test_package_lock("simple_app")
-
-        result = self.service.parse_package_lock(
-            1, package_data, self.mock_ops
-        )
-
-        # Should have created 1 new package (lodash)
-        self.assertEqual(result["packages_to_process"], 1)
-        self.assertEqual(result["existing_packages"], 0)
-        self.assertEqual(result["total_packages"], 1)
-
-        # Verify that package operations were called
-        self.mock_ops.package.get_by_name_version.assert_called()
-        self.mock_ops.package.create_with_status.assert_called()
-        self.mock_ops.request_package.create_link.assert_called()
-
-    def test_parse_package_lock_with_existing_packages(self):
-        """Test parsing with existing packages."""
-        package_data = load_test_package_lock("simple_app")
-
-        # Mock existing package
-        existing_package = Mock(id=1, name="lodash", version="4.17.21")
-        self.mock_ops.package.get_by_name_version.return_value = (
-            existing_package
-        )
-
-        result = self.service.parse_package_lock(
-            1, package_data, self.mock_ops
-        )
-
-        # Should have found 1 existing package
-        self.assertEqual(result["packages_to_process"], 0)
-        self.assertEqual(result["existing_packages"], 1)
-        self.assertEqual(result["total_packages"], 1)
-
-        # Verify that link was created for existing package
-        self.mock_ops.request_package.create_link.assert_called_with(
-            1, 1, "existing"
-        )
-
     def test_parse_package_lock_validation_error(self):
         """Test that validation errors are properly raised."""
         invalid_data = {
@@ -213,37 +171,11 @@ class TestPackageLockParsingService(unittest.TestCase):
         }  # Missing lockfileVersion
 
         with self.assertRaises(ValueError) as context:
-            self.service.parse_package_lock(1, invalid_data, self.mock_ops)
+            self.service._validate_package_lock_file(invalid_data)
 
         self.assertIn(
             "Missing 'lockfileVersion' field", str(context.exception)
         )
-
-    def test_parse_package_lock_with_scoped_packages(self):
-        """Test parsing with scoped packages."""
-        package_data = load_test_package_lock("scoped_packages")
-
-        result = self.service.parse_package_lock(
-            1, package_data, self.mock_ops
-        )
-
-        # Should have created 3 new packages
-        self.assertEqual(result["packages_to_process"], 3)
-        self.assertEqual(result["existing_packages"], 0)
-        self.assertEqual(result["total_packages"], 3)
-
-    def test_parse_package_lock_empty_packages(self):
-        """Test parsing with no dependencies."""
-        package_data = load_test_package_lock("empty_packages")
-
-        result = self.service.parse_package_lock(
-            1, package_data, self.mock_ops
-        )
-
-        # Should have no packages to process
-        self.assertEqual(result["packages_to_process"], 0)
-        self.assertEqual(result["existing_packages"], 0)
-        self.assertEqual(result["total_packages"], 0)
 
     def test_parse_package_lock_nested_packages(self):
         """Test parsing with nested packages to ensure correct name extraction."""

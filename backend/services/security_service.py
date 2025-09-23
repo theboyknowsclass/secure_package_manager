@@ -112,11 +112,11 @@ class SecurityService:
             # Perform the actual security scan using Trivy service
             scan_result = self._perform_security_scan(package)
 
-            # Process scan results
+            # Process scan results - the new scan_package_data_only method returns the correct format
             if scan_result.get("status") == "failed":
-                return {"status": "failed", "error": "Security scan failed"}
+                return {"status": "failed", "error": scan_result.get("error", "Security scan failed")}
             else:
-                return {"status": "success", "scan_data": scan_result}
+                return {"status": "success", "scan_data": scan_result.get("scan_data", {})}
 
         except Exception as e:
             self.logger.error(f"Error scanning package {package.name}@{package.version}: {str(e)}")
@@ -174,10 +174,16 @@ class SecurityService:
                             status_ops.update_security_score(package.id, result["scan_data"]["security_score"])
                         
                         # Store scan results if available
+                        scan_stored = True
                         if "scan_data" in result:
-                            self._store_scan_results(security_scan_ops, package.id, result["scan_data"])
+                            scan_stored = self._store_scan_results(security_scan_ops, package.id, result["scan_data"])
                         
-                        successful_count += 1
+                        if scan_stored:
+                            successful_count += 1
+                        else:
+                            # If scan results couldn't be stored, treat as failed
+                            status_ops.update_status(package.id, "Security Scan Failed")
+                            failed_count += 1
                     else:  # failed
                         status_ops.update_status(package.id, "Security Scan Failed")
                         failed_count += 1
@@ -202,13 +208,16 @@ class SecurityService:
             "total_packages": len(scan_results)
         }
 
-    def _store_scan_results(self, security_scan_ops: SecurityScanOperations, package_id: int, scan_data: Dict[str, Any]) -> None:
+    def _store_scan_results(self, security_scan_ops: SecurityScanOperations, package_id: int, scan_data: Dict[str, Any]) -> bool:
         """Store security scan results in database.
 
         Args:
             security_scan_ops: Security scan operations instance
             package_id: ID of the package that was scanned
             scan_data: Scan results data
+
+        Returns:
+            True if successful, False if failed
         """
         try:
             # Create security scan record
@@ -217,10 +226,7 @@ class SecurityService:
             security_scan = SecurityScan(
                 package_id=package_id,
                 scan_type="trivy",
-                scan_status="completed",
-                vulnerabilities_found=scan_data.get("scan_result", {}).get("vulnerabilities", []),
-                scan_summary=scan_data.get("scan_result", {}).get("summary", {}),
-                scan_details=scan_data.get("scan_result", {}),
+                scan_result=scan_data.get("scan_result", {}),
                 critical_count=scan_data.get("critical_count", 0),
                 high_count=scan_data.get("high_count", 0),
                 medium_count=scan_data.get("medium_count", 0),
@@ -232,6 +238,8 @@ class SecurityService:
             )
             
             security_scan_ops.create(security_scan)
+            return True
             
         except Exception as e:
             self.logger.error(f"Error storing scan results for package {package_id}: {str(e)}")
+            return False

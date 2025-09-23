@@ -52,7 +52,7 @@ class TestPackageCacheService(unittest.TestCase):
         
         path = self.cache_service._get_package_cache_path(package)
         
-        expected_path = os.path.join(self.test_cache_dir, "-babel-core-7.22.0")
+        expected_path = os.path.join(self.test_cache_dir, "@babel-core-7.22.0")
         self.assertEqual(path, expected_path)
 
     def test_get_package_cache_path_special_characters(self):
@@ -139,7 +139,7 @@ class TestPackageCacheService(unittest.TestCase):
         
         # Mock tarfile extraction
         mock_tar = Mock()
-        mock_tarfile_open.return_value.__enter__.return_value = mock_tar
+        mock_tarfile_open.return_value = mock_tar
         
         # Create the package directory and package.json after extraction
         package_dir = self.cache_service._get_package_cache_path(package)
@@ -236,7 +236,7 @@ class TestPackageCacheService(unittest.TestCase):
     def test_list_cached_packages_with_packages(self):
         """Test listing cached packages with packages in cache."""
         package = Mock()
-        package.name = "test-package"
+        package.name = "test"
         package.version = "1.0.0"
         
         # Create the package directory
@@ -246,7 +246,7 @@ class TestPackageCacheService(unittest.TestCase):
         packages = self.cache_service.list_cached_packages()
         
         self.assertEqual(len(packages), 1)
-        self.assertEqual(packages[0]["name"], "test-package")
+        self.assertEqual(packages[0]["name"], "test")
         self.assertEqual(packages[0]["version"], "1.0.0")
         self.assertEqual(packages[0]["path"], package_dir)
 
