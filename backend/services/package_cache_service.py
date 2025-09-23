@@ -23,7 +23,7 @@ class PackageCacheService:
         # Ensure package cache directory exists
         os.makedirs(self.package_cache_dir, exist_ok=True)
 
-    def store_package_from_tarball(self, package, tarball_content: bytes) -> bool:
+    def store_package_from_tarball(self, package, tarball_content: bytes) -> Optional[str]:
         """Store a package in the cache from tarball content.
 
         Args:
@@ -31,7 +31,7 @@ class PackageCacheService:
             tarball_content: Raw tarball content as bytes
 
         Returns:
-            True if storage successful, False otherwise
+            Path to the stored package directory if successful, None otherwise
         """
         try:
             # Create package cache directory
@@ -43,19 +43,19 @@ class PackageCacheService:
             tarball_buffer.extractall(package_dir)
             tarball_buffer.close()
 
-            # Successfully stored - no need to log every single package
-            return True
+            # Return the actual path to the package directory
+            return package_dir
 
         except tarfile.TarError as e:
             logger.error(
                 f"Error extracting tarball for {package.name}@{package.version}: {str(e)}"
             )
-            return False
+            return None
         except Exception as e:
             logger.error(
                 f"Unexpected error storing package {package.name}@{package.version}: {str(e)}"
             )
-            return False
+            return None
 
     def is_package_cached(self, package) -> bool:
         """Check if package is already cached locally.

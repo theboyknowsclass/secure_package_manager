@@ -94,6 +94,21 @@ export default function Navbar() {
             </Button>
           )}
 
+          {/* Audit section - for approvers and admins */}
+          {(user?.role === "approver" || user?.role === "admin") && (
+            <Button
+              color="inherit"
+              onClick={() => navigate("/audit")}
+              sx={{
+                backgroundColor: isActive("/audit")
+                  ? "rgba(255, 255, 255, 0.1)"
+                  : "transparent",
+              }}
+            >
+              Audit
+            </Button>
+          )}
+
           {/* Settings section - for admins only */}
           {user?.role === "admin" && (
             <Button

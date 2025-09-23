@@ -66,3 +66,41 @@ export interface DetailedRequestResponse {
   request: PackageRequest;
   packages: Package[];
 }
+
+// Audit Types
+export interface AuditUser {
+  id: number;
+  username: string;
+  full_name: string;
+}
+
+export interface AuditPackage {
+  id: number;
+  name: string;
+  version: string;
+  license_identifier: string | null;
+  created_at: string | null;
+}
+
+export interface AuditApproval {
+  approved_at: string | null;
+  approver: AuditUser | null;
+}
+
+export interface AuditOriginalRequest {
+  id: number;
+  application_name: string;
+  application_version: string;
+  requested_at: string | null;
+  requestor: AuditUser | null;
+}
+
+export interface AuditDataItem {
+  package: AuditPackage;
+  approval: AuditApproval;
+  original_request: AuditOriginalRequest | null;
+}
+
+export interface AuditResponse {
+  audit_data: AuditDataItem[];
+}

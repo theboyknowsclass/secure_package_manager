@@ -186,7 +186,43 @@ class DownloadService:
             
             # Store tarball in local cache
             cache_service = PackageCacheService()
-            return cache_service.store_package_from_tarball(package, tarball_content)
+            cache_path = cache_service.store_package_from_tarball(package, tarball_content)
+            
+            if cache_path is None:
+                return False
+            
+            # Update package with download information (cache_path, size, checksum)
+            with SessionHelper.get_session() as db:
+                from database.operations.package_status_operations import PackageStatusOperations
+                status_ops = PackageStatusOperations(db.session)
+                
+                # Calculate file size and checksum
+                file_size = None
+                checksum = None
+                try:
+                    # Calculate size of the extracted package directory
+                    package_dir = os.path.join(cache_path, "package")
+                    if os.path.exists(package_dir):
+                        file_size = sum(
+                            os.path.getsize(os.path.join(dirpath, filename))
+                            for dirpath, dirnames, filenames in os.walk(package_dir)
+                            for filename in filenames
+                        )
+                    
+                    # Calculate checksum of the original tarball content
+                    if tarball_content:
+                        import hashlib
+                        checksum = hashlib.sha256(tarball_content).hexdigest()
+                except Exception as e:
+                    self.logger.warning(f"Could not calculate file size/checksum for {package.name}@{package.version}: {str(e)}")
+                
+                if status_ops.update_download_info(package.id, cache_path, file_size, checksum):
+                    db.commit()
+                    self.logger.info(f"Updated download info for {package.name}@{package.version}: cache_path={cache_path}, size={file_size}, checksum={checksum[:16] if checksum else 'None'}...")
+                    return True
+                else:
+                    self.logger.error(f"Failed to update download info for {package.name}@{package.version}")
+                    return False
             
         except Exception as e:
             self.logger.error(f"Error performing download: {str(e)}")

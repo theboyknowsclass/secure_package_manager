@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS package_status (
     status VARCHAR(50) NOT NULL,
     file_size BIGINT,
     checksum VARCHAR(255),
+    cache_path VARCHAR(500), -- Actual cache directory path where package is stored
     license_score INTEGER CHECK (license_score >= 0 AND license_score <= 100),
     security_score INTEGER CHECK (security_score >= 0 AND security_score <= 100),
     security_scan_status VARCHAR(50) DEFAULT 'pending',
@@ -166,6 +167,10 @@ ON package_status(security_scan_status);
 -- Index for publish status queries
 CREATE INDEX IF NOT EXISTS idx_package_status_publish_status 
 ON package_status(publish_status);
+
+-- Index for cache path queries
+CREATE INDEX IF NOT EXISTS idx_package_status_cache_path 
+ON package_status(cache_path);
 
 
 -- Create function to update updated_at timestamp

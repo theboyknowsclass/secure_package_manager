@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import { api, endpoints } from "../api";
-import { PackageRequest, DetailedRequestResponse } from "../../types/package";
+import { PackageRequest, DetailedRequestResponse, AuditDataItem } from "../../types/package";
 
 // Package Request Queries
 export const usePackageRequests = (options?: { refetchInterval?: number }) => {
@@ -63,4 +63,19 @@ export const useApprovalRequests = () => {
     const response = await api.get(endpoints.packages.requests);
     return response.data.requests;
   });
+};
+
+// Audit data query
+export const useAuditData = () => {
+  return useQuery<AuditDataItem[]>(
+    "auditData",
+    async () => {
+      const response = await api.get(endpoints.packages.audit);
+      return response.data.audit_data;
+    },
+    {
+      refetchInterval: 30000, // Refetch every 30 seconds
+      refetchIntervalInBackground: true,
+    }
+  );
 };

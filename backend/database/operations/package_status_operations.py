@@ -255,6 +255,86 @@ class PackageStatusOperations(BaseOperations):
         status.updated_at = datetime.utcnow()
         return True
 
+    def update_download_info(self, package_id: int, cache_path: Optional[str] = None, file_size: Optional[int] = None, checksum: Optional[str] = None) -> bool:
+        """Update package download-related fields in a single operation.
+
+        Args:
+            package_id: The ID of the package
+            cache_path: The actual cache directory path where package is stored (optional)
+            file_size: The size of the downloaded/extracted package (optional)
+            checksum: The checksum of the downloaded package (optional)
+
+        Returns:
+            True if update was successful, False otherwise
+        """
+        status = self.get_by_package_id(package_id)
+        if not status:
+            return False
+
+        if cache_path is not None:
+            status.cache_path = cache_path
+        if file_size is not None:
+            status.file_size = file_size
+        if checksum is not None:
+            status.checksum = checksum
+        
+        status.updated_at = datetime.utcnow()
+        return True
+
+    def update_security_scan_info(self, package_id: int, security_score: int = None, 
+                                 security_scan_status: str = None) -> bool:
+        """Update package security scan-related fields in a single operation.
+
+        Args:
+            package_id: The ID of the package
+            security_score: The security score 0-100 (optional)
+            security_scan_status: The security scan status (optional)
+
+        Returns:
+            True if update was successful, False otherwise
+        """
+        status = self.get_by_package_id(package_id)
+        if not status:
+            return False
+
+        if security_score is not None:
+            status.security_score = security_score
+        if security_scan_status is not None:
+            status.security_scan_status = security_scan_status
+        
+        status.updated_at = datetime.utcnow()
+        return True
+
+    def update_approval_info(self, package_id: int, approver_id: int = None, rejector_id: int = None,
+                           published_at: datetime = None, publish_status: str = None) -> bool:
+        """Update package approval-related fields in a single operation.
+
+        Args:
+            package_id: The ID of the package
+            approver_id: The ID of the approver (optional)
+            rejector_id: The ID of the rejector (optional)
+            published_at: The publication timestamp (optional)
+            publish_status: The publish status (optional)
+
+        Returns:
+            True if update was successful, False otherwise
+        """
+        status = self.get_by_package_id(package_id)
+        if not status:
+            return False
+
+        if approver_id is not None:
+            status.approver_id = approver_id
+        if rejector_id is not None:
+            status.rejector_id = rejector_id
+        if published_at is not None:
+            status.published_at = published_at
+        if publish_status is not None:
+            status.publish_status = publish_status
+        
+        status.updated_at = datetime.utcnow()
+        return True
+
     def go_to_next_stage(self, package_id: int, **kwargs) -> bool:
         """Advance package to the next stage in the workflow.
 

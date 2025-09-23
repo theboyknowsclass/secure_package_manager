@@ -102,7 +102,21 @@ class TrivyService:
             Path to downloaded package or None if not available
         """
         try:
-            # Import here to avoid circular imports
+            # First, try to use the stored cache_path from package_status
+            if package.package_status and package.package_status.cache_path and os.path.exists(package.package_status.cache_path):
+                # The cache_path points to the cache directory, we need the package subdirectory
+                package_path = os.path.join(package.package_status.cache_path, "package")
+                if os.path.exists(package_path):
+                    logger.info(
+                        f"Using stored cache_path for scanning: {package_path}"
+                    )
+                    return package_path
+                else:
+                    logger.warning(
+                        f"Stored cache_path exists but package subdirectory not found: {package.package_status.cache_path}"
+                    )
+
+            # Fallback to the old method for backward compatibility
             from .package_cache_service import PackageCacheService
 
             cache_service = PackageCacheService()
@@ -110,13 +124,14 @@ class TrivyService:
 
             if package_path and os.path.exists(package_path):
                 logger.info(
-                    f"Using cached package for scanning: {package_path}"
+                    f"Using fallback cache lookup for scanning: {package_path}"
                 )
                 return package_path
             else:
                 logger.error(
                     f"Package {package.name}@{package.version} not found in cache. "
-                    f"Download worker should have completed download before security scanning."
+                    f"Download worker should have completed download before security scanning. "
+                    f"Stored cache_path: {package.package_status.cache_path if package.package_status else 'None'}"
                 )
                 return None
 

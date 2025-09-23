@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import PackageUpload from "./pages/PackageUpload";
 import { RequestStatusDashboard } from "./components/pages";
 import ApprovalDashboard from "./pages/ApprovalDashboard";
+import AuditDashboard from "./pages/AuditDashboard";
 import Settings from "./pages/Settings";
 import ConfigurationRequired from "./pages/ConfigurationRequired";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -78,6 +79,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <ApprovalDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/audit"
+            element={
+              <ProtectedRoute>
+                <AuditDashboard />
               </ProtectedRoute>
             }
           />

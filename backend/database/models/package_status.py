@@ -22,6 +22,7 @@ class PackageStatus(Base):
     status = Column(String(50), default="Checking Licence", nullable=False)
     file_size = Column(BigInteger)
     checksum = Column(String(255))
+    cache_path = Column(String(500))  # Actual cache directory path where package is stored
     license_score = Column(Integer)
     security_score = Column(Integer)
     security_scan_status = Column(
@@ -53,6 +54,7 @@ class PackageStatus(Base):
             "status": self.status,
             "file_size": self.file_size,
             "checksum": self.checksum,
+            "cache_path": self.cache_path,
             "license_score": self.license_score,
             "security_score": self.security_score,
             "security_scan_status": self.security_scan_status,

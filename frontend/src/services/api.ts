@@ -47,6 +47,7 @@ export const endpoints = {
     upload: "/api/packages/upload",
     requests: "/api/packages/requests",
     request: (id: number) => `/api/packages/requests/${id}`,
+    audit: "/api/packages/audit",
   },
   admin: {
     validatedPackages: "/api/admin/packages/validated",

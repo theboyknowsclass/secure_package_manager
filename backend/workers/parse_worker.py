@@ -38,21 +38,24 @@ class ParseWorker(BaseWorker):
         logger.info("ParseWorker parsing service initialized")
 
     def process_cycle(self) -> None:
-        """Process one cycle of parsing work."""
+        """Process one cycle of package lock parsing."""
         try:
-            # Process requests that need parsing
+            # Service now manages its own database sessions
             result = self.parsing_service.process_requests(self.max_requests_per_cycle)
             
             if result["success"]:
-                if result.get("processed_count", 0) > 0:
-                    logger.info(f"Parse cycle completed: {result.get('message', 'Success')}")
+                if result.get("processed_requests", 0) > 0:
+                    logger.info(
+                        f"Parse processing complete: {result.get('successful_parsing', 0)} successful, "
+                        f"{result.get('failed_parsing', 0)} failed across {result.get('processed_requests', 0)} requests"
+                    )
                 else:
                     logger.info("ParseWorker heartbeat: No requests found for parsing")
             else:
-                logger.error(f"Parse cycle failed: {result.get('error', 'Unknown error')}")
-
+                logger.error(f"Parse processing failed: {result.get('error', 'Unknown error')}")
+                
         except Exception as e:
-            logger.error(f"Error in parse cycle: {str(e)}", exc_info=True)
+            logger.error(f"Error in parse worker cycle: {str(e)}", exc_info=True)
 
     def get_required_env_vars(self) -> List[str]:
         """Get list of required environment variables."""

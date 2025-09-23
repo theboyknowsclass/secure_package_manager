@@ -624,3 +624,89 @@ def retry_failed_packages() -> ResponseReturnValue:
         with SessionHelper.get_session() as db:
             db.rollback()
         return handle_error(e, "Retry failed packages")
+
+
+@package_bp.route("/audit", methods=["GET"])  # type: ignore[misc]
+@auth_service.require_auth
+def get_audit_data() -> ResponseReturnValue:
+    """Get audit data for approved packages."""
+    try:
+        # Only admins and approvers can view audit data
+        if not (request.user.is_admin() or request.user.is_approver()):
+            return jsonify({"error": "Access denied"}), 403
+
+        with SessionHelper.get_session() as db:
+            # Query for approved packages with their approval information
+            from sqlalchemy.orm import joinedload
+            from database.models import User
+            
+            # Get all approved packages with their relationships
+            approved_packages = (
+                db.session.query(Package)
+                .join(PackageStatus, Package.id == PackageStatus.package_id)
+                .join(RequestPackage, Package.id == RequestPackage.package_id)
+                .join(Request, RequestPackage.request_id == Request.id)
+                .join(User, Request.requestor_id == User.id)
+                .options(
+                    joinedload(Package.package_status),
+                    joinedload(Package.request_packages).joinedload(RequestPackage.request)
+                )
+                .filter(PackageStatus.status == "Approved")
+                .all()
+            )
+
+            audit_data = []
+            for package in approved_packages:
+                # Get the approver information
+                approver = None
+                if package.package_status and package.package_status.approver_id:
+                    approver = db.session.query(User).filter(
+                        User.id == package.package_status.approver_id
+                    ).first()
+
+                # Get the original request information
+                original_request = None
+                original_requestor = None
+                if package.request_packages:
+                    # Get the first request (there should typically be only one)
+                    request_package = package.request_packages[0]
+                    original_request = request_package.request
+                    original_requestor = original_request.requestor
+
+                audit_data.append({
+                    "package": {
+                        "id": package.id,
+                        "name": package.name,
+                        "version": package.version,
+                        "license_identifier": package.license_identifier,
+                        "created_at": package.created_at.isoformat() if package.created_at else None,
+                    },
+                    "approval": {
+                        "approved_at": (
+                            package.package_status.updated_at.isoformat()
+                            if package.package_status and package.package_status.updated_at
+                            else None
+                        ),
+                        "approver": {
+                            "id": approver.id,
+                            "username": approver.username,
+                            "full_name": approver.full_name,
+                        } if approver else None,
+                    },
+                    "original_request": {
+                        "id": original_request.id,
+                        "application_name": original_request.application_name,
+                        "application_version": original_request.version,
+                        "requested_at": original_request.created_at.isoformat() if original_request.created_at else None,
+                        "requestor": {
+                            "id": original_requestor.id,
+                            "username": original_requestor.username,
+                            "full_name": original_requestor.full_name,
+                        } if original_requestor else None,
+                    } if original_request else None,
+                })
+
+        return jsonify({"audit_data": audit_data}), 200
+
+    except Exception as e:
+        return handle_error(e, "Get audit data")

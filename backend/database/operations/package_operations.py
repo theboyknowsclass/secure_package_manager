@@ -121,6 +121,30 @@ class PackageOperations(BaseOperations):
 
         return package
 
+    def update_license_info(self, package_id: int, license_identifier: Optional[str] = None, license_text: Optional[str] = None) -> bool:
+        """Update package license information (readonly package table fields).
+
+        Args:
+            package_id: The ID of the package
+            license_identifier: The license identifier from package-lock.json (optional)
+            license_text: The license text from package-lock.json (optional)
+
+        Returns:
+            True if update was successful, False otherwise
+        """
+        package = self.get_by_id(Package, package_id)
+        if not package:
+            return False
+
+        # Update package fields (these are input fields from package-lock.json)
+        if license_identifier is not None:
+            package.license_identifier = license_identifier
+        if license_text is not None:
+            package.license_text = license_text
+        
+        self.update(package)
+        return True
+
     def batch_create_with_status(
         self, packages_data: List[dict], status: str = "Checking Licence"
     ) -> List[Package]:
