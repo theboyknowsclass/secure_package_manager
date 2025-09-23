@@ -24,7 +24,7 @@ from flask.typing import ResponseReturnValue
 # Type assertion helper for authenticated requests
 def get_authenticated_user() -> "User":
     """Get the authenticated user from the request context."""
-    return request.user  # type: ignore[attr-defined]
+    return request.user  # type: ignore[attr-defined,no-any-return]
 
 
 from services.auth_service import AuthService

@@ -30,7 +30,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 # Add the backend directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -92,7 +92,7 @@ class PackageStatusMonitor:
             logger.error(f"Error getting package counts: {str(e)}")
             return {}
 
-    def get_detailed_status_breakdown(self) -> Dict[str, any]:
+    def get_detailed_status_breakdown(self) -> Dict[str, Any]:
         """Get detailed breakdown of package statuses with additional metrics.
 
         Returns:

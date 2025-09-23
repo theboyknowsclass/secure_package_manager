@@ -30,7 +30,7 @@ from flask.typing import ResponseReturnValue
 # Type assertion helper for authenticated requests
 def get_authenticated_user() -> "User":
     """Get the authenticated user from the request context."""
-    return request.user  # type: ignore[attr-defined]
+    return request.user  # type: ignore[attr-defined,no-any-return]
 
 
 from services.auth_service import AuthService
@@ -108,7 +108,7 @@ def _validate_uploaded_file() -> Union[Any, ResponseReturnValue]:
     if file.filename == "":
         return jsonify({"error": "No file selected"}), 400
 
-    if not file.filename.endswith(".json"):
+    if not file.filename or not file.filename.endswith(".json"):
         return jsonify({"error": "File must be a JSON file"}), 400
 
     return file

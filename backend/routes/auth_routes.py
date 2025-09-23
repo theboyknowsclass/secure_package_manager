@@ -14,7 +14,7 @@ from flask.typing import ResponseReturnValue
 # Type assertion helper for authenticated requests
 def get_authenticated_user() -> "User":
     """Get the authenticated user from the request context."""
-    return request.user  # type: ignore[attr-defined]
+    return request.user  # type: ignore[attr-defined,no-any-return]
 
 
 from services.auth_service import AuthService
@@ -36,7 +36,7 @@ def login() -> ResponseReturnValue:
         logger.info(
             f"Login request received. Content-Type: {request.content_type}"
         )
-        logger.info(f"Raw data: {request.get_data()}")
+        logger.info(f"Raw data: {request.get_data()!r}")
 
         data = request.get_json()
         if not data:
