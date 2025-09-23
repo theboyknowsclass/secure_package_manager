@@ -136,7 +136,7 @@ class SecurityService:
             from services.trivy_service import TrivyService
             
             trivy_service = TrivyService()
-            return trivy_service.scan_package(package)
+            return trivy_service.scan_package_data_only(package)
         except Exception as e:
             self.logger.error(f"Error performing security scan: {str(e)}")
             return {"status": "failed", "error": str(e)}
@@ -168,6 +168,10 @@ class SecurityService:
                     if result["status"] == "success":
                         # Update package status to Security Scanned
                         status_ops.update_status(package.id, "Security Scanned")
+                        
+                        # Update package with security score if available
+                        if "scan_data" in result and "security_score" in result["scan_data"]:
+                            status_ops.update_security_score(package.id, result["scan_data"]["security_score"])
                         
                         # Store scan results if available
                         if "scan_data" in result:
@@ -214,9 +218,17 @@ class SecurityService:
                 package_id=package_id,
                 scan_type="trivy",
                 scan_status="completed",
-                vulnerabilities_found=scan_data.get("vulnerabilities", []),
-                scan_summary=scan_data.get("summary", {}),
-                scan_details=scan_data.get("details", {})
+                vulnerabilities_found=scan_data.get("scan_result", {}).get("vulnerabilities", []),
+                scan_summary=scan_data.get("scan_result", {}).get("summary", {}),
+                scan_details=scan_data.get("scan_result", {}),
+                critical_count=scan_data.get("critical_count", 0),
+                high_count=scan_data.get("high_count", 0),
+                medium_count=scan_data.get("medium_count", 0),
+                low_count=scan_data.get("low_count", 0),
+                info_count=scan_data.get("info_count", 0),
+                scan_duration_ms=scan_data.get("scan_duration_ms", 0),
+                trivy_version=scan_data.get("trivy_version", "unknown"),
+                completed_at=datetime.utcnow()
             )
             
             security_scan_ops.create(security_scan)

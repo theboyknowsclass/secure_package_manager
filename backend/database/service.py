@@ -39,6 +39,9 @@ class DatabaseService:
                 "echo": self.echo,
                 "pool_pre_ping": True,  # Verify connections before use
                 "pool_recycle": 3600,  # Recycle connections every hour
+                "pool_size": 5,  # Number of connections to maintain in pool
+                "max_overflow": 10,  # Additional connections beyond pool_size
+                "pool_timeout": 30,  # Seconds to wait for connection from pool
             }
 
             # Use StaticPool for SQLite, regular pool for PostgreSQL
