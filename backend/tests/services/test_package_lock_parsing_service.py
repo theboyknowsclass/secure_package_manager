@@ -10,15 +10,14 @@ import json
 import os
 import sys
 import unittest
+from pathlib import Path
 from typing import Any, Dict
 from unittest.mock import MagicMock, Mock
 
 # Add the backend directory to the Python path
 sys.path.insert(
     0,
-    os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ),
+    str(Path(__file__).parent.parent.parent),
 )
 
 from services.package_lock_parsing_service import (
@@ -31,9 +30,7 @@ def load_test_package_lock(filename):
     if not filename.endswith(".json"):
         filename += ".json"
 
-    file_path = os.path.join(
-        os.path.dirname(__file__), "..", "test_data", "package_locks", filename
-    )
+    file_path = Path(__file__).parent / ".." / "test_data" / "package_locks" / filename
 
     with open(file_path, "r", encoding="utf-8") as f:
         return json.load(f)

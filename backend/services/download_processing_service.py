@@ -6,6 +6,7 @@ This service manages its own database sessions and operations, following the ser
 
 import logging
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -214,14 +215,12 @@ class DownloadService:
                 checksum = None
                 try:
                     # Calculate size of the extracted package directory
-                    package_dir = os.path.join(cache_path, "package")
-                    if os.path.exists(package_dir):
+                    package_dir = Path(cache_path) / "package"
+                    if package_dir.exists():
                         file_size = sum(
-                            os.path.getsize(os.path.join(dirpath, filename))
-                            for dirpath, dirnames, filenames in os.walk(
-                                package_dir
-                            )
-                            for filename in filenames
+                            filepath.stat().st_size
+                            for filepath in package_dir.rglob("*")
+                            if filepath.is_file()
                         )
 
                     # Calculate checksum of the original tarball content

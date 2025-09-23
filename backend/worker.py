@@ -9,6 +9,7 @@ variable.
 import logging
 import os
 import sys
+from pathlib import Path
 
 # Configure logging - minimal output for production
 log_level = (
@@ -21,7 +22,7 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout),
         (
             logging.FileHandler("/app/logs/worker.log", mode="a")
-            if os.path.exists("/app/logs")
+            if Path("/app/logs").exists()
             else logging.StreamHandler(sys.stdout)
         ),
     ],

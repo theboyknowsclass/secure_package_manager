@@ -5,14 +5,13 @@ import shutil
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, mock_open, patch
 
 # Add the backend directory to the Python path
 sys.path.insert(
     0,
-    os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ),
+    str(Path(__file__).parent.parent.parent),
 )
 
 from services.package_cache_service import PackageCacheService
@@ -35,7 +34,7 @@ class TestPackageCacheService(unittest.TestCase):
     def tearDown(self) -> None:
         """Clean up test fixtures."""
         # Remove the temporary directory
-        if os.path.exists(self.test_cache_dir):
+        if Path(self.test_cache_dir).exists():
             shutil.rmtree(self.test_cache_dir)
 
     def test_get_package_cache_path_regular_package(self) -> None:
@@ -46,7 +45,7 @@ class TestPackageCacheService(unittest.TestCase):
 
         path = self.cache_service._get_package_cache_path(package)
 
-        expected_path = os.path.join(self.test_cache_dir, "react-18.2.0")
+        expected_path = Path(self.test_cache_dir) / "react-18.2.0"
         self.assertEqual(path, expected_path)
 
     def test_get_package_cache_path_scoped_package(self) -> None:
@@ -57,7 +56,7 @@ class TestPackageCacheService(unittest.TestCase):
 
         path = self.cache_service._get_package_cache_path(package)
 
-        expected_path = os.path.join(self.test_cache_dir, "@babel-core-7.22.0")
+        expected_path = Path(self.test_cache_dir) / "@babel-core-7.22.0"
         self.assertEqual(path, expected_path)
 
     def test_get_package_cache_path_special_characters(self) -> None:
@@ -68,9 +67,7 @@ class TestPackageCacheService(unittest.TestCase):
 
         path = self.cache_service._get_package_cache_path(package)
 
-        expected_path = os.path.join(
-            self.test_cache_dir, "package-with-dashes-1.0.0"
-        )
+        expected_path = Path(self.test_cache_dir) / "package-with-dashes-1.0.0"
         self.assertEqual(path, expected_path)
 
     def test_is_package_cached_not_cached(self) -> None:
@@ -91,13 +88,11 @@ class TestPackageCacheService(unittest.TestCase):
 
         # Create the package directory structure
         package_dir = self.cache_service._get_package_cache_path(package)
-        os.makedirs(package_dir, exist_ok=True)
-        os.makedirs(os.path.join(package_dir, "package"), exist_ok=True)
+        package_dir.mkdir(parents=True, exist_ok=True)
+        (package_dir / "package").mkdir(parents=True, exist_ok=True)
 
         # Create a dummy package.json
-        package_json_path = os.path.join(
-            package_dir, "package", "package.json"
-        )
+        package_json_path = package_dir / "package" / "package.json"
         with open(package_json_path, "w") as f:
             f.write('{"name": "test-package", "version": "1.0.0"}')
 
@@ -123,19 +118,17 @@ class TestPackageCacheService(unittest.TestCase):
 
         # Create the package directory structure
         package_dir = self.cache_service._get_package_cache_path(package)
-        os.makedirs(package_dir, exist_ok=True)
-        os.makedirs(os.path.join(package_dir, "package"), exist_ok=True)
+        package_dir.mkdir(parents=True, exist_ok=True)
+        (package_dir / "package").mkdir(parents=True, exist_ok=True)
 
         # Create a dummy package.json
-        package_json_path = os.path.join(
-            package_dir, "package", "package.json"
-        )
+        package_json_path = package_dir / "package" / "package.json"
         with open(package_json_path, "w") as f:
             f.write('{"name": "test-package", "version": "1.0.0"}')
 
         result = self.cache_service.get_package_path(package)
 
-        expected_path = os.path.join(package_dir, "package")
+        expected_path = package_dir / "package"
         self.assertEqual(result, expected_path)
 
     @patch("tarfile.open")
@@ -154,13 +147,11 @@ class TestPackageCacheService(unittest.TestCase):
 
         # Create the package directory and package.json after extraction
         package_dir = self.cache_service._get_package_cache_path(package)
-        os.makedirs(package_dir, exist_ok=True)
-        os.makedirs(os.path.join(package_dir, "package"), exist_ok=True)
+        package_dir.mkdir(parents=True, exist_ok=True)
+        (package_dir / "package").mkdir(parents=True, exist_ok=True)
 
         # Create a dummy package.json
-        package_json_path = os.path.join(
-            package_dir, "package", "package.json"
-        )
+        package_json_path = package_dir / "package" / "package.json"
         with open(package_json_path, "w") as f:
             f.write('{"name": "test-package", "version": "1.0.0"}')
 
@@ -201,12 +192,12 @@ class TestPackageCacheService(unittest.TestCase):
         os.makedirs(package_dir, exist_ok=True)
 
         # Verify it exists
-        self.assertTrue(os.path.exists(package_dir))
+        self.assertTrue(package_dir.exists())
 
         result = self.cache_service.remove_package(package)
 
         self.assertTrue(result)
-        self.assertFalse(os.path.exists(package_dir))
+        self.assertFalse(package_dir.exists())
 
     def test_remove_package_not_exists(self) -> None:
         """Test removing package that doesn't exist."""
@@ -237,7 +228,7 @@ class TestPackageCacheService(unittest.TestCase):
         os.makedirs(package_dir, exist_ok=True)
 
         # Create a file with known size
-        test_file_path = os.path.join(package_dir, "test.txt")
+        test_file_path = package_dir / "test.txt"
         with open(test_file_path, "w") as f:
             f.write("test content")
 

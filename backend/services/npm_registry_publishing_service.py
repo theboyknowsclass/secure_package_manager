@@ -11,6 +11,7 @@ import logging
 import os
 import tarfile
 import tempfile
+from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
 
@@ -57,8 +58,9 @@ class NpmRegistryPublishingService:
             success = self._upload_to_registry(package, tarball_path)
 
             # Clean up temporary file
-            if os.path.exists(tarball_path):
-                os.unlink(tarball_path)
+            tarball_file = Path(tarball_path)
+            if tarball_file.exists():
+                tarball_file.unlink()
 
             return success
 
@@ -82,7 +84,7 @@ class NpmRegistryPublishingService:
             with tempfile.TemporaryDirectory() as temp_dir:
                 # Create package.json
                 package_json = self._create_package_json(package)
-                package_json_path = os.path.join(temp_dir, "package.json")
+                package_json_path = Path(temp_dir) / "package.json"
                 with open(package_json_path, "w") as f:
                     json.dump(package_json, f, indent=2)
 
@@ -94,9 +96,7 @@ class NpmRegistryPublishingService:
 
                 # Create tarball
                 safe_name = package.name.replace("@", "").replace("/", "-")
-                tarball_path = os.path.join(
-                    temp_dir, f"{safe_name}-{package.version}.tgz"
-                )
+                tarball_path = Path(temp_dir) / f"{safe_name}-{package.version}.tgz"
 
                 with tarfile.open(tarball_path, "w:gz") as tar:
                     tar.add(
@@ -104,18 +104,16 @@ class NpmRegistryPublishingService:
                         arcname="package",
                         filter=lambda tarinfo: (
                             None
-                            if tarinfo.name == os.path.basename(tarball_path)
+                            if tarinfo.name == tarball_path.name
                             else tarinfo
                         ),
                     )
 
                 # Move tarball to a permanent location
-                permanent_path = os.path.join(
-                    temp_dir, f"{safe_name}-{package.version}.tgz"
-                )
-                os.rename(tarball_path, permanent_path)
+                permanent_path = Path(temp_dir) / f"{safe_name}-{package.version}.tgz"
+                tarball_path.rename(permanent_path)
 
-                return permanent_path
+                return str(permanent_path)
 
         except Exception as e:
             logger.error(
@@ -142,7 +140,7 @@ class NpmRegistryPublishingService:
 
     def _create_index_js(self, package: Package, temp_dir: str) -> None:
         """Create index.js file for the package."""
-        index_js_path = os.path.join(temp_dir, "index.js")
+        index_js_path = Path(temp_dir) / "index.js"
         with open(index_js_path, "w") as f:
             f.write(f"// Secure package {package.name} v{package.version}\n")
             f.write("module.exports = {\n")
@@ -155,7 +153,7 @@ class NpmRegistryPublishingService:
 
     def _create_readme(self, package: Package, temp_dir: str) -> None:
         """Create README.md file for the package."""
-        readme_path = os.path.join(temp_dir, "README.md")
+        readme_path = Path(temp_dir) / "README.md"
         with open(readme_path, "w") as f:
             f.write(f"# {package.name}\n\n")
             f.write(f"Version: {package.version}\n\n")

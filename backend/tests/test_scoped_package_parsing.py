@@ -4,15 +4,15 @@ This module tests the critical functionality of extracting package names
 from package-lock.json paths, with special focus on scoped packages.
 """
 
-import os
 import sys
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
 from services.package_lock_parsing_service import PackageLockParsingService
 
 # Add the backend directory to the Python path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 class TestScopedPackageParsing:

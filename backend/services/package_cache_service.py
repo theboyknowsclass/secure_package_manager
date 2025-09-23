@@ -18,12 +18,12 @@ class PackageCacheService:
     """Service for managing local package cache operations."""
 
     def __init__(self) -> None:
-        self.package_cache_dir = os.getenv(
+        self.package_cache_dir = Path(os.getenv(
             "PACKAGE_CACHE_DIR", "/app/package_cache"
-        )
+        ))
 
         # Ensure package cache directory exists
-        os.makedirs(self.package_cache_dir, exist_ok=True)
+        self.package_cache_dir.mkdir(parents=True, exist_ok=True)
 
     def store_package_from_tarball(
         self, package: Any, tarball_content: bytes
@@ -40,17 +40,17 @@ class PackageCacheService:
         try:
             # Create package cache directory
             package_dir = self._get_package_cache_path(package)
-            os.makedirs(package_dir, exist_ok=True)
+            package_dir.mkdir(parents=True, exist_ok=True)
 
             # Extract tarball to package cache directory
             tarball_buffer = tarfile.open(
                 fileobj=io.BytesIO(tarball_content), mode="r:gz"
             )
-            tarball_buffer.extractall(package_dir)
+            tarball_buffer.extractall(str(package_dir))
             tarball_buffer.close()
 
             # Return the actual path to the package directory
-            return package_dir
+            return str(package_dir)
 
         except tarfile.TarError as e:
             logger.error(
@@ -72,7 +72,7 @@ class PackageCacheService:
         Returns:
             True if package exists in cache, False otherwise
         """
-        package_dir = Path(self._get_package_cache_path(package))
+        package_dir = self._get_package_cache_path(package)
         return package_dir.exists() and package_dir.is_dir()
 
     def get_package_path(self, package) -> Optional[str]:
@@ -85,7 +85,7 @@ class PackageCacheService:
             Path to package directory or None if not cached
         """
         if self.is_package_cached(package):
-            package_dir = Path(self._get_package_cache_path(package))
+            package_dir = self._get_package_cache_path(package)
 
             # All npm tarballs extract to a "package" directory
             # Both scoped and regular packages use the same structure
@@ -103,10 +103,10 @@ class PackageCacheService:
         """
         try:
             package_dir = self._get_package_cache_path(package)
-            if os.path.exists(package_dir):
+            if package_dir.exists():
                 import shutil
 
-                shutil.rmtree(package_dir)
+                shutil.rmtree(str(package_dir))
                 logger.info(
                     f"Removed package {package.name}@{package.version} from cache"
                 )
@@ -126,13 +126,9 @@ class PackageCacheService:
         """
         total_size = 0
         try:
-            for dirpath, dirnames, filenames in os.walk(
-                self.package_cache_dir
-            ):
-                for filename in filenames:
-                    filepath = os.path.join(dirpath, filename)
-                    if os.path.exists(filepath):
-                        total_size += os.path.getsize(filepath)
+            for filepath in self.package_cache_dir.rglob("*"):
+                if filepath.is_file():
+                    total_size += filepath.stat().st_size
         except Exception as e:
             logger.error(f"Error calculating cache size: {str(e)}")
         return total_size
@@ -145,14 +141,14 @@ class PackageCacheService:
         """
         cached_packages = []
         try:
-            for item in os.listdir(self.package_cache_dir):
-                item_path = os.path.join(self.package_cache_dir, item)
-                if os.path.isdir(item_path):
+            for item in self.package_cache_dir.iterdir():
+                if item.is_dir():
                     # Parse package name and version from directory name
                     # Format: package-name-version or @scope-package-version
-                    if item.startswith("@"):
+                    item_name = item.name
+                    if item_name.startswith("@"):
                         # Scoped package: @scope-package-version
-                        parts = item.split("-")
+                        parts = item_name.split("-")
                         if len(parts) >= 3:
                             scope = parts[0]
                             package_name = parts[1]
@@ -162,7 +158,7 @@ class PackageCacheService:
                             continue
                     else:
                         # Regular package: package-name-version
-                        parts = item.split("-")
+                        parts = item_name.split("-")
                         if len(parts) >= 2:
                             package_name = parts[0]
                             version = "-".join(parts[1:])
@@ -174,14 +170,14 @@ class PackageCacheService:
                         {
                             "name": full_name,
                             "version": version,
-                            "path": item_path,
+                            "path": str(item),
                         }
                     )
         except Exception as e:
             logger.error(f"Error listing cached packages: {str(e)}")
         return cached_packages
 
-    def _get_package_cache_path(self, package) -> str:
+    def _get_package_cache_path(self, package) -> Path:
         """Get the cache directory path for a package.
 
         Args:
@@ -197,6 +193,4 @@ class PackageCacheService:
         else:
             safe_package_name = package.name
 
-        return os.path.join(
-            self.package_cache_dir, f"{safe_package_name}-{package.version}"
-        )
+        return self.package_cache_dir / f"{safe_package_name}-{package.version}"

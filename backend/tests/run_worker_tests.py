@@ -5,14 +5,14 @@ Runs all unit tests in the workers test package.
 """
 
 import logging
-import os
 import sys
 import unittest
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 # Add the parent directory to the path so we can import modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 def run_worker_tests():
@@ -22,7 +22,7 @@ def run_worker_tests():
 
     # Discover and run all tests in the workers test package
     loader = unittest.TestLoader()
-    workers_dir = os.path.join(os.path.dirname(__file__), "workers")
+    workers_dir = Path(__file__).parent / "workers"
     suite = loader.discover(workers_dir, pattern="test_*.py")
 
     runner = unittest.TextTestRunner(verbosity=2)

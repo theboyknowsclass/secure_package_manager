@@ -3,14 +3,13 @@
 import os
 import sys
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 # Add the backend directory to the Python path
 sys.path.insert(
     0,
-    os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ),
+    str(Path(__file__).parent.parent.parent),
 )
 
 from services.download_service import DownloadService

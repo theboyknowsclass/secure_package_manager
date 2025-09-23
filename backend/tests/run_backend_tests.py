@@ -6,10 +6,10 @@ workers, and integrations.
 """
 
 import logging
-import os
 import subprocess
 import sys
 import unittest
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ def run_backend_tests():
     logger.info("=" * 50)
 
     # Get the directory containing this script
-    test_dir = os.path.dirname(os.path.abspath(__file__))
+    test_dir = Path(__file__).parent
 
     # Discover and run tests
     loader = unittest.TestLoader()
@@ -49,17 +49,17 @@ def run_specific_test(test_file):
     logger.info("=" * 50)
 
     # Get the directory containing this script
-    test_dir = os.path.dirname(os.path.abspath(__file__))
-    test_path = os.path.join(test_dir, test_file)
+    test_dir = Path(__file__).parent
+    test_path = test_dir / test_file
 
-    if not os.path.exists(test_path):
+    if not test_path.exists():
         logger.error(f"❌ Test file not found: {test_path}")
         return False
 
     # Run the specific test
-    result = subprocess.run(
-        [sys.executable, test_path], capture_output=False, text=True
-    )
+        result = subprocess.run(
+            [sys.executable, str(test_path)], capture_output=False, text=True
+        )
 
     if result.returncode == 0:
         logger.info(f"\n🎉 {test_file} passed!")

@@ -1,6 +1,6 @@
 import logging
-import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from config.constants import (
@@ -125,17 +125,15 @@ class TrivyService:
             if (
                 package.package_status
                 and package.package_status.cache_path
-                and os.path.exists(package.package_status.cache_path)
+                and Path(package.package_status.cache_path).exists()
             ):
                 # The cache_path points to the cache directory, we need the package subdirectory
-                package_path = os.path.join(
-                    package.package_status.cache_path, "package"
-                )
-                if os.path.exists(package_path):
+                package_path = Path(package.package_status.cache_path) / "package"
+                if package_path.exists():
                     logger.info(
                         f"Using stored cache_path for scanning: {package_path}"
                     )
-                    return package_path
+                    return str(package_path)
                 else:
                     logger.warning(
                         f"Stored cache_path exists but package subdirectory not found: {package.package_status.cache_path}"
@@ -147,7 +145,7 @@ class TrivyService:
             cache_service = PackageCacheService()
             package_path = cache_service.get_package_path(package)
 
-            if package_path and os.path.exists(package_path):
+            if package_path and Path(package_path).exists():
                 logger.info(
                     f"Using fallback cache lookup for scanning: {package_path}"
                 )
