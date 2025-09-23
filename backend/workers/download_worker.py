@@ -1,13 +1,12 @@
 """Download Worker.
 
-Transitions packages from Licence Checked to Downloaded (via Downloading).
-This worker delegates all business logic to DownloadProcessingService.
+Transitions packages from Licence Checked to Downloaded.
+This worker delegates all business logic to DownloadService.
 """
 
 import logging
 from typing import List
 
-from database.session_helper import SessionHelper
 from services.download_service import DownloadService
 from workers.base_worker import BaseWorker
 
@@ -43,16 +42,15 @@ class DownloadWorker(BaseWorker):
     def process_cycle(self) -> None:
         """Process one cycle of downloading."""
         try:
-            with SessionHelper.get_session() as db:
-                # Process packages using the service
-                result = self.download_service.process_package_batch(
-                    self.max_packages_per_cycle
-                )
+            # Process packages using the service (service manages its own database sessions)
+            result = self.download_service.process_package_batch(
+                self.max_packages_per_cycle
+            )
 
-                if not result["success"]:
-                    logger.error(
-                        f"Error in download batch: {result['error']}"
-                    )
+            if not result["success"]:
+                logger.error(
+                    f"Error in download batch: {result['error']}"
+                )
 
         except Exception as e:
             logger.error(f"Download cycle error: {str(e)}", exc_info=True)

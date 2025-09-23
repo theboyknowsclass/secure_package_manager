@@ -1,12 +1,12 @@
 """Download Service.
 
 Handles downloading packages from external npm registries and managing their local cache.
-This service manages its own database sessions and operations, following the service-first architecture pattern.
+This service separates database operations from I/O work for optimal performance.
 """
 
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
@@ -20,90 +20,52 @@ logger = logging.getLogger(__name__)
 class DownloadService:
     """Service for downloading packages from external npm registries and managing local cache.
 
-    This service manages its own database sessions and operations,
-    following the service-first architecture pattern.
+    This service separates database operations from I/O work to minimize database session time.
     """
 
     def __init__(self) -> None:
         """Initialize the download service."""
         self.logger = logger
-        # Operations instances (set up in _setup_operations)
-        self._session = None
-        self._package_ops = None
-        self._status_ops = None
         
         # Download configuration
         self.download_timeout = int(os.getenv("DOWNLOAD_TIMEOUT", "60"))
         self.source_repository_url = os.getenv("SOURCE_REPOSITORY_URL", "https://registry.npmjs.org")
-
-    def _setup_operations(self, session):
-        """Set up operations instances for the current session."""
-        self._session = session
-        self._package_ops = PackageOperations(session)
-        self._status_ops = PackageStatusOperations(session)
 
     def process_package_batch(
         self, max_packages: int = 5
     ) -> Dict[str, Any]:
         """Process a batch of packages for downloading.
 
+        This method separates database operations from I/O work:
+        1. Get packages that need downloading (short DB session)
+        2. Perform downloads (no DB session)
+        3. Update database with results (short DB session)
+
         Args:
-            max_packages: Maximum number of packages to process (reduced for better performance)
+            max_packages: Maximum number of packages to process
 
         Returns:
             Dict with processing results
         """
         try:
-            with SessionHelper.get_session() as db:
-                # Set up operations
-                self._setup_operations(db.session)
-                
-                # Find packages that need downloading
-                ready_packages = self._package_ops.get_by_status("Licence Checked")
-                
-                # Limit the number of packages processed (smaller batches)
-                limited_packages = ready_packages[:max_packages]
-
-                if not limited_packages:
-                    return {
-                        "success": True,
-                        "processed_count": 0,
-                        "successful_downloads": 0,
-                        "failed_downloads": 0,
-                        "total_packages": 0
-                    }
-
-                successful_downloads = 0
-                failed_downloads = 0
-                already_cached = 0
-
-                for package in limited_packages:
-                    result = self.process_single_package(package)
-                    if result["success"]:
-                        if result["message"] == "Already downloaded":
-                            already_cached += 1
-                        else:
-                            successful_downloads += 1
-                    else:
-                        failed_downloads += 1
-
-                db.commit()
-
-                # Log batch summary
-                if successful_downloads > 0 or failed_downloads > 0 or already_cached > 0:
-                    self.logger.info(
-                        f"Download batch complete: {successful_downloads} downloaded, "
-                        f"{already_cached} already cached, {failed_downloads} failed"
-                    )
-
+            # Phase 1: Get package data (short DB session)
+            packages_to_process = self._get_packages_for_download(max_packages)
+            if not packages_to_process:
                 return {
                     "success": True,
-                    "processed_count": len(limited_packages),
-                    "successful_downloads": successful_downloads,
-                    "failed_downloads": failed_downloads,
-                    "already_cached": already_cached,
-                    "total_packages": len(limited_packages)
+                    "processed_count": 0,
+                    "successful_downloads": 0,
+                    "failed_downloads": 0,
+                    "already_cached": 0,
+                    "total_packages": 0
                 }
+
+            # Phase 2: Perform downloads (no DB session)
+            download_results = self._perform_download_batch(packages_to_process)
+
+            # Phase 3: Update database (short DB session)
+            return self._update_download_results(download_results)
+
         except Exception as e:
             self.logger.error(f"Error processing download batch: {str(e)}")
             return {
@@ -112,51 +74,123 @@ class DownloadService:
                 "processed_count": 0,
                 "successful_downloads": 0,
                 "failed_downloads": 0,
+                "already_cached": 0,
                 "total_packages": 0
             }
 
-    def process_single_package(self, package: Any) -> Dict[str, Any]:
-        """Process a single package for downloading.
+    def _get_packages_for_download(self, max_packages: int) -> List[Any]:
+        """Get packages that need downloading (short DB session).
 
         Args:
-            package: Package to process
+            max_packages: Maximum number of packages to retrieve
+
+        Returns:
+            List of packages that need downloading
+        """
+        with SessionHelper.get_session() as db:
+            package_ops = PackageOperations(db.session)
+            return package_ops.get_by_status("Licence Checked")[:max_packages]
+
+    def _perform_download_batch(self, packages: List[Any]) -> List[Tuple[Any, Dict[str, Any]]]:
+        """Perform downloads without database sessions.
+
+        Args:
+            packages: List of packages to download
+
+        Returns:
+            List of tuples (package, result_dict)
+        """
+        results = []
+        for package in packages:
+            result = self._perform_download_work(package)
+            results.append((package, result))
+        return results
+
+    def _perform_download_work(self, package: Any) -> Dict[str, Any]:
+        """Pure I/O work - no database operations.
+
+        Args:
+            package: Package to download
+
+        Returns:
+            Dict with download result
+        """
+        try:
+            # Check if already cached
+            if self._is_package_already_downloaded(package):
+                return {"status": "already_cached", "message": "Already downloaded"}
+
+            # Perform download
+            download_success = self._perform_download(package)
+
+            if download_success:
+                # Verify download
+                if self._is_package_already_downloaded(package):
+                    return {"status": "success", "message": "Download completed"}
+                else:
+                    return {"status": "failed", "error": "Download completed but file not found in cache"}
+            else:
+                return {"status": "failed", "error": "Download failed"}
+
+        except Exception as e:
+            self.logger.error(f"Error downloading package {package.name}@{package.version}: {str(e)}")
+            return {"status": "failed", "error": str(e)}
+
+    def _update_download_results(self, download_results: List[Tuple[Any, Dict[str, Any]]]) -> Dict[str, Any]:
+        """Update database with download results (short DB session).
+
+        Args:
+            download_results: List of tuples (package, result_dict)
 
         Returns:
             Dict with processing results
         """
-        try:
-            # Check if package is already downloaded
-            if self._is_package_already_downloaded(package):
-                self._mark_package_downloaded_with_session(package)
-                return {"success": True, "message": "Already downloaded"}
+        successful_count = 0
+        failed_count = 0
+        already_cached_count = 0
 
-            # Mark package as downloading with separate session
-            self._mark_package_downloading_with_session(package)
+        with SessionHelper.get_session() as db:
+            package_ops = PackageOperations(db.session)
+            status_ops = PackageStatusOperations(db.session)
 
-            # Perform the actual download (no database operations here)
-            download_success = self._perform_download(package)
+            for package, result in download_results:
+                try:
+                    # Verify package still needs processing (race condition protection)
+                    current_package = package_ops.get_by_id(package.id)
+                    if not current_package or not current_package.package_status or current_package.package_status.status != "Licence Checked":
+                        continue  # Skip if status changed
 
-            if download_success:
-                # Double-check that the package is actually in the cache before marking as downloaded
-                if self._is_package_already_downloaded(package):
-                    self._mark_package_downloaded_with_session(package)
-                    return {"success": True, "message": "Download completed"}
-                else:
-                    self.logger.error(
-                        f"Download reported success but package not found in cache: {package.name}@{package.version}"
-                    )
-                    self._mark_package_download_failed_with_session(package)
-                    return {"success": False, "error": "Download completed but file not found in cache"}
-            else:
-                self._mark_package_download_failed_with_session(package)
-                return {"success": False, "error": "Download failed"}
+                    if result["status"] == "already_cached":
+                        status_ops.update_status(package.id, "Downloaded")
+                        already_cached_count += 1
+                    elif result["status"] == "success":
+                        status_ops.update_status(package.id, "Downloaded")
+                        successful_count += 1
+                    else:  # failed
+                        status_ops.update_status(package.id, "Download Failed")
+                        failed_count += 1
 
-        except Exception as e:
-            self.logger.error(
-                f"Error processing package {package.name}@{package.version}: {str(e)}"
+                except Exception as e:
+                    self.logger.error(f"Error updating package {package.name}@{package.version}: {str(e)}")
+                    failed_count += 1
+
+            db.commit()
+
+        # Log batch summary
+        if successful_count > 0 or failed_count > 0 or already_cached_count > 0:
+            self.logger.info(
+                f"Download batch complete: {successful_count} downloaded, "
+                f"{already_cached_count} already cached, {failed_count} failed"
             )
-            self._mark_package_download_failed_with_session(package)
-            return {"success": False, "error": str(e)}
+
+        return {
+            "success": True,
+            "processed_count": len(download_results),
+            "successful_downloads": successful_count,
+            "failed_downloads": failed_count,
+            "already_cached": already_cached_count,
+            "total_packages": len(download_results)
+        }
 
     def _is_package_already_downloaded(self, package: Any) -> bool:
         """Check if package is already downloaded.
@@ -267,107 +301,3 @@ class DownloadService:
         else:
             # For regular packages: package -> package
             return f"{self.source_repository_url}/{package.name}/-/{package.name}-{package.version}.tgz"
-
-    def _mark_package_downloading(self, package: Any) -> None:
-        """Mark package as downloading.
-
-        Args:
-            package: Package to update
-        """
-        if package.package_status:
-            self._status_ops.go_to_next_stage(package.id)
-
-    def _mark_package_downloaded(self, package: Any) -> None:
-        """Mark package as downloaded.
-
-        Args:
-            package: Package to update
-        """
-        try:
-            if package.package_status:
-                old_status = package.package_status.status
-                # Set status directly to "Downloaded" instead of going through "Downloading"
-                success = self._status_ops.update_status(package.id, "Downloaded")
-                if success:
-                    self.logger.info(f"Marked package {package.name}@{package.version} as downloaded (was {old_status})")
-                else:
-                    self.logger.error(f"Failed to mark package {package.name}@{package.version} as downloaded (was {old_status})")
-            else:
-                self.logger.warning(f"Package {package.name}@{package.version} has no package_status")
-        except Exception as e:
-            self.logger.error(f"Error updating status for package {package.name}@{package.version}: {str(e)}")
-
-    def _mark_package_download_failed(self, package: Any) -> None:
-        """Mark package as download failed.
-
-        Args:
-            package: Package to update
-        """
-        if package.package_status:
-            self._status_ops.update_status(package.id, "Download Failed")
-
-    def _mark_package_downloading_with_session(self, package: Any) -> None:
-        """Mark package as downloading using a separate database session.
-
-        Args:
-            package: Package to update
-        """
-        try:
-            with SessionHelper.get_session() as db:
-                status_ops = PackageStatusOperations(db.session)
-                if package.package_status:
-                    old_status = package.package_status.status
-                    success = status_ops.update_status(package.id, "Downloading")
-                    if success:
-                        db.commit()
-                        self.logger.info(f"Marked package {package.name}@{package.version} as downloading (was {old_status})")
-                    else:
-                        self.logger.error(f"Failed to mark package {package.name}@{package.version} as downloading (was {old_status})")
-                else:
-                    self.logger.warning(f"Package {package.name}@{package.version} has no package_status")
-        except Exception as e:
-            self.logger.error(f"Error updating status for package {package.name}@{package.version}: {str(e)}")
-
-    def _mark_package_downloaded_with_session(self, package: Any) -> None:
-        """Mark package as downloaded using a separate database session.
-
-        Args:
-            package: Package to update
-        """
-        try:
-            with SessionHelper.get_session() as db:
-                status_ops = PackageStatusOperations(db.session)
-                if package.package_status:
-                    old_status = package.package_status.status
-                    success = status_ops.update_status(package.id, "Downloaded")
-                    if success:
-                        db.commit()
-                        self.logger.info(f"Marked package {package.name}@{package.version} as downloaded (was {old_status})")
-                    else:
-                        self.logger.error(f"Failed to mark package {package.name}@{package.version} as downloaded (was {old_status})")
-                else:
-                    self.logger.warning(f"Package {package.name}@{package.version} has no package_status")
-        except Exception as e:
-            self.logger.error(f"Error updating status for package {package.name}@{package.version}: {str(e)}")
-
-    def _mark_package_download_failed_with_session(self, package: Any) -> None:
-        """Mark package as download failed using a separate database session.
-
-        Args:
-            package: Package to update
-        """
-        try:
-            with SessionHelper.get_session() as db:
-                status_ops = PackageStatusOperations(db.session)
-                if package.package_status:
-                    old_status = package.package_status.status
-                    success = status_ops.update_status(package.id, "Download Failed")
-                    if success:
-                        db.commit()
-                        self.logger.info(f"Marked package {package.name}@{package.version} as download failed (was {old_status})")
-                    else:
-                        self.logger.error(f"Failed to mark package {package.name}@{package.version} as download failed (was {old_status})")
-                else:
-                    self.logger.warning(f"Package {package.name}@{package.version} has no package_status")
-        except Exception as e:
-            self.logger.error(f"Error updating status for package {package.name}@{package.version}: {str(e)}")

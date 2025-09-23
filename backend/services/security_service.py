@@ -1,15 +1,16 @@
 """Security Service.
 
-Handles security scanning for packages. This service manages its own database sessions
-and operations, following the service-first architecture pattern.
+Handles security scanning for packages. This service separates database operations 
+from I/O work for optimal performance.
 """
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from database.operations.package_operations import PackageOperations
 from database.operations.package_status_operations import PackageStatusOperations
+from database.operations.security_scan_operations import SecurityScanOperations
 from database.session_helper import SessionHelper
 
 logger = logging.getLogger(__name__)
@@ -18,74 +19,47 @@ logger = logging.getLogger(__name__)
 class SecurityService:
     """Service for handling package security scanning.
 
-    This service manages its own database sessions and operations,
-    following the service-first architecture pattern.
+    This service separates database operations from I/O work to minimize database session time.
     """
 
     def __init__(self) -> None:
         """Initialize the security service."""
         self.logger = logger
-        # Operations instances (set up in _setup_operations)
-        self._session = None
-        self._package_ops = None
-        self._status_ops = None
-
-    def _setup_operations(self, session):
-        """Set up operations instances for the current session."""
-        self._session = session
-        self._package_ops = PackageOperations(session)
-        self._status_ops = PackageStatusOperations(session)
 
     def process_package_batch(
         self, max_packages: int = 5
     ) -> Dict[str, Any]:
         """Process a batch of packages for security scanning.
 
+        This method separates database operations from I/O work:
+        1. Get packages that need scanning (short DB session)
+        2. Perform security scans (no DB session)
+        3. Update database with results (short DB session)
+
         Args:
-            max_packages: Maximum number of packages to process (reduced for better performance)
+            max_packages: Maximum number of packages to process
 
         Returns:
             Dict with processing results
         """
         try:
-            with SessionHelper.get_session() as db:
-                # Set up operations
-                self._setup_operations(db.session)
-                
-                # Find packages that need security scanning
-                downloaded_packages = self._package_ops.get_by_status("Downloaded")
-                
-                # Limit the number of packages processed (smaller batches)
-                limited_packages = downloaded_packages[:max_packages]
-
-                if not limited_packages:
-                    return {
-                        "success": True,
-                        "processed_count": 0,
-                        "successful_scans": 0,
-                        "failed_scans": 0,
-                        "total_packages": 0
-                    }
-
-                successful_scans = 0
-                failed_scans = 0
-
-                for package in limited_packages:
-                    result = self.scan_single_package(package)
-                    if result["success"]:
-                        successful_scans += 1
-                    else:
-                        failed_scans += 1
-
-                db.commit()
-
+            # Phase 1: Get package data (short DB session)
+            packages_to_process = self._get_packages_for_scanning(max_packages)
+            if not packages_to_process:
                 return {
                     "success": True,
-                    "processed_count": len(limited_packages),
-                    "successful_scans": successful_scans,
-                    "failed_scans": failed_scans,
-                    "total_packages": len(limited_packages)
+                    "processed_count": 0,
+                    "successful_scans": 0,
+                    "failed_scans": 0,
+                    "total_packages": 0
                 }
+
+            # Phase 2: Perform security scans (no DB session)
+            scan_results = self._perform_security_scan_batch(packages_to_process)
+
+            # Phase 3: Update database (short DB session)
+            return self._update_scan_results(scan_results)
+
         except Exception as e:
             self.logger.error(f"Error processing security scan batch: {str(e)}")
             return {
@@ -97,37 +71,56 @@ class SecurityService:
                 "total_packages": 0
             }
 
-    def scan_single_package(self, package: Any) -> Dict[str, Any]:
-        """Scan a single package for security vulnerabilities.
+    def _get_packages_for_scanning(self, max_packages: int) -> List[Any]:
+        """Get packages that need security scanning (short DB session).
+
+        Args:
+            max_packages: Maximum number of packages to retrieve
+
+        Returns:
+            List of packages that need security scanning
+        """
+        with SessionHelper.get_session() as db:
+            package_ops = PackageOperations(db.session)
+            return package_ops.get_by_status("Downloaded")[:max_packages]
+
+    def _perform_security_scan_batch(self, packages: List[Any]) -> List[Tuple[Any, Dict[str, Any]]]:
+        """Perform security scans without database sessions.
+
+        Args:
+            packages: List of packages to scan
+
+        Returns:
+            List of tuples (package, result_dict)
+        """
+        results = []
+        for package in packages:
+            result = self._perform_security_scan_work(package)
+            results.append((package, result))
+        return results
+
+    def _perform_security_scan_work(self, package: Any) -> Dict[str, Any]:
+        """Pure I/O work - no database operations.
 
         Args:
             package: Package to scan
 
         Returns:
-            Dict with scan results
+            Dict with scan result
         """
         try:
-            # Update package status to "Security Scanning"
-            self._update_package_status_to_scanning(package)
-
-            # Perform the actual security scan
+            # Perform the actual security scan using Trivy service
             scan_result = self._perform_security_scan(package)
 
             # Process scan results
             if scan_result.get("status") == "failed":
-                self._mark_scan_failed(package)
-                return {"success": False, "error": "Security scan failed"}
+                return {"status": "failed", "error": "Security scan failed"}
             else:
-                self._mark_scan_completed(package, scan_result)
-                return {"success": True, "scan_result": scan_result}
+                return {"status": "success", "scan_data": scan_result}
 
         except Exception as e:
-            self.logger.error(
-                f"Error scanning package {package.name}@{package.version}: {str(e)}"
-            )
-            self._mark_scan_failed(package)
-            return {"success": False, "error": str(e)}
-
+            self.logger.error(f"Error scanning package {package.name}@{package.version}: {str(e)}")
+            return {"status": "failed", "error": str(e)}
 
     def _perform_security_scan(self, package: Any) -> Dict[str, Any]:
         """Perform the actual security scan using Trivy service.
@@ -148,30 +141,85 @@ class SecurityService:
             self.logger.error(f"Error performing security scan: {str(e)}")
             return {"status": "failed", "error": str(e)}
 
-    def _update_package_status_to_scanning(self, package: Any) -> None:
-        """Update package status to Security Scanning.
+    def _update_scan_results(self, scan_results: List[Tuple[Any, Dict[str, Any]]]) -> Dict[str, Any]:
+        """Update database with scan results (short DB session).
 
         Args:
-            package: Package to update
-        """
-        if package.package_status:
-            self._status_ops.go_to_next_stage(package.id)
+            scan_results: List of tuples (package, result_dict)
 
-    def _mark_scan_completed(self, package: Any, scan_result: Dict[str, Any]) -> None:
-        """Mark package scan as completed.
+        Returns:
+            Dict with processing results
+        """
+        successful_count = 0
+        failed_count = 0
+
+        with SessionHelper.get_session() as db:
+            package_ops = PackageOperations(db.session)
+            status_ops = PackageStatusOperations(db.session)
+            security_scan_ops = SecurityScanOperations(db.session)
+
+            for package, result in scan_results:
+                try:
+                    # Verify package still needs processing (race condition protection)
+                    current_package = package_ops.get_by_id(package.id)
+                    if not current_package or not current_package.package_status or current_package.package_status.status != "Downloaded":
+                        continue  # Skip if status changed
+
+                    if result["status"] == "success":
+                        # Update package status to Security Scanned
+                        status_ops.update_status(package.id, "Security Scanned")
+                        
+                        # Store scan results if available
+                        if "scan_data" in result:
+                            self._store_scan_results(security_scan_ops, package.id, result["scan_data"])
+                        
+                        successful_count += 1
+                    else:  # failed
+                        status_ops.update_status(package.id, "Security Scan Failed")
+                        failed_count += 1
+
+                except Exception as e:
+                    self.logger.error(f"Error updating package {package.name}@{package.version}: {str(e)}")
+                    failed_count += 1
+
+            db.commit()
+
+        # Log batch summary
+        if successful_count > 0 or failed_count > 0:
+            self.logger.info(
+                f"Security scan batch complete: {successful_count} successful, {failed_count} failed"
+            )
+
+        return {
+            "success": True,
+            "processed_count": len(scan_results),
+            "successful_scans": successful_count,
+            "failed_scans": failed_count,
+            "total_packages": len(scan_results)
+        }
+
+    def _store_scan_results(self, security_scan_ops: SecurityScanOperations, package_id: int, scan_data: Dict[str, Any]) -> None:
+        """Store security scan results in database.
 
         Args:
-            package: Package to update
-            scan_result: Results from the security scan
+            security_scan_ops: Security scan operations instance
+            package_id: ID of the package that was scanned
+            scan_data: Scan results data
         """
-        if package.package_status:
-            self._status_ops.go_to_next_stage(package.id)
-
-    def _mark_scan_failed(self, package: Any) -> None:
-        """Mark package scan as failed.
-
-        Args:
-            package: Package to update
-        """
-        if package.package_status:
-            self._status_ops.update_status(package.id, "Security Scan Failed")
+        try:
+            # Create security scan record
+            from database.models.security_scan import SecurityScan
+            
+            security_scan = SecurityScan(
+                package_id=package_id,
+                scan_type="trivy",
+                scan_status="completed",
+                vulnerabilities_found=scan_data.get("vulnerabilities", []),
+                scan_summary=scan_data.get("summary", {}),
+                scan_details=scan_data.get("details", {})
+            )
+            
+            security_scan_ops.create(security_scan)
+            
+        except Exception as e:
+            self.logger.error(f"Error storing scan results for package {package_id}: {str(e)}")
