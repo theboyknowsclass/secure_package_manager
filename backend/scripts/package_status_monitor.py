@@ -50,7 +50,7 @@ logger = logging.getLogger(__name__)
 class PackageStatusMonitor:
     """Monitor package counts by status."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the monitor."""
         self.database_url = os.getenv("DATABASE_URL")
         if not self.database_url:
@@ -269,7 +269,7 @@ class PackageStatusMonitor:
             sys.exit(1)
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(
         description="Monitor package counts by status",

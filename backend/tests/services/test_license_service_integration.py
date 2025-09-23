@@ -13,7 +13,7 @@ from services.license_service import LicenseService
 class TestLicenseServiceIntegration:
     """Integration test suite for the optimized LicenseService."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.service = LicenseService()
 
@@ -350,7 +350,7 @@ class TestLicenseServiceIntegration:
                     return_value=mock_status_ops,
                 ):
                     # Mock license validation with different results
-                    def mock_lookup_side_effect(license_identifier):
+                    def mock_lookup_side_effect(license_identifier: str) -> dict[str, str]:
                         if license_identifier == "MIT":
                             return {
                                 "status": "allowed",
@@ -365,7 +365,7 @@ class TestLicenseServiceIntegration:
                             }
                         return None
 
-                    def mock_score_side_effect(license_data):
+                    def mock_score_side_effect(license_data: dict[str, str]) -> int:
                         if license_data["status"] == "allowed":
                             return 75
                         elif license_data["status"] == "blocked":

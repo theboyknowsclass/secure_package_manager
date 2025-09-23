@@ -7,6 +7,8 @@ statuses based on the states of individual packages within the request.
 import logging
 from typing import Any, Dict, List, Optional
 
+from sqlalchemy.orm import Session
+
 from database.models import Package, PackageStatus, Request, RequestPackage
 from database.operations.package_operations import PackageOperations
 from database.operations.request_operations import RequestOperations
@@ -119,7 +121,7 @@ class PackageRequestStatusManager:
         )
 
     def _get_package_counts_by_status_with_session(
-        self, request_id: int, session
+        self, request_id: int, session: Session
     ) -> Dict[str, int]:
         """Get package counts using a single optimized query."""
         from database.models import Package, PackageStatus, RequestPackage

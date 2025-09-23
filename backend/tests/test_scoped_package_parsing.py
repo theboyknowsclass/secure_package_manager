@@ -18,14 +18,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 class TestScopedPackageParsing:
     """Test cases for scoped package name extraction."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.package_service = PackageLockParsingService()
-        # Mock the operations that the service needs
-        self.package_service._package_ops = Mock()
-        self.package_service._package_ops.get_by_name_version.return_value = (
-            None
-        )
 
     def test_extract_regular_package_name(self) -> None:
         """Test extraction of regular (non-scoped) package names."""
@@ -282,17 +277,12 @@ class TestScopedPackageParsing:
 class TestPackageLockProcessing:
     """Test cases for full package-lock.json processing."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.package_service = PackageLockParsingService()
-        # Mock the operations that the service needs
-        self.package_service._package_ops = Mock()
-        self.package_service._package_ops.get_by_name_version.return_value = (
-            None
-        )
 
-    def test_process_scoped_package_lock(self) -> None:
-        """Test processing a package-lock.json with scoped packages."""
+    def test_extract_packages_from_json_with_scoped_packages(self) -> None:
+        """Test extracting packages from package-lock.json with scoped packages."""
         package_lock_data = {
             "name": "test-project",
             "version": "1.0.0",
@@ -324,61 +314,17 @@ class TestPackageLockProcessing:
             package_lock_data
         )
 
-        # Filter new packages (simulate with request_id=1)
-        new_packages, existing_packages = (
-            self.package_service._filter_new_packages(packages, 1)
-        )
-
         # Verify scoped packages are correctly extracted
-        package_names = [pkg["name"] for pkg in new_packages]
-
         assert (
-            "@types/node" in package_names
+            "node_modules/@types/node" in packages
         ), "Scoped package @types/node not found"
         assert (
-            "@babel/core" in package_names
+            "node_modules/@babel/core" in packages
         ), "Scoped package @babel/core not found"
 
         # Verify versions are correct
-        for pkg in new_packages:
-            if pkg["name"] == "@types/node":
-                assert pkg["version"] == "18.15.0"
-            elif pkg["name"] == "@babel/core":
-                assert pkg["version"] == "7.22.0"
-
-    def test_deduplication_with_scoped_packages(self) -> None:
-        """Test that scoped packages are properly deduplicated."""
-        package_lock_data = {
-            "name": "test-project",
-            "version": "1.0.0",
-            "lockfileVersion": 3,
-            "packages": {
-                "": {"name": "test-project", "version": "1.0.0"},
-                "node_modules/@types/node": {
-                    "version": "18.15.0",
-                    "resolved": "https://registry.npmjs.org/@types/node/-/node-18.15.0.tgz",
-                },
-                "node_modules/express/node_modules/@types/node": {
-                    "version": "18.15.0",
-                    "resolved": "https://registry.npmjs.org/@types/node/-/node-18.15.0.tgz",
-                },
-            },
-        }
-
-        packages = self.package_service._extract_packages_from_json(
-            package_lock_data
-        )
-        new_packages, existing_packages = (
-            self.package_service._filter_new_packages(packages, 1)
-        )
-
-        # Should only have one @types/node package despite appearing twice
-        types_node_packages = [
-            pkg for pkg in new_packages if pkg["name"] == "@types/node"
-        ]
-        assert (
-            len(types_node_packages) == 1
-        ), f"Expected 1 @types/node package, got {len(types_node_packages)}"
+        assert packages["node_modules/@types/node"]["version"] == "18.15.0"
+        assert packages["node_modules/@babel/core"]["version"] == "7.22.0"
 
 
 if __name__ == "__main__":

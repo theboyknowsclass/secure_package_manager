@@ -273,7 +273,7 @@ class TrivyService:
             trivy_version = self._get_trivy_version()
 
             # Extract vulnerabilities from Trivy response
-            vulnerabilities = []
+            vulnerabilities: list[dict[str, Any]] = []
             summary = {
                 "total": 0,
                 "critical": 0,

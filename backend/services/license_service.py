@@ -170,7 +170,7 @@ class LicenseService:
         Returns:
             Tuple of (successful_packages, failed_packages)
         """
-        successful_packages = []
+        successful_packages: list[Any] = []
         failed_packages = []
 
         try:
@@ -267,7 +267,7 @@ class LicenseService:
         self, packages: List[Any]
     ) -> Dict[str, List[Any]]:
         """Group packages by their license string for efficient processing."""
-        license_groups = {}
+        license_groups: dict[str, list[Any]] = {}
 
         for package in packages:
             license_string = package.license_identifier or "No License"

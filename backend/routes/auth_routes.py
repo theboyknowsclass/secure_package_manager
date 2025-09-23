@@ -28,7 +28,7 @@ auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 auth_service = AuthService()
 
 
-@auth_bp.route("/login", methods=["POST"])  # type: ignore[misc]
+@auth_bp.route("/login", methods=["POST"])
 def login() -> ResponseReturnValue:
     """Login endpoint - integrates with mock-idp service in dev, ADFS in
     production"""
@@ -85,7 +85,7 @@ def login() -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
-@auth_bp.route("/userinfo", methods=["GET"])  # type: ignore[misc]
+@auth_bp.route("/userinfo", methods=["GET"])
 @auth_service.require_auth
 def userinfo() -> ResponseReturnValue:
     """Get current user information."""

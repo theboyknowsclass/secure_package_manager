@@ -1,7 +1,7 @@
 """Database operations for PackageStatus entities."""
 
 from datetime import datetime
-from typing import List, Optional, Type
+from typing import Any, List, Optional, Type
 
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
@@ -28,7 +28,7 @@ class PackageStatusOperations(BaseOperations):
         return self.session.execute(stmt).scalar_one_or_none()
 
     def update_status(
-        self, package_id: int, new_status: str, **kwargs
+        self, package_id: int, new_status: str, **kwargs: Any
     ) -> bool:
         """Update package status.
 
@@ -56,7 +56,7 @@ class PackageStatusOperations(BaseOperations):
         return True
 
     def batch_update_status(
-        self, package_ids: List[int], new_status: str, **kwargs
+        self, package_ids: List[int], new_status: str, **kwargs: Any
     ) -> int:
         """Update status for multiple packages.
 
@@ -363,7 +363,7 @@ class PackageStatusOperations(BaseOperations):
         status.updated_at = datetime.utcnow()
         return True
 
-    def go_to_next_stage(self, package_id: int, **kwargs) -> bool:
+    def go_to_next_stage(self, package_id: int, **kwargs: Any) -> bool:
         """Advance package to the next stage in the workflow.
 
         This method provides workflow abstraction by automatically determining

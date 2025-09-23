@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from database.models import User
@@ -46,7 +46,7 @@ publishing_service = NpmRegistryPublishingService()
 # Package Approval Routes - Batch Operations Only
 @approver_bp.route(
     "/packages/publish/<int:package_id>", methods=["POST"]
-)  # type: ignore[misc]
+)
 @auth_service.require_admin
 def publish_package(package_id: int) -> ResponseReturnValue:
     """Publish an approved package to the secure repository."""
@@ -99,7 +99,7 @@ def publish_package(package_id: int) -> ResponseReturnValue:
 
 @approver_bp.route(
     "/packages/batch-approve", methods=["POST"]
-)  # type: ignore[misc]
+)
 @auth_service.require_admin
 def batch_approve_packages() -> ResponseReturnValue:
     """Approve multiple packages at once."""
@@ -182,7 +182,7 @@ def batch_approve_packages() -> ResponseReturnValue:
 
 @approver_bp.route(
     "/packages/batch-reject", methods=["POST"]
-)  # type: ignore[misc]
+)
 @auth_service.require_admin
 def batch_reject_packages() -> ResponseReturnValue:
     """Reject multiple packages at once."""
@@ -250,7 +250,7 @@ def batch_reject_packages() -> ResponseReturnValue:
 
 @approver_bp.route(
     "/packages/validated", methods=["GET"]
-)  # type: ignore[misc]
+)
 @auth_service.require_admin
 def get_validated_packages() -> ResponseReturnValue:
     """Get all packages ready for admin review (pending approval)"""
@@ -333,7 +333,7 @@ def get_validated_packages() -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
-def _process_package_approval(package_id: int, user, reason: str) -> dict:
+def _process_package_approval(package_id: int, user: Any, reason: str) -> dict:
     """Process approval of a single package.
 
     Returns:
@@ -344,46 +344,45 @@ def _process_package_approval(package_id: int, user, reason: str) -> dict:
             package_ops = PackageOperations(db.session)
             package = package_ops.get_by_id(package_id)
 
-        if not package:
-            return {
-                "success": False,
-                "error": {"id": package_id, "error": "Package not found"},
-            }
+            if not package:
+                return {
+                    "success": False,
+                    "error": {"id": package_id, "error": "Package not found"},
+                }
 
-        if not package.package_status:
-            return {
-                "success": False,
-                "error": {
-                    "id": package_id,
-                    "error": "Package status not found",
-                },
-            }
+            if not package.package_status:
+                return {
+                    "success": False,
+                    "error": {
+                        "id": package_id,
+                        "error": "Package status not found",
+                    },
+                }
 
-        if package.package_status.status != "Pending Approval":
-            return {
-                "success": False,
-                "error": {
-                    "id": package_id,
-                    "error": "Package must be pending approval",
-                },
-            }
+            if package.package_status.status != "Pending Approval":
+                return {
+                    "success": False,
+                    "error": {
+                        "id": package_id,
+                        "error": "Package must be pending approval",
+                    },
+                }
 
-        # Approve the package
-        package.package_status.status = "Approved"
-        package.package_status.approver_id = user.id
+            # Approve the package
+            package.package_status.status = "Approved"
+            package.package_status.approver_id = user.id
 
-        # Log the approval
-        audit_log = AuditLog(
-            user_id=user.id,
-            action="approve_package",
-            resource_type="package",
-            resource_id=package.id,
-            details=(
-                f"Package {package.name}@{package.version} approved: "
-                f"{reason}"
-            ),
-        )
-        with SessionHelper.get_session() as db:
+            # Log the approval
+            audit_log = AuditLog(
+                user_id=user.id,
+                action="approve_package",
+                resource_type="package",
+                resource_id=package.id,
+                details=(
+                    f"Package {package.name}@{package.version} approved: "
+                    f"{reason}"
+                ),
+            )
             audit_ops = AuditLogOperations(db.session)
             audit_ops.create(audit_log)
             db.commit()
@@ -398,7 +397,7 @@ def _process_package_approval(package_id: int, user, reason: str) -> dict:
         }
 
 
-def _process_package_rejection(package_id: int, user, reason: str) -> dict:
+def _process_package_rejection(package_id: int, user: Any, reason: str) -> dict:
     """Process rejection of a single package.
 
     Returns:
@@ -409,46 +408,45 @@ def _process_package_rejection(package_id: int, user, reason: str) -> dict:
             package_ops = PackageOperations(db.session)
             package = package_ops.get_by_id(package_id)
 
-        if not package:
-            return {
-                "success": False,
-                "error": {"id": package_id, "error": "Package not found"},
-            }
+            if not package:
+                return {
+                    "success": False,
+                    "error": {"id": package_id, "error": "Package not found"},
+                }
 
-        if not package.package_status:
-            return {
-                "success": False,
-                "error": {
-                    "id": package_id,
-                    "error": "Package status not found",
-                },
-            }
+            if not package.package_status:
+                return {
+                    "success": False,
+                    "error": {
+                        "id": package_id,
+                        "error": "Package status not found",
+                    },
+                }
 
-        if package.package_status.status in ["Approved"]:
-            return {
-                "success": False,
-                "error": {
-                    "id": package_id,
-                    "error": "Cannot reject an already approved package",
-                },
-            }
+            if package.package_status.status in ["Approved"]:
+                return {
+                    "success": False,
+                    "error": {
+                        "id": package_id,
+                        "error": "Cannot reject an already approved package",
+                    },
+                }
 
-        # Reject the package
-        package.package_status.status = "Rejected"
-        package.package_status.rejector_id = user.id
+            # Reject the package
+            package.package_status.status = "Rejected"
+            package.package_status.rejector_id = user.id
 
-        # Log the rejection
-        audit_log = AuditLog(
-            user_id=user.id,
-            action="batch_reject_package",
-            resource_type="package",
-            resource_id=package.id,
-            details=(
-                f"Package {package.name}@{package.version} rejected: "
-                f"{reason}"
-            ),
-        )
-        with SessionHelper.get_session() as db:
+            # Log the rejection
+            audit_log = AuditLog(
+                user_id=user.id,
+                action="batch_reject_package",
+                resource_type="package",
+                resource_id=package.id,
+                details=(
+                    f"Package {package.name}@{package.version} rejected: "
+                    f"{reason}"
+                ),
+            )
             audit_ops = AuditLogOperations(db.session)
             audit_ops.create(audit_log)
             db.commit()

@@ -75,7 +75,7 @@ auth_service = AuthService()
 trivy_service = TrivyService()
 
 
-@package_bp.route("/upload", methods=["POST"])  # type: ignore[misc]
+@package_bp.route("/upload", methods=["POST"])
 @auth_service.require_auth
 def upload_package_lock() -> ResponseReturnValue:
     """Upload package-lock.json file for background processing."""
@@ -209,7 +209,7 @@ def _create_success_response(
 
 @package_bp.route(
     "/requests/<int:request_id>", methods=["GET"]
-)  # type: ignore[misc]
+)
 @auth_service.require_auth
 def get_package_request(request_id: int) -> ResponseReturnValue:
     """Get package request details."""
@@ -350,7 +350,7 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
         return handle_error(e, "Get request")
 
 
-@package_bp.route("/requests", methods=["GET"])  # type: ignore[misc]
+@package_bp.route("/requests", methods=["GET"])
 @auth_service.require_auth
 def list_package_requests() -> ResponseReturnValue:
     """List package requests for the user."""
@@ -405,7 +405,7 @@ def list_package_requests() -> ResponseReturnValue:
 
 @package_bp.route(
     "/<int:package_id>/security-scan/status", methods=["GET"]
-)  # type: ignore[misc]
+)
 @auth_service.require_auth
 def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
     """Get security scan status for a package."""
@@ -454,7 +454,7 @@ def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
 
 @package_bp.route(
     "/<int:package_id>/security-scan/report", methods=["GET"]
-)  # type: ignore[misc]
+)
 @auth_service.require_auth
 def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
     """Get detailed security scan report for a package."""
@@ -505,7 +505,7 @@ def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
 
 @package_bp.route(
     "/<int:package_id>/security-scan/trigger", methods=["POST"]
-)  # type: ignore[misc]
+)
 @auth_service.require_auth
 def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
     """Trigger a new security scan for a package."""
@@ -547,7 +547,7 @@ def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
         return handle_error(e, "Trigger security scan")
 
 
-@package_bp.route("/processing/status", methods=["GET"])  # type: ignore[misc]
+@package_bp.route("/processing/status", methods=["GET"])
 @auth_service.require_auth
 def get_processing_status() -> ResponseReturnValue:
     """Get overall processing status and statistics."""
@@ -611,7 +611,7 @@ def get_processing_status() -> ResponseReturnValue:
         return handle_error(e, "Get processing status")
 
 
-@package_bp.route("/processing/retry", methods=["POST"])  # type: ignore[misc]
+@package_bp.route("/processing/retry", methods=["POST"])
 @auth_service.require_auth
 def retry_failed_packages() -> ResponseReturnValue:
     """Retry failed packages, optionally for a specific request."""
@@ -673,7 +673,7 @@ def retry_failed_packages() -> ResponseReturnValue:
         return handle_error(e, "Retry failed packages")
 
 
-@package_bp.route("/audit", methods=["GET"])  # type: ignore[misc]
+@package_bp.route("/audit", methods=["GET"])
 @auth_service.require_auth
 def get_audit_data() -> ResponseReturnValue:
     """Get audit data for approved packages."""

@@ -25,7 +25,7 @@ from services.package_lock_parsing_service import (
 )
 
 
-def load_test_package_lock(filename):
+def load_test_package_lock(filename: str) -> dict:
     """Load a test package-lock.json file and return as JSON data."""
     if not filename.endswith(".json"):
         filename += ".json"

@@ -214,7 +214,7 @@ class PackageOperations(BaseOperations):
         return list(self.session.execute(stmt).scalars().all())
 
     def get_stuck_packages_in_publishing(
-        self, stuck_threshold
+        self, stuck_threshold: int
     ) -> List[Package]:
         """Get packages stuck in publishing state.
 
@@ -289,7 +289,7 @@ class PackageOperations(BaseOperations):
         return self.session.execute(stmt).scalars().count()
 
     def get_stuck_packages_in_security_scanned(
-        self, stuck_threshold
+        self, stuck_threshold: int
     ) -> List[Package]:
         """Get packages stuck in Security Scanned state.
 
@@ -313,7 +313,7 @@ class PackageOperations(BaseOperations):
         return list(self.session.execute(stmt).scalars().all())
 
     def get_stuck_packages_in_security_scanning(
-        self, stuck_threshold
+        self, stuck_threshold: int
     ) -> List[Package]:
         """Get packages stuck in Security Scanning state.
 
@@ -337,7 +337,7 @@ class PackageOperations(BaseOperations):
         return list(self.session.execute(stmt).scalars().all())
 
     def get_stuck_packages_in_downloading(
-        self, stuck_threshold
+        self, stuck_threshold: int
     ) -> List[Package]:
         """Get packages stuck in Downloading state.
 
@@ -361,7 +361,7 @@ class PackageOperations(BaseOperations):
         return list(self.session.execute(stmt).scalars().all())
 
     def get_packages_needing_license_check(
-        self, limit: int = None
+        self, limit: int | None = None
     ) -> List[Package]:
         """Get packages that need license checking.
 
@@ -382,7 +382,7 @@ class PackageOperations(BaseOperations):
         return list(self.session.execute(stmt).scalars().all())
 
     def get_stuck_packages_in_license_checking(
-        self, stuck_threshold
+        self, stuck_threshold: int
     ) -> List[Package]:
         """Get packages stuck in license checking state.
 

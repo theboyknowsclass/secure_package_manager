@@ -13,7 +13,7 @@ from services.license_service import LicenseService
 class TestLicenseServiceOptimized:
     """Test suite for the optimized LicenseService."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.service = LicenseService()
 

@@ -34,7 +34,7 @@ config_service = ConfigurationService()
 
 
 # License Management Routes
-@admin_bp.route("/licenses", methods=["GET"])  # type: ignore[misc]
+@admin_bp.route("/licenses", methods=["GET"])
 @auth_service.require_auth
 def get_supported_licenses() -> ResponseReturnValue:
     """Get all supported licenses."""
@@ -56,7 +56,7 @@ def get_supported_licenses() -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
-@admin_bp.route("/licenses", methods=["POST"])  # type: ignore[misc]
+@admin_bp.route("/licenses", methods=["POST"])
 @auth_service.require_auth
 def create_supported_license() -> ResponseReturnValue:
     """Create a new supported license."""
@@ -121,7 +121,7 @@ def create_supported_license() -> ResponseReturnValue:
 
 @admin_bp.route(
     "/licenses/<int:license_id>", methods=["PUT"]
-)  # type: ignore[misc]
+)
 @auth_service.require_auth
 def update_supported_license(license_id: int) -> ResponseReturnValue:
     """Update a supported license."""
@@ -172,7 +172,7 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
 
 @admin_bp.route(
     "/licenses/<int:license_id>", methods=["DELETE"]
-)  # type: ignore[misc]
+)
 @auth_service.require_auth
 def delete_supported_license(license_id: int) -> ResponseReturnValue:
     """Delete a supported license."""
@@ -231,7 +231,7 @@ def delete_supported_license(license_id: int) -> ResponseReturnValue:
 
 
 # Configuration Route (consolidated from repository-config endpoints)
-@admin_bp.route("/config", methods=["GET"])  # type: ignore[misc]
+@admin_bp.route("/config", methods=["GET"])
 @auth_service.require_auth
 def get_config() -> ResponseReturnValue:
     """Get system configuration including status and environment variables."""
