@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
-def run_worker_tests():
+def run_worker_tests() -> bool:
     """Run all worker unit tests."""
     logger.info("🚀 Starting Worker Unit Tests...")
     logger.info("=" * 50)
@@ -23,7 +23,7 @@ def run_worker_tests():
     # Discover and run all tests in the workers test package
     loader = unittest.TestLoader()
     workers_dir = Path(__file__).parent / "workers"
-    suite = loader.discover(workers_dir, pattern="test_*.py")
+    suite = loader.discover(str(workers_dir), pattern="test_*.py")
 
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)

@@ -5,7 +5,7 @@ No Flask dependencies, can be used by workers independently
 
 import logging
 from contextlib import contextmanager
-from typing import Generator, Optional
+from typing import Any, Dict, Generator, Optional
 
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -35,7 +35,7 @@ class DatabaseService:
         """Initialize the SQLAlchemy engine and session factory."""
         try:
             # Create engine with appropriate configuration
-            engine_kwargs = {
+            engine_kwargs: Dict[str, Any] = {
                 "echo": self.echo,
                 "pool_pre_ping": True,  # Verify connections before use
                 "pool_recycle": 3600,  # Recycle connections every hour
@@ -82,6 +82,8 @@ class DatabaseService:
                 result = session.query(Model).all()
                 session.commit()
         """
+        if self._SessionLocal is None:
+            raise RuntimeError("Database service not initialized")
         session = self._SessionLocal()
         try:
             yield session
@@ -109,7 +111,7 @@ class DatabaseService:
             logger.error(f"Database connection test failed: {str(e)}")
             return False
 
-    def get_engine(self):
+    def get_engine(self) -> Optional[Engine]:
         """Get the SQLAlchemy engine (for advanced usage)"""
         return self._engine
 

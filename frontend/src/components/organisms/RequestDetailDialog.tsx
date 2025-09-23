@@ -150,7 +150,9 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     accessorKey: "type",
     header: "Type",
     size: 80,
-    Cell: ({ row }: { row: any }) => <TypeCell type={row.original.type} />,
+    Cell: ({ row }: { row: { original: Package } }) => (
+      <TypeCell type={row.original.type} />
+    ),
   },
 ];
 

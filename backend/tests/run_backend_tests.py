@@ -14,7 +14,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-def run_backend_tests():
+def run_backend_tests() -> bool:
     """Run all backend tests."""
     logger.info("🚀 Starting Backend Tests...")
     logger.info("=" * 50)
@@ -25,7 +25,7 @@ def run_backend_tests():
     # Discover and run tests
     loader = unittest.TestLoader()
     start_dir = test_dir
-    suite = loader.discover(start_dir, pattern="test_*.py")
+    suite = loader.discover(str(start_dir), pattern="test_*.py")
 
     # Run the tests
     runner = unittest.TextTestRunner(verbosity=2)
@@ -43,7 +43,7 @@ def run_backend_tests():
         return False
 
 
-def run_specific_test(test_file):
+def run_specific_test(test_file: str) -> bool:
     """Run a specific test file."""
     logger.info(f"🚀 Running {test_file}...")
     logger.info("=" * 50)
@@ -57,9 +57,9 @@ def run_specific_test(test_file):
         return False
 
     # Run the specific test
-        result = subprocess.run(
-            [sys.executable, str(test_path)], capture_output=False, text=True
-        )
+    result = subprocess.run(
+        [sys.executable, str(test_path)], capture_output=False, text=True
+    )
 
     if result.returncode == 0:
         logger.info(f"\n🎉 {test_file} passed!")

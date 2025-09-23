@@ -10,6 +10,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from typing import cast
 
 # Configure logging - minimal output for production
 log_level = (
@@ -37,7 +38,7 @@ logging.getLogger("sqlalchemy.pool").setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
 
 
-def get_worker_class_by_type(worker_type: str) -> type:
+def get_worker_class_by_type(worker_type: str) -> type | None:
     """Get worker class by type using dynamic import - only load the specific worker needed."""
     # Define worker type to module mapping
     worker_modules = {
@@ -55,7 +56,7 @@ def get_worker_class_by_type(worker_type: str) -> type:
     module_name, class_name = worker_modules[worker_type]
     try:
         module = __import__(module_name, fromlist=[class_name])
-        return getattr(module, class_name)
+        return cast(type, getattr(module, class_name))
     except (ImportError, AttributeError) as e:
         logger.error(f"Failed to import {worker_type} from {module_name}: {e}")
         return None

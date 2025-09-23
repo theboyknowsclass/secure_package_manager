@@ -7,7 +7,7 @@ the overhead of the full CompositeOperations class.
 
 import os
 from contextlib import contextmanager
-from typing import Generator
+from typing import Any, Generator
 
 from sqlalchemy.orm import Session
 
@@ -29,19 +29,19 @@ class SessionHelper:
         """
         self.session = session
 
-    def add(self, entity):
+    def add(self, entity: Any) -> None:
         """Add an entity to the session."""
         return self.session.add(entity)
 
-    def delete(self, entity):
+    def delete(self, entity: Any) -> None:
         """Delete an entity from the session."""
         return self.session.delete(entity)
 
-    def merge(self, entity):
+    def merge(self, entity: Any) -> Any:
         """Merge an entity into the session."""
         return self.session.merge(entity)
 
-    def query(self, *args, **kwargs):
+    def query(self, *args: Any, **kwargs: Any) -> Any:
         """Query the session."""
         return self.session.query(*args, **kwargs)
 

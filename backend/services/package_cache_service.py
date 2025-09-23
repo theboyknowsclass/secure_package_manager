@@ -63,7 +63,7 @@ class PackageCacheService:
             )
             return None
 
-    def is_package_cached(self, package) -> bool:
+    def is_package_cached(self, package: Any) -> bool:
         """Check if package is already cached locally.
 
         Args:
@@ -75,7 +75,7 @@ class PackageCacheService:
         package_dir = self._get_package_cache_path(package)
         return package_dir.exists() and package_dir.is_dir()
 
-    def get_package_path(self, package) -> Optional[str]:
+    def get_package_path(self, package: Any) -> Optional[str]:
         """Get the local path to cached package.
 
         Args:
@@ -92,7 +92,7 @@ class PackageCacheService:
             return str(package_dir / "package")
         return None
 
-    def remove_package(self, package) -> bool:
+    def remove_package(self, package: Any) -> bool:
         """Remove a package from the cache.
 
         Args:
@@ -177,7 +177,7 @@ class PackageCacheService:
             logger.error(f"Error listing cached packages: {str(e)}")
         return cached_packages
 
-    def _get_package_cache_path(self, package) -> Path:
+    def _get_package_cache_path(self, package: Any) -> Path:
         """Get the cache directory path for a package.
 
         Args:
