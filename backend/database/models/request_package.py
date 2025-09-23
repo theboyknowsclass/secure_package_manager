@@ -14,7 +14,7 @@ class RequestPackage(Base):
     request_id = Column(Integer, ForeignKey("requests.id"), primary_key=True)
     package_id = Column(Integer, ForeignKey("packages.id"), primary_key=True)
     package_type = Column(String(20), default="new", nullable=False)
-    
+
     # Relationships
     request = relationship("Request", back_populates="request_packages")
     package = relationship("Package", back_populates="request_packages")

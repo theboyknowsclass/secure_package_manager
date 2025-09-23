@@ -60,9 +60,7 @@ class PublishWorker(BaseWorker):
                         "PublishWorker heartbeat: No packages found for publishing"
                     )
             else:
-                logger.error(
-                    f"Error in publishing batch: {result['error']}"
-                )
+                logger.error(f"Error in publishing batch: {result['error']}")
 
         except Exception as e:
             logger.error(
@@ -86,12 +84,12 @@ class PublishWorker(BaseWorker):
         try:
             # Service manages its own database sessions
             result = self.publishing_service.retry_failed_packages()
-            
+
             if "retried" in result and result["retried"] > 0:
                 logger.info(
                     f"Retried {result['retried']} failed publishing packages"
                 )
-            
+
             return result
         except Exception as e:
             logger.error(

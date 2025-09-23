@@ -1,6 +1,6 @@
 """Database operations for RequestPackage entities."""
 
-from typing import List, Optional
+from typing import Type, List, Optional, Type
 
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
@@ -79,7 +79,9 @@ class RequestPackageOperations(BaseOperations):
         self.session.add(link)
         return link
 
-    def get_all(self) -> List[RequestPackage]:
+    def get_all(
+        self, model_class: Type[RequestPackage]
+    ) -> List[RequestPackage]:
         """Get all request-package links.
 
         Returns:
@@ -98,6 +100,7 @@ class RequestPackageOperations(BaseOperations):
             True if user has access, False otherwise
         """
         from ..models import Request
+
         stmt = (
             select(RequestPackage)
             .join(Request)

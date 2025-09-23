@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class NpmRegistryPublishingService:
     """Service for publishing packages to secure repository."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.target_repo_url = os.getenv(
             "TARGET_REPOSITORY_URL", TARGET_REPOSITORY_URL
         )

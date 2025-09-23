@@ -3,7 +3,7 @@
 from typing import List, Optional
 
 from sqlalchemy import and_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..models import Package, PackageStatus
 from .base_operations import BaseOperations
@@ -42,6 +42,7 @@ class PackageOperations(BaseOperations):
             select(Package)
             .join(PackageStatus)
             .where(PackageStatus.status == status)
+            .options(selectinload(Package.package_status))
             .order_by(Package.name.asc())
         )
         return list(self.session.execute(stmt).scalars().all())
@@ -59,6 +60,7 @@ class PackageOperations(BaseOperations):
             select(Package)
             .join(PackageStatus)
             .where(PackageStatus.status.in_(statuses))
+            .options(selectinload(Package.package_status))
         )
         return list(self.session.execute(stmt).scalars().all())
 
@@ -92,6 +94,7 @@ class PackageOperations(BaseOperations):
                     PackageStatus.updated_at < stuck_threshold,
                 )
             )
+            .options(selectinload(Package.package_status))
         )
         return list(self.session.execute(stmt).scalars().all())
 
@@ -121,7 +124,12 @@ class PackageOperations(BaseOperations):
 
         return package
 
-    def update_license_info(self, package_id: int, license_identifier: Optional[str] = None, license_text: Optional[str] = None) -> bool:
+    def update_license_info(
+        self,
+        package_id: int,
+        license_identifier: Optional[str] = None,
+        license_text: Optional[str] = None,
+    ) -> bool:
         """Update package license information (readonly package table fields).
 
         Args:
@@ -141,7 +149,7 @@ class PackageOperations(BaseOperations):
             package.license_identifier = license_identifier
         if license_text is not None:
             package.license_text = license_text
-        
+
         self.update(package)
         return True
 
@@ -197,14 +205,17 @@ class PackageOperations(BaseOperations):
             .where(
                 and_(
                     PackageStatus.status == "Approved",
-                    PackageStatus.publish_status == "pending"
+                    PackageStatus.publish_status == "pending",
                 )
             )
+            .options(selectinload(Package.package_status))
             .limit(limit)
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_stuck_packages_in_publishing(self, stuck_threshold) -> List[Package]:
+    def get_stuck_packages_in_publishing(
+        self, stuck_threshold
+    ) -> List[Package]:
         """Get packages stuck in publishing state.
 
         Args:
@@ -219,13 +230,16 @@ class PackageOperations(BaseOperations):
             .where(
                 and_(
                     PackageStatus.publish_status.in_(["publishing", "failed"]),
-                    PackageStatus.updated_at < stuck_threshold
+                    PackageStatus.updated_at < stuck_threshold,
                 )
             )
+            .options(selectinload(Package.package_status))
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_packages_by_publish_status(self, publish_status: str) -> List[Package]:
+    def get_packages_by_publish_status(
+        self, publish_status: str
+    ) -> List[Package]:
         """Get packages by publish status.
 
         Args:
@@ -238,6 +252,7 @@ class PackageOperations(BaseOperations):
             select(Package)
             .join(PackageStatus)
             .where(PackageStatus.publish_status == publish_status)
+            .options(selectinload(Package.package_status))
         )
         return list(self.session.execute(stmt).scalars().all())
 
@@ -273,7 +288,9 @@ class PackageOperations(BaseOperations):
         )
         return self.session.execute(stmt).scalars().count()
 
-    def get_stuck_packages_in_security_scanned(self, stuck_threshold) -> List[Package]:
+    def get_stuck_packages_in_security_scanned(
+        self, stuck_threshold
+    ) -> List[Package]:
         """Get packages stuck in Security Scanned state.
 
         Args:
@@ -288,13 +305,16 @@ class PackageOperations(BaseOperations):
             .where(
                 and_(
                     PackageStatus.status == "Security Scanned",
-                    PackageStatus.updated_at < stuck_threshold
+                    PackageStatus.updated_at < stuck_threshold,
                 )
             )
+            .options(selectinload(Package.package_status))
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_stuck_packages_in_security_scanning(self, stuck_threshold) -> List[Package]:
+    def get_stuck_packages_in_security_scanning(
+        self, stuck_threshold
+    ) -> List[Package]:
         """Get packages stuck in Security Scanning state.
 
         Args:
@@ -309,13 +329,16 @@ class PackageOperations(BaseOperations):
             .where(
                 and_(
                     PackageStatus.status == "Security Scanning",
-                    PackageStatus.updated_at < stuck_threshold
+                    PackageStatus.updated_at < stuck_threshold,
                 )
             )
+            .options(selectinload(Package.package_status))
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_stuck_packages_in_downloading(self, stuck_threshold) -> List[Package]:
+    def get_stuck_packages_in_downloading(
+        self, stuck_threshold
+    ) -> List[Package]:
         """Get packages stuck in Downloading state.
 
         Args:
@@ -330,13 +353,16 @@ class PackageOperations(BaseOperations):
             .where(
                 and_(
                     PackageStatus.status == "Downloading",
-                    PackageStatus.updated_at < stuck_threshold
+                    PackageStatus.updated_at < stuck_threshold,
                 )
             )
+            .options(selectinload(Package.package_status))
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_packages_needing_license_check(self, limit: int = None) -> List[Package]:
+    def get_packages_needing_license_check(
+        self, limit: int = None
+    ) -> List[Package]:
         """Get packages that need license checking.
 
         Args:
@@ -349,12 +375,15 @@ class PackageOperations(BaseOperations):
             select(Package)
             .join(PackageStatus)
             .where(PackageStatus.status == "Checking Licence")
+            .options(selectinload(Package.package_status))
         )
         if limit:
             stmt = stmt.limit(limit)
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_stuck_packages_in_license_checking(self, stuck_threshold) -> List[Package]:
+    def get_stuck_packages_in_license_checking(
+        self, stuck_threshold
+    ) -> List[Package]:
         """Get packages stuck in license checking state.
 
         Args:
@@ -369,9 +398,10 @@ class PackageOperations(BaseOperations):
             .where(
                 and_(
                     PackageStatus.status == "Checking Licence",
-                    PackageStatus.updated_at < stuck_threshold
+                    PackageStatus.updated_at < stuck_threshold,
                 )
             )
+            .options(selectinload(Package.package_status))
         )
         return list(self.session.execute(stmt).scalars().all())
 
@@ -385,6 +415,7 @@ class PackageOperations(BaseOperations):
             select(Package)
             .join(PackageStatus)
             .where(PackageStatus.status == "Pending Approval")
+            .options(selectinload(Package.package_status))
         )
         return list(self.session.execute(stmt).scalars().all())
 
@@ -401,12 +432,15 @@ class PackageOperations(BaseOperations):
             select(Package)
             .join(PackageStatus)
             .where(PackageStatus.updated_at.isnot(None))
+            .options(selectinload(Package.package_status))
             .order_by(PackageStatus.updated_at.desc())
             .limit(limit)
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_with_security_scan_info(self, package_id: int) -> Optional[Package]:
+    def get_with_security_scan_info(
+        self, package_id: int
+    ) -> Optional[Package]:
         """Get package with security scan information.
 
         Args:
@@ -416,6 +450,7 @@ class PackageOperations(BaseOperations):
             Package with security scan info if found, None otherwise
         """
         from ..models import SecurityScan
+
         stmt = (
             select(Package)
             .outerjoin(SecurityScan)
@@ -432,10 +467,14 @@ class PackageOperations(BaseOperations):
         Returns:
             Number of packages with the specified license
         """
-        stmt = select(Package).where(Package.license_identifier == license_identifier)
+        stmt = select(Package).where(
+            Package.license_identifier == license_identifier
+        )
         return self.session.execute(stmt).scalars().count()
 
-    def get_packages_with_context_and_scans(self, request_id: int) -> List[tuple]:
+    def get_packages_with_context_and_scans(
+        self, request_id: int
+    ) -> List[tuple]:
         """Get packages with their request context and security scan info.
 
         Args:
@@ -444,40 +483,45 @@ class PackageOperations(BaseOperations):
         Returns:
             List of tuples containing (Package, RequestPackage, SecurityScan)
         """
-        from ..models import RequestPackage, SecurityScan
         from sqlalchemy import func
-        
+
+        from ..models import RequestPackage, SecurityScan
+
         # First, get all request_packages for this request
-        request_package_stmt = (
-            select(RequestPackage)
-            .where(RequestPackage.request_id == request_id)
+        request_package_stmt = select(RequestPackage).where(
+            RequestPackage.request_id == request_id
         )
-        request_packages = self.session.execute(request_package_stmt).scalars().all()
-        
+        request_packages = (
+            self.session.execute(request_package_stmt).scalars().all()
+        )
+
         if not request_packages:
             return []
-        
+
         # Get package IDs for batch query
         package_ids = [rp.package_id for rp in request_packages]
-        
+
         # Get all packages in one query
         packages_stmt = select(Package).where(Package.id.in_(package_ids))
-        packages = {pkg.id: pkg for pkg in self.session.execute(packages_stmt).scalars().all()}
-        
+        packages = {
+            pkg.id: pkg
+            for pkg in self.session.execute(packages_stmt).scalars().all()
+        }
+
         # Get latest security scans for all packages in one query
-        latest_scans_stmt = (
-            select(SecurityScan)
-            .where(
-                SecurityScan.package_id.in_(package_ids),
-                SecurityScan.id.in_(
-                    select(func.max(SecurityScan.id))
-                    .where(SecurityScan.package_id.in_(package_ids))
-                    .group_by(SecurityScan.package_id)
-                )
-            )
+        latest_scans_stmt = select(SecurityScan).where(
+            SecurityScan.package_id.in_(package_ids),
+            SecurityScan.id.in_(
+                select(func.max(SecurityScan.id))
+                .where(SecurityScan.package_id.in_(package_ids))
+                .group_by(SecurityScan.package_id)
+            ),
         )
-        latest_scans = {scan.package_id: scan for scan in self.session.execute(latest_scans_stmt).scalars().all()}
-        
+        latest_scans = {
+            scan.package_id: scan
+            for scan in self.session.execute(latest_scans_stmt).scalars().all()
+        }
+
         # Build results maintaining order
         results = []
         for rp in request_packages:
@@ -485,5 +529,5 @@ class PackageOperations(BaseOperations):
             if package:
                 scan = latest_scans.get(rp.package_id)
                 results.append((package, rp, scan))
-        
+
         return results

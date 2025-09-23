@@ -14,7 +14,12 @@ from typing import Any, Dict
 from unittest.mock import MagicMock, Mock
 
 # Add the backend directory to the Python path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(
+    0,
+    os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    ),
+)
 
 from services.package_lock_parsing_service import (
     PackageLockParsingService,
@@ -37,7 +42,7 @@ def load_test_package_lock(filename):
 class TestPackageLockParsingService(unittest.TestCase):
     """Test suite for PackageLockParsingService business logic."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         self.service = PackageLockParsingService()
         self.mock_ops = self._create_mock_operations()
@@ -60,7 +65,7 @@ class TestPackageLockParsingService(unittest.TestCase):
 
         return mock_ops
 
-    def test_validate_simple_app(self):
+    def test_validate_simple_app(self) -> None:
         """Test validation of simple app package-lock.json."""
         package_data = load_test_package_lock("simple_app")
 
@@ -72,7 +77,7 @@ class TestPackageLockParsingService(unittest.TestCase):
         self.assertEqual(package_data["version"], "1.0.0")
         self.assertEqual(package_data["lockfileVersion"], 3)
 
-    def test_validate_invalid_version_fails(self):
+    def test_validate_invalid_version_fails(self) -> None:
         """Test that invalid lockfile version fails validation."""
         package_data = load_test_package_lock("invalid_version")
 
@@ -83,7 +88,7 @@ class TestPackageLockParsingService(unittest.TestCase):
             "Unsupported lockfile version: 1", str(context.exception)
         )
 
-    def test_extract_packages_from_json(self):
+    def test_extract_packages_from_json(self) -> None:
         """Test package extraction from JSON data."""
         package_data = load_test_package_lock("simple_app")
         packages = self.service._extract_packages_from_json(package_data)
@@ -98,7 +103,7 @@ class TestPackageLockParsingService(unittest.TestCase):
         self.assertEqual(lodash_pkg["version"], "4.17.21")
         self.assertEqual(lodash_pkg["license"], "MIT")
 
-    def test_deduplicate_packages(self):
+    def test_deduplicate_packages(self) -> None:
         """Test package deduplication logic."""
         package_data = load_test_package_lock("duplicate_packages")
         packages = self.service._extract_packages_from_json(package_data)
@@ -113,7 +118,7 @@ class TestPackageLockParsingService(unittest.TestCase):
         ]
         self.assertEqual(len(lodash_keys), 1)
 
-    def test_extract_package_name_from_path(self):
+    def test_extract_package_name_from_path(self) -> None:
         """Test package name extraction from paths."""
         # Test regular package
         name = self.service._extract_package_name("node_modules/lodash", {})
@@ -131,7 +136,7 @@ class TestPackageLockParsingService(unittest.TestCase):
         )
         self.assertEqual(name, "actual-name")
 
-    def test_extract_package_name_nested_packages(self):
+    def test_extract_package_name_nested_packages(self) -> None:
         """Test package name extraction from nested package paths."""
         # Test nested regular package (the bug we fixed)
         name = self.service._extract_package_name(
@@ -147,23 +152,26 @@ class TestPackageLockParsingService(unittest.TestCase):
 
         # Test deeply nested regular package
         name = self.service._extract_package_name(
-            "node_modules/package1/node_modules/package2/node_modules/package3", {}
+            "node_modules/package1/node_modules/package2/node_modules/package3",
+            {},
         )
         self.assertEqual(name, "package3")
 
         # Test deeply nested scoped package
         name = self.service._extract_package_name(
-            "node_modules/package1/node_modules/package2/node_modules/@scope/package3", {}
+            "node_modules/package1/node_modules/package2/node_modules/@scope/package3",
+            {},
         )
         self.assertEqual(name, "@scope/package3")
 
         # Test edge case: multiple node_modules in path
         name = self.service._extract_package_name(
-            "node_modules/package1/node_modules/package2/node_modules/@babel/core", {}
+            "node_modules/package1/node_modules/package2/node_modules/@babel/core",
+            {},
         )
         self.assertEqual(name, "@babel/core")
 
-    def test_parse_package_lock_validation_error(self):
+    def test_parse_package_lock_validation_error(self) -> None:
         """Test that validation errors are properly raised."""
         invalid_data = {
             "name": "test",
@@ -177,7 +185,7 @@ class TestPackageLockParsingService(unittest.TestCase):
             "Missing 'lockfileVersion' field", str(context.exception)
         )
 
-    def test_parse_package_lock_nested_packages(self):
+    def test_parse_package_lock_nested_packages(self) -> None:
         """Test parsing with nested packages to ensure correct name extraction."""
         package_data = load_test_package_lock("nested_packages")
 
@@ -190,8 +198,12 @@ class TestPackageLockParsingService(unittest.TestCase):
 
         # Check that nested packages are correctly identified
         package_names = [data["name"] for data in unique_packages.values()]
-        package_versions = [data["version"] for data in unique_packages.values()]
-        package_urls = [data["info"].get("resolved") for data in unique_packages.values()]
+        package_versions = [
+            data["version"] for data in unique_packages.values()
+        ]
+        package_urls = [
+            data["info"].get("resolved") for data in unique_packages.values()
+        ]
 
         # Verify specific nested packages are correctly parsed
         self.assertIn("test-exclude", package_names)
@@ -210,12 +222,29 @@ class TestPackageLockParsingService(unittest.TestCase):
         self.assertIn("8.1.0", package_versions)  # @types/glob (nested)
 
         # Verify URLs are correct (not cross-contaminated)
-        self.assertIn("https://repo/repository/npm/test-exclude/-/test-exclude-7.0.1.tgz", package_urls)
-        self.assertIn("https://repo/repository/npm/minimatch/-/minimatch-9.0.5.tgz", package_urls)
-        self.assertIn("https://repo/repository/npm/brace-expansion/-/brace-expansion-2.0.2.tgz", package_urls)
-        self.assertIn("https://repo/repository/npm/@types/node/-/node-18.15.0.tgz", package_urls)
-        self.assertIn("https://repo/repository/npm/glob/-/glob-10.4.5.tgz", package_urls)
-        self.assertIn("https://repo/repository/npm/@types/glob/-/glob-8.1.0.tgz", package_urls)
+        self.assertIn(
+            "https://repo/repository/npm/test-exclude/-/test-exclude-7.0.1.tgz",
+            package_urls,
+        )
+        self.assertIn(
+            "https://repo/repository/npm/minimatch/-/minimatch-9.0.5.tgz",
+            package_urls,
+        )
+        self.assertIn(
+            "https://repo/repository/npm/brace-expansion/-/brace-expansion-2.0.2.tgz",
+            package_urls,
+        )
+        self.assertIn(
+            "https://repo/repository/npm/@types/node/-/node-18.15.0.tgz",
+            package_urls,
+        )
+        self.assertIn(
+            "https://repo/repository/npm/glob/-/glob-10.4.5.tgz", package_urls
+        )
+        self.assertIn(
+            "https://repo/repository/npm/@types/glob/-/glob-8.1.0.tgz",
+            package_urls,
+        )
 
         # Verify no cross-contamination (the bug we fixed)
         # None of the packages should have the wrong name/version/URL combination
@@ -223,7 +252,7 @@ class TestPackageLockParsingService(unittest.TestCase):
             name = data["name"]
             version = data["version"]
             url = data["info"].get("resolved", "")
-            
+
             # Each package should have its own correct URL
             if name == "test-exclude" and version == "7.0.1":
                 self.assertIn("test-exclude-7.0.1.tgz", url)

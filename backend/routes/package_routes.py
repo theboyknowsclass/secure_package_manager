@@ -5,11 +5,6 @@ import traceback
 from datetime import datetime
 from typing import Any, Dict, Union
 
-from database.session_helper import SessionHelper
-from database.operations.request_operations import RequestOperations
-from database.operations.package_operations import PackageOperations
-from database.operations.request_package_operations import RequestPackageOperations
-from database.operations.audit_log_operations import AuditLogOperations
 from database.models import (
     AuditLog,
     Package,
@@ -18,6 +13,13 @@ from database.models import (
     RequestPackage,
     SecurityScan,
 )
+from database.operations.audit_log_operations import AuditLogOperations
+from database.operations.package_operations import PackageOperations
+from database.operations.request_operations import RequestOperations
+from database.operations.request_package_operations import (
+    RequestPackageOperations,
+)
+from database.session_helper import SessionHelper
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from services.auth_service import AuthService
@@ -33,21 +35,29 @@ def handle_error(e: Exception, context: str = "") -> ResponseReturnValue:
     """Handle errors with detailed information in development mode."""
     logger.error(f"{context} error: {str(e)}")
     logger.error(f"Traceback: {traceback.format_exc()}")
-    
+
     # Check environment variables for development mode
     flask_env = os.getenv("FLASK_ENV")
     environment = os.getenv("ENVIRONMENT")
     flask_debug = os.getenv("FLASK_DEBUG")
-    
-    logger.info(f"Environment check - FLASK_ENV: {flask_env}, ENVIRONMENT: {environment}, FLASK_DEBUG: {flask_debug}")
-    
+
+    logger.info(
+        f"Environment check - FLASK_ENV: {flask_env}, ENVIRONMENT: {environment}, FLASK_DEBUG: {flask_debug}"
+    )
+
     # For now, always return detailed errors to test
-    return jsonify({
-        "error": "Internal server error",
-        "details": str(e),
-        "context": context,
-        "traceback": traceback.format_exc()
-    }), 500
+    return (
+        jsonify(
+            {
+                "error": "Internal server error",
+                "details": str(e),
+                "context": context,
+                "traceback": traceback.format_exc(),
+            }
+        ),
+        500,
+    )
+
 
 # Initialize services
 auth_service = AuthService()
@@ -135,7 +145,7 @@ def _create_request_with_blob(package_data: Dict[str, Any]) -> Dict[str, Any]:
             requestor_id=request.user.id,
             raw_request_blob=json.dumps(package_data),  # Store raw JSON blob
         )
-        
+
         request_ops = RequestOperations(db.session)
         request_ops.create(request_record)
         db.flush()  # Get the ID without committing
@@ -151,7 +161,7 @@ def _create_request_with_blob(package_data: Dict[str, Any]) -> Dict[str, Any]:
         audit_ops = AuditLogOperations(db.session)
         audit_ops.create(audit_log)
         db.commit()
-        
+
         # Return the essential data as a dictionary
         return {
             "id": request_record.id,
@@ -159,7 +169,7 @@ def _create_request_with_blob(package_data: Dict[str, Any]) -> Dict[str, Any]:
             "version": request_record.version,
             "requestor_id": request_record.requestor_id,
             "raw_request_blob": request_record.raw_request_blob,
-            "created_at": request_record.created_at
+            "created_at": request_record.created_at,
         }
 
 
@@ -208,7 +218,9 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
 
             # Get packages for this request with their creation context and scan results
             package_ops = PackageOperations(db.session)
-            packages_with_context = package_ops.get_packages_with_context_and_scans(request_id)
+            packages_with_context = (
+                package_ops.get_packages_with_context_and_scans(request_id)
+            )
 
             # Get request status from status manager using the same session
             from services.package_request_status_manager import (
@@ -216,7 +228,9 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
             )
 
             status_manager = PackageRequestStatusManager(db)
-            status_summary = status_manager.get_request_status_summary(request_id)
+            status_summary = status_manager.get_request_status_summary(
+                request_id
+            )
 
             # Build packages list
             packages_list = []
@@ -231,63 +245,65 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                             pkg = item
                             rp = None
                             scan = None
-                        
-                        packages_list.append({
-                            "id": pkg.id,
-                            "name": pkg.name,
-                            "version": pkg.version,
-                            "status": (
-                                pkg.package_status.status
-                                if pkg.package_status
-                                else "Checking Licence"
-                            ),
-                            "security_score": (
-                                pkg.package_status.security_score
-                                if pkg.package_status
-                                else None
-                            ),
-                            "license_score": (
-                                pkg.package_status.license_score
-                                if pkg.package_status
-                                else None
-                            ),
-                            "security_scan_status": (
-                                pkg.package_status.security_scan_status
-                                if pkg.package_status
-                                else "pending"
-                            ),
-                            "license_identifier": pkg.license_identifier,
-                            "license_status": (
-                                pkg.package_status.license_status
-                                if pkg.package_status
-                                else None
-                            ),
-                            "type": rp.package_type if rp else "unknown",
-                            "scan_result": (
-                                {
-                                    "scan_duration_ms": scan.scan_duration_ms,
-                                    "critical_count": scan.critical_count,
-                                    "high_count": scan.high_count,
-                                    "medium_count": scan.medium_count,
-                                    "low_count": scan.low_count,
-                                    "info_count": scan.info_count,
-                                    "scan_type": scan.scan_type,
-                                    "trivy_version": scan.trivy_version,
-                                    "created_at": (
-                                        scan.created_at.isoformat()
-                                        if scan.created_at
-                                        else None
-                                    ),
-                                    "completed_at": (
-                                        scan.completed_at.isoformat()
-                                        if scan.completed_at
-                                        else None
-                                    ),
-                                }
-                                if scan
-                                else None
-                            ),
-                        })
+
+                        packages_list.append(
+                            {
+                                "id": pkg.id,
+                                "name": pkg.name,
+                                "version": pkg.version,
+                                "status": (
+                                    pkg.package_status.status
+                                    if pkg.package_status
+                                    else "Checking Licence"
+                                ),
+                                "security_score": (
+                                    pkg.package_status.security_score
+                                    if pkg.package_status
+                                    else None
+                                ),
+                                "license_score": (
+                                    pkg.package_status.license_score
+                                    if pkg.package_status
+                                    else None
+                                ),
+                                "security_scan_status": (
+                                    pkg.package_status.security_scan_status
+                                    if pkg.package_status
+                                    else "pending"
+                                ),
+                                "license_identifier": pkg.license_identifier,
+                                "license_status": (
+                                    pkg.package_status.license_status
+                                    if pkg.package_status
+                                    else None
+                                ),
+                                "type": rp.package_type if rp else "unknown",
+                                "scan_result": (
+                                    {
+                                        "scan_duration_ms": scan.scan_duration_ms,
+                                        "critical_count": scan.critical_count,
+                                        "high_count": scan.high_count,
+                                        "medium_count": scan.medium_count,
+                                        "low_count": scan.low_count,
+                                        "info_count": scan.info_count,
+                                        "scan_type": scan.scan_type,
+                                        "trivy_version": scan.trivy_version,
+                                        "created_at": (
+                                            scan.created_at.isoformat()
+                                            if scan.created_at
+                                            else None
+                                        ),
+                                        "completed_at": (
+                                            scan.completed_at.isoformat()
+                                            if scan.completed_at
+                                            else None
+                                        ),
+                                    }
+                                    if scan
+                                    else None
+                                ),
+                            }
+                        )
                     except Exception as e:
                         logger.error(f"Error processing package item: {e}")
                         logger.error(f"Item type: {type(item)}, Item: {item}")
@@ -344,7 +360,9 @@ def list_package_requests() -> ResponseReturnValue:
                 )
 
                 status_manager = PackageRequestStatusManager()
-                status_summary = status_manager.get_request_status_summary(req.id)
+                status_summary = status_manager.get_request_status_summary(
+                    req.id
+                )
 
                 result_requests.append(
                     {
@@ -390,7 +408,9 @@ def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
             # Check if user has access through any request
             with SessionHelper.get_session() as db:
                 request_package_ops = RequestPackageOperations(db.session)
-                has_access = request_package_ops.check_user_access(package_id, request.user.id)
+                has_access = request_package_ops.check_user_access(
+                    package_id, request.user.id
+                )
 
             if not has_access:
                 return jsonify({"error": "Access denied"}), 403
@@ -437,7 +457,9 @@ def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
             # Check if user has access through any request
             with SessionHelper.get_session() as db:
                 request_package_ops = RequestPackageOperations(db.session)
-                has_access = request_package_ops.check_user_access(package_id, request.user.id)
+                has_access = request_package_ops.check_user_access(
+                    package_id, request.user.id
+                )
 
             if not has_access:
                 return jsonify({"error": "Access denied"}), 403
@@ -486,7 +508,9 @@ def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
             # Check if user has access through any request
             with SessionHelper.get_session() as db:
                 request_package_ops = RequestPackageOperations(db.session)
-                has_access = request_package_ops.check_user_access(package_id, request.user.id)
+                has_access = request_package_ops.check_user_access(
+                    package_id, request.user.id
+                )
 
             if not has_access:
                 return jsonify({"error": "Access denied"}), 403
@@ -544,10 +568,15 @@ def get_processing_status() -> ResponseReturnValue:
                 {
                     "package_name": package.name,
                     "package_version": package.version,
-                    "status": package.package_status.status if package.package_status else None,
+                    "status": (
+                        package.package_status.status
+                        if package.package_status
+                        else None
+                    ),
                     "updated_at": (
                         package.package_status.updated_at.isoformat()
-                        if package.package_status and package.package_status.updated_at
+                        if package.package_status
+                        and package.package_status.updated_at
                         else None
                     ),
                 }
@@ -585,12 +614,17 @@ def retry_failed_packages() -> ResponseReturnValue:
         with SessionHelper.get_session() as db:
             package_ops = PackageOperations(db.session)
             failed_packages = package_ops.get_by_status("Rejected")
-            
+
             if request_id:
                 # Filter by request if specified
-                failed_packages = [p for p in failed_packages if any(
-                    rp.request_id == request_id for rp in p.request_packages
-                )]
+                failed_packages = [
+                    p
+                    for p in failed_packages
+                    if any(
+                        rp.request_id == request_id
+                        for rp in p.request_packages
+                    )
+                ]
 
         if not failed_packages:
             return (
@@ -637,9 +671,9 @@ def get_audit_data() -> ResponseReturnValue:
 
         with SessionHelper.get_session() as db:
             # Query for approved packages with their approval information
-            from sqlalchemy.orm import joinedload
             from database.models import User
-            
+            from sqlalchemy.orm import joinedload
+
             # Get all approved packages with their relationships
             approved_packages = (
                 db.session.query(Package)
@@ -649,7 +683,9 @@ def get_audit_data() -> ResponseReturnValue:
                 .join(User, Request.requestor_id == User.id)
                 .options(
                     joinedload(Package.package_status),
-                    joinedload(Package.request_packages).joinedload(RequestPackage.request)
+                    joinedload(Package.request_packages).joinedload(
+                        RequestPackage.request
+                    ),
                 )
                 .filter(PackageStatus.status == "Approved")
                 .all()
@@ -659,10 +695,15 @@ def get_audit_data() -> ResponseReturnValue:
             for package in approved_packages:
                 # Get the approver information
                 approver = None
-                if package.package_status and package.package_status.approver_id:
-                    approver = db.session.query(User).filter(
-                        User.id == package.package_status.approver_id
-                    ).first()
+                if (
+                    package.package_status
+                    and package.package_status.approver_id
+                ):
+                    approver = (
+                        db.session.query(User)
+                        .filter(User.id == package.package_status.approver_id)
+                        .first()
+                    )
 
                 # Get the original request information
                 original_request = None
@@ -673,38 +714,61 @@ def get_audit_data() -> ResponseReturnValue:
                     original_request = request_package.request
                     original_requestor = original_request.requestor
 
-                audit_data.append({
-                    "package": {
-                        "id": package.id,
-                        "name": package.name,
-                        "version": package.version,
-                        "license_identifier": package.license_identifier,
-                        "created_at": package.created_at.isoformat() if package.created_at else None,
-                    },
-                    "approval": {
-                        "approved_at": (
-                            package.package_status.updated_at.isoformat()
-                            if package.package_status and package.package_status.updated_at
+                audit_data.append(
+                    {
+                        "package": {
+                            "id": package.id,
+                            "name": package.name,
+                            "version": package.version,
+                            "license_identifier": package.license_identifier,
+                            "created_at": (
+                                package.created_at.isoformat()
+                                if package.created_at
+                                else None
+                            ),
+                        },
+                        "approval": {
+                            "approved_at": (
+                                package.package_status.updated_at.isoformat()
+                                if package.package_status
+                                and package.package_status.updated_at
+                                else None
+                            ),
+                            "approver": (
+                                {
+                                    "id": approver.id,
+                                    "username": approver.username,
+                                    "full_name": approver.full_name,
+                                }
+                                if approver
+                                else None
+                            ),
+                        },
+                        "original_request": (
+                            {
+                                "id": original_request.id,
+                                "application_name": original_request.application_name,
+                                "application_version": original_request.version,
+                                "requested_at": (
+                                    original_request.created_at.isoformat()
+                                    if original_request.created_at
+                                    else None
+                                ),
+                                "requestor": (
+                                    {
+                                        "id": original_requestor.id,
+                                        "username": original_requestor.username,
+                                        "full_name": original_requestor.full_name,
+                                    }
+                                    if original_requestor
+                                    else None
+                                ),
+                            }
+                            if original_request
                             else None
                         ),
-                        "approver": {
-                            "id": approver.id,
-                            "username": approver.username,
-                            "full_name": approver.full_name,
-                        } if approver else None,
-                    },
-                    "original_request": {
-                        "id": original_request.id,
-                        "application_name": original_request.application_name,
-                        "application_version": original_request.version,
-                        "requested_at": original_request.created_at.isoformat() if original_request.created_at else None,
-                        "requestor": {
-                            "id": original_requestor.id,
-                            "username": original_requestor.username,
-                            "full_name": original_requestor.full_name,
-                        } if original_requestor else None,
-                    } if original_request else None,
-                })
+                    }
+                )
 
         return jsonify({"audit_data": audit_data}), 200
 

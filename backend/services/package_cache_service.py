@@ -15,15 +15,17 @@ logger = logging.getLogger(__name__)
 class PackageCacheService:
     """Service for managing local package cache operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.package_cache_dir = os.getenv(
             "PACKAGE_CACHE_DIR", "/app/package_cache"
         )
-        
+
         # Ensure package cache directory exists
         os.makedirs(self.package_cache_dir, exist_ok=True)
 
-    def store_package_from_tarball(self, package, tarball_content: bytes) -> Optional[str]:
+    def store_package_from_tarball(
+        self, package, tarball_content: bytes
+    ) -> Optional[str]:
         """Store a package in the cache from tarball content.
 
         Args:
@@ -39,7 +41,9 @@ class PackageCacheService:
             os.makedirs(package_dir, exist_ok=True)
 
             # Extract tarball to package cache directory
-            tarball_buffer = tarfile.open(fileobj=tarfile.io.BytesIO(tarball_content), mode="r:gz")
+            tarball_buffer = tarfile.open(
+                fileobj=tarfile.io.BytesIO(tarball_content), mode="r:gz"
+            )
             tarball_buffer.extractall(package_dir)
             tarball_buffer.close()
 
@@ -80,7 +84,7 @@ class PackageCacheService:
         """
         if self.is_package_cached(package):
             package_dir = self._get_package_cache_path(package)
-            
+
             # All npm tarballs extract to a "package" directory
             # Both scoped and regular packages use the same structure
             return os.path.join(package_dir, "package")
@@ -99,8 +103,11 @@ class PackageCacheService:
             package_dir = self._get_package_cache_path(package)
             if os.path.exists(package_dir):
                 import shutil
+
                 shutil.rmtree(package_dir)
-                logger.info(f"Removed package {package.name}@{package.version} from cache")
+                logger.info(
+                    f"Removed package {package.name}@{package.version} from cache"
+                )
                 return True
             return True  # Already removed
         except Exception as e:
@@ -117,7 +124,9 @@ class PackageCacheService:
         """
         total_size = 0
         try:
-            for dirpath, dirnames, filenames in os.walk(self.package_cache_dir):
+            for dirpath, dirnames, filenames in os.walk(
+                self.package_cache_dir
+            ):
                 for filename in filenames:
                     filepath = os.path.join(dirpath, filename)
                     if os.path.exists(filepath):
@@ -158,12 +167,14 @@ class PackageCacheService:
                             full_name = package_name
                         else:
                             continue
-                    
-                    cached_packages.append({
-                        "name": full_name,
-                        "version": version,
-                        "path": item_path
-                    })
+
+                    cached_packages.append(
+                        {
+                            "name": full_name,
+                            "version": version,
+                            "path": item_path,
+                        }
+                    )
         except Exception as e:
             logger.error(f"Error listing cached packages: {str(e)}")
         return cached_packages
@@ -183,7 +194,7 @@ class PackageCacheService:
             safe_package_name = package.name.replace("/", "-")
         else:
             safe_package_name = package.name
-            
+
         return os.path.join(
             self.package_cache_dir, f"{safe_package_name}-{package.version}"
         )

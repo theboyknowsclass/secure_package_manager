@@ -9,9 +9,10 @@ import os
 from typing import Any, Dict, List, Optional
 
 import requests
-
 from database.operations.package_operations import PackageOperations
-from database.operations.package_status_operations import PackageStatusOperations
+from database.operations.package_status_operations import (
+    PackageStatusOperations,
+)
 from database.session_helper import SessionHelper
 
 logger = logging.getLogger(__name__)
@@ -31,20 +32,20 @@ class DownloadService:
         self._session = None
         self._package_ops = None
         self._status_ops = None
-        
+
         # Download configuration
         self.download_timeout = int(os.getenv("DOWNLOAD_TIMEOUT", "60"))
-        self.source_repository_url = os.getenv("SOURCE_REPOSITORY_URL", "https://registry.npmjs.org")
+        self.source_repository_url = os.getenv(
+            "SOURCE_REPOSITORY_URL", "https://registry.npmjs.org"
+        )
 
-    def _setup_operations(self, session):
+    def _setup_operations() -> None:
         """Set up operations instances for the current session."""
         self._session = session
         self._package_ops = PackageOperations(session)
         self._status_ops = PackageStatusOperations(session)
 
-    def process_package_batch(
-        self, max_packages: int = 5
-    ) -> Dict[str, Any]:
+    def process_package_batch(self, max_packages: int = 5) -> Dict[str, Any]:
         """Process a batch of packages for downloading.
 
         Args:
@@ -57,10 +58,12 @@ class DownloadService:
             with SessionHelper.get_session() as db:
                 # Set up operations
                 self._setup_operations(db.session)
-                
+
                 # Find packages that need downloading
-                ready_packages = self._package_ops.get_by_status("Licence Checked")
-                
+                ready_packages = self._package_ops.get_by_status(
+                    "Licence Checked"
+                )
+
                 # Limit the number of packages processed (smaller batches)
                 limited_packages = ready_packages[:max_packages]
 
@@ -70,7 +73,7 @@ class DownloadService:
                         "processed_count": 0,
                         "successful_downloads": 0,
                         "failed_downloads": 0,
-                        "total_packages": 0
+                        "total_packages": 0,
                     }
 
                 successful_downloads = 0
@@ -90,7 +93,7 @@ class DownloadService:
                     "processed_count": len(limited_packages),
                     "successful_downloads": successful_downloads,
                     "failed_downloads": failed_downloads,
-                    "total_packages": len(limited_packages)
+                    "total_packages": len(limited_packages),
                 }
         except Exception as e:
             self.logger.error(f"Error processing download batch: {str(e)}")
@@ -100,7 +103,7 @@ class DownloadService:
                 "processed_count": 0,
                 "successful_downloads": 0,
                 "failed_downloads": 0,
-                "total_packages": 0
+                "total_packages": 0,
             }
 
     def process_single_package(self, package: Any) -> Dict[str, Any]:
@@ -134,7 +137,10 @@ class DownloadService:
                         f"Download reported success but package not found in cache: {package.name}@{package.version}"
                     )
                     self._mark_package_download_failed(package)
-                    return {"success": False, "error": "Download completed but file not found in cache"}
+                    return {
+                        "success": False,
+                        "error": "Download completed but file not found in cache",
+                    }
             else:
                 self._mark_package_download_failed(package)
                 return {"success": False, "error": "Download failed"}
@@ -158,11 +164,13 @@ class DownloadService:
         try:
             # Import here to avoid circular imports
             from services.package_cache_service import PackageCacheService
-            
+
             cache_service = PackageCacheService()
             return cache_service.is_package_cached(package)
         except Exception as e:
-            self.logger.error(f"Error checking if package is downloaded: {str(e)}")
+            self.logger.error(
+                f"Error checking if package is downloaded: {str(e)}"
+            )
             return False
 
     def _perform_download(self, package: Any) -> bool:
@@ -177,25 +185,30 @@ class DownloadService:
         try:
             # Import here to avoid circular imports
             from services.package_cache_service import PackageCacheService
-            
+
             # Download tarball from external registry
             tarball_content = self._download_package_tarball(package)
-            
+
             if tarball_content is None:
                 return False
-            
+
             # Store tarball in local cache
             cache_service = PackageCacheService()
-            cache_path = cache_service.store_package_from_tarball(package, tarball_content)
-            
+            cache_path = cache_service.store_package_from_tarball(
+                package, tarball_content
+            )
+
             if cache_path is None:
                 return False
-            
+
             # Update package with download information (cache_path, size, checksum)
             with SessionHelper.get_session() as db:
-                from database.operations.package_status_operations import PackageStatusOperations
+                from database.operations.package_status_operations import (
+                    PackageStatusOperations,
+                )
+
                 status_ops = PackageStatusOperations(db.session)
-                
+
                 # Calculate file size and checksum
                 file_size = None
                 checksum = None
@@ -205,25 +218,36 @@ class DownloadService:
                     if os.path.exists(package_dir):
                         file_size = sum(
                             os.path.getsize(os.path.join(dirpath, filename))
-                            for dirpath, dirnames, filenames in os.walk(package_dir)
+                            for dirpath, dirnames, filenames in os.walk(
+                                package_dir
+                            )
                             for filename in filenames
                         )
-                    
+
                     # Calculate checksum of the original tarball content
                     if tarball_content:
                         import hashlib
+
                         checksum = hashlib.sha256(tarball_content).hexdigest()
                 except Exception as e:
-                    self.logger.warning(f"Could not calculate file size/checksum for {package.name}@{package.version}: {str(e)}")
-                
-                if status_ops.update_download_info(package.id, cache_path, file_size, checksum):
+                    self.logger.warning(
+                        f"Could not calculate file size/checksum for {package.name}@{package.version}: {str(e)}"
+                    )
+
+                if status_ops.update_download_info(
+                    package.id, cache_path, file_size, checksum
+                ):
                     db.commit()
-                    self.logger.info(f"Updated download info for {package.name}@{package.version}: cache_path={cache_path}, size={file_size}, checksum={checksum[:16] if checksum else 'None'}...")
+                    self.logger.info(
+                        f"Updated download info for {package.name}@{package.version}: cache_path={cache_path}, size={file_size}, checksum={checksum[:16] if checksum else 'None'}..."
+                    )
                     return True
                 else:
-                    self.logger.error(f"Failed to update download info for {package.name}@{package.version}")
+                    self.logger.error(
+                        f"Failed to update download info for {package.name}@{package.version}"
+                    )
                     return False
-            
+
         except Exception as e:
             self.logger.error(f"Error performing download: {str(e)}")
             return False
@@ -240,8 +264,10 @@ class DownloadService:
         try:
             # Construct download URL using SOURCE_REPOSITORY_URL
             download_url = self._construct_download_url(package)
-            
-            self.logger.info(f"Downloading package {package.name}@{package.version} from {download_url}")
+
+            self.logger.info(
+                f"Downloading package {package.name}@{package.version} from {download_url}"
+            )
 
             # Download tarball
             response = requests.get(
@@ -272,17 +298,19 @@ class DownloadService:
 
     def _construct_download_url(self, package: Any) -> str:
         """Construct download URL using SOURCE_REPOSITORY_URL.
-        
+
         Args:
             package: Package object with name and version
-            
+
         Returns:
             Constructed download URL
         """
         # If package has an npm_url that starts with the same base as source_repository_url, use it directly
-        if package.npm_url and package.npm_url.startswith(self.source_repository_url):
+        if package.npm_url and package.npm_url.startswith(
+            self.source_repository_url
+        ):
             return package.npm_url
-        
+
         # Otherwise, use custom logic to construct the URL
         # Handle scoped packages (e.g., @babel/core)
         if package.name.startswith("@"):

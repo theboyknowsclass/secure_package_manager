@@ -69,4 +69,9 @@ class SecurityWorker(BaseWorker):
 
     def get_required_env_vars(self) -> List[str]:
         """Get list of required environment variables."""
-        return ["DATABASE_URL", "TRIVY_URL", "TRIVY_TIMEOUT", "TRIVY_MAX_RETRIES"]
+        return [
+            "DATABASE_URL",
+            "TRIVY_URL",
+            "TRIVY_TIMEOUT",
+            "TRIVY_MAX_RETRIES",
+        ]

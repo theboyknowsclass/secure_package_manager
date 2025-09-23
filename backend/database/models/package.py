@@ -16,9 +16,13 @@ class Package(Base):
     name = Column(String(255), nullable=False)
     version = Column(String(100), nullable=False)
     npm_url = Column(String(500))  # URL from package-lock.json
-    local_path = Column(String(500))  # Input field from package-lock.json (readonly)
+    local_path = Column(
+        String(500)
+    )  # Input field from package-lock.json (readonly)
     integrity = Column(String(255))  # Integrity hash from package-lock.json
-    license_identifier = Column(String(100))  # SPDX license identifier from package-lock.json
+    license_identifier = Column(
+        String(100)
+    )  # SPDX license identifier from package-lock.json
     license_text = Column(Text)  # Full license text from package-lock.json
     created_at = Column(DateTime, default=datetime.utcnow)
 

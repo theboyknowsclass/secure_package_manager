@@ -93,13 +93,17 @@ class BaseWorker(ABC):
             try:
                 self.process_cycle()
                 cycle_count += 1
-                
+
                 # Log heartbeat every 10 cycles in production (every ~5 minutes with default sleep)
-                if (os.getenv("FLASK_ENV") == "production" and 
-                    os.getenv("LOG_HEARTBEATS", "false").lower() == "true" and 
-                    cycle_count % 10 == 0):
-                    logger.info(f"{self.worker_name} heartbeat - {cycle_count} cycles completed")
-                    
+                if (
+                    os.getenv("FLASK_ENV") == "production"
+                    and os.getenv("LOG_HEARTBEATS", "false").lower() == "true"
+                    and cycle_count % 10 == 0
+                ):
+                    logger.info(
+                        f"{self.worker_name} heartbeat - {cycle_count} cycles completed"
+                    )
+
             except Exception as e:
                 logger.error(
                     f"Error in {self.worker_name} processing cycle: {str(e)}",

@@ -1,6 +1,6 @@
 """Database operations for SecurityScan entities."""
 
-from typing import List, Optional
+from typing import Type, List, Optional, Type
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -58,7 +58,7 @@ class SecurityScanOperations(BaseOperations):
         # requirements
         return []
 
-    def get_all(self) -> List[SecurityScan]:
+    def get_all(self, model_class: Type[SecurityScan]) -> List[SecurityScan]:
         """Get all security scans.
 
         Returns:

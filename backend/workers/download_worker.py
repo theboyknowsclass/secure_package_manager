@@ -48,9 +48,7 @@ class DownloadWorker(BaseWorker):
             )
 
             if not result["success"]:
-                logger.error(
-                    f"Error in download batch: {result['error']}"
-                )
+                logger.error(f"Error in download batch: {result['error']}")
 
         except Exception as e:
             logger.error(f"Download cycle error: {str(e)}", exc_info=True)

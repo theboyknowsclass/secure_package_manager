@@ -41,12 +41,16 @@ def create_app() -> Flask:
     )
 
     # Configure logging - only show errors and warnings in production
-    log_level = logging.ERROR if os.getenv("FLASK_ENV") == "production" else logging.INFO
+    log_level = (
+        logging.ERROR
+        if os.getenv("FLASK_ENV") == "production"
+        else logging.INFO
+    )
     logging.basicConfig(
         level=log_level,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-    
+
     # Suppress noisy loggers
     logging.getLogger("werkzeug").setLevel(logging.ERROR)
     logging.getLogger("urllib3").setLevel(logging.ERROR)
@@ -87,14 +91,17 @@ def health_check() -> Response:
 def heartbeat() -> Response:
     """Heartbeat endpoint for monitoring."""
     # Only log heartbeat in production if specifically requested
-    if os.getenv("FLASK_ENV") == "production" and os.getenv("LOG_HEARTBEATS", "false").lower() == "true":
+    if (
+        os.getenv("FLASK_ENV") == "production"
+        and os.getenv("LOG_HEARTBEATS", "false").lower() == "true"
+    ):
         logging.info("API heartbeat check")
-    
+
     return jsonify(
         {
-            "status": "alive", 
+            "status": "alive",
             "timestamp": datetime.utcnow().isoformat(),
-            "service": "secure-package-manager-api"
+            "service": "secure-package-manager-api",
         }
     )
 
@@ -147,6 +154,8 @@ if __name__ == "__main__":
         Base.metadata.create_all(engine)
         # Only log table creation in development
         if os.getenv("FLASK_ENV") != "production":
-            logging.getLogger(__name__).info("Database tables created/verified")
+            logging.getLogger(__name__).info(
+                "Database tables created/verified"
+            )
 
     app.run(host="0.0.0.0", port=5000, debug=True)

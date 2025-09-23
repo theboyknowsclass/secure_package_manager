@@ -1,9 +1,5 @@
 import logging
 
-from database.session_helper import SessionHelper
-from database.operations.package_operations import PackageOperations
-from database.operations.request_package_operations import RequestPackageOperations
-from database.operations.audit_log_operations import AuditLogOperations
 from database.models import (
     AuditLog,
     Package,
@@ -11,6 +7,12 @@ from database.models import (
     Request,
     RequestPackage,
 )
+from database.operations.audit_log_operations import AuditLogOperations
+from database.operations.package_operations import PackageOperations
+from database.operations.request_package_operations import (
+    RequestPackageOperations,
+)
+from database.session_helper import SessionHelper
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from services.auth_service import AuthService
@@ -256,14 +258,23 @@ def get_validated_packages() -> ResponseReturnValue:
                 # Get request information for this package
                 with SessionHelper.get_session() as db:
                     request_package_ops = RequestPackageOperations(db.session)
-                    request_packages = request_package_ops.get_by_package_id(pkg.id)
-                    request_package = request_packages[0] if request_packages else None
+                    request_packages = request_package_ops.get_by_package_id(
+                        pkg.id
+                    )
+                    request_package = (
+                        request_packages[0] if request_packages else None
+                    )
                     request_data = None
 
                     if request_package:
-                        from database.operations.request_operations import RequestOperations
+                        from database.operations.request_operations import (
+                            RequestOperations,
+                        )
+
                         request_ops = RequestOperations(db.session)
-                        request_record = request_ops.get_by_id(request_package.request_id)
+                        request_record = request_ops.get_by_id(
+                            request_package.request_id
+                        )
                     if request_record:
                         request_data = {
                             "id": request_record.id,

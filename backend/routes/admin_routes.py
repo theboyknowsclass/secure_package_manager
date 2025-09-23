@@ -1,9 +1,11 @@
 import logging
 
-from database.session_helper import SessionHelper
-from database.operations.supported_license_operations import SupportedLicenseOperations
-from database.operations.audit_log_operations import AuditLogOperations
 from database.models import AuditLog, SupportedLicense
+from database.operations.audit_log_operations import AuditLogOperations
+from database.operations.supported_license_operations import (
+    SupportedLicenseOperations,
+)
+from database.session_helper import SessionHelper
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from services.auth_service import AuthService
@@ -175,7 +177,9 @@ def delete_supported_license(license_id: int) -> ResponseReturnValue:
         # Check if license is being used by any packages
         with SessionHelper.get_session() as db:
             license_ops = SupportedLicenseOperations(db.session)
-            package_count = license_ops.count_packages_by_license(license.identifier)
+            package_count = license_ops.count_packages_by_license(
+                license.identifier
+            )
         if package_count > 0:
             return (
                 jsonify(

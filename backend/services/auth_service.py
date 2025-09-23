@@ -3,9 +3,9 @@ from typing import Any, Callable, Dict, Optional
 
 import jwt
 from config.constants import JWT_SECRET, OAUTH_AUDIENCE, OAUTH_ISSUER
-from database.session_helper import SessionHelper
-from database.operations.user_operations import UserOperations
 from database.models import User
+from database.operations.user_operations import UserOperations
+from database.session_helper import SessionHelper
 from flask import jsonify, request
 
 
@@ -180,7 +180,7 @@ class AuthService:
         user.email = payload.get("email", user.email)
         user.full_name = payload.get("full_name", user.full_name)
         user.role = payload.get("role", user.role)
-        
+
         user = user_ops.update(user)
         logger.info(
             f"Updated existing user: {user.username} with role: {user.role}"
@@ -204,7 +204,9 @@ class AuthService:
                 try:
                     token = auth_header.split(" ")[1]
                 except IndexError:
-                    logger.error("Invalid token format - missing space separator")
+                    logger.error(
+                        "Invalid token format - missing space separator"
+                    )
                     return jsonify({"error": "Invalid token format"}), 401
             else:
                 logger.warning("No Authorization header found")
@@ -216,7 +218,9 @@ class AuthService:
             # Verify token
             user = self.verify_token(token)
             if not user:
-                logger.error("Token verification failed - invalid or expired token")
+                logger.error(
+                    "Token verification failed - invalid or expired token"
+                )
                 return jsonify({"error": "Invalid or expired token"}), 401
 
             # Add user to request context

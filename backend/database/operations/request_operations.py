@@ -1,6 +1,6 @@
 """Database operations for Request entities."""
 
-from typing import List, Optional
+from typing import Type, List, Optional, Type
 
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
@@ -52,7 +52,7 @@ class RequestOperations(BaseOperations):
         stmt = select(Request).where(Request.id == request_id)
         return self.session.execute(stmt).scalar_one_or_none()
 
-    def get_all(self) -> List[Request]:
+    def get_all(self, model_class: Type[Request]) -> List[Request]:
         """Get all requests.
 
         Returns:
@@ -80,7 +80,9 @@ class RequestOperations(BaseOperations):
         stmt = select(Request)
         return self.session.execute(stmt).scalars().count()
 
-    def get_with_packages_and_status(self, request_id: int) -> Optional[Request]:
+    def get_with_packages_and_status(
+        self, request_id: int
+    ) -> Optional[Request]:
         """Get request with all associated packages and their statuses.
 
         Args:
@@ -90,6 +92,7 @@ class RequestOperations(BaseOperations):
             The request with packages and statuses if found, None otherwise
         """
         from ..models import PackageStatus
+
         stmt = (
             select(Request)
             .join(RequestPackage)

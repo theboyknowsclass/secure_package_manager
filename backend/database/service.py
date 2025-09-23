@@ -5,9 +5,9 @@ No Flask dependencies, can be used by workers independently
 
 import logging
 from contextlib import contextmanager
-from typing import Generator
+from typing import Generator, Optional
 
-from sqlalchemy import create_engine
+from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -27,8 +27,8 @@ class DatabaseService:
         """
         self.database_url = database_url
         self.echo = echo
-        self._engine = None
-        self._SessionLocal = None
+        self._engine: Optional[Engine] = None
+        self._SessionLocal: Optional[sessionmaker] = None
         self._initialize_engine()
 
     def _initialize_engine(self) -> None:
@@ -46,6 +46,8 @@ class DatabaseService:
 
             # Use StaticPool for SQLite, regular pool for PostgreSQL
             if self.database_url.startswith("sqlite"):
+                from sqlalchemy.pool import StaticPool
+
                 engine_kwargs["poolclass"] = StaticPool
                 engine_kwargs["connect_args"] = {"check_same_thread": False}
 

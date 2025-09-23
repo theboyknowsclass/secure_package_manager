@@ -1,8 +1,8 @@
 import logging
 
-from database.session_helper import SessionHelper
-from database.operations.user_operations import UserOperations
 from database.models import User
+from database.operations.user_operations import UserOperations
+from database.session_helper import SessionHelper
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from services.auth_service import AuthService

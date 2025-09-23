@@ -23,9 +23,11 @@ class TestScopedPackageParsing:
         self.package_service = PackageLockParsingService()
         # Mock the operations that the service needs
         self.package_service._package_ops = Mock()
-        self.package_service._package_ops.get_by_name_version.return_value = None
+        self.package_service._package_ops.get_by_name_version.return_value = (
+            None
+        )
 
-    def test_extract_regular_package_name(self):
+    def test_extract_regular_package_name(self) -> None:
         """Test extraction of regular (non-scoped) package names."""
         test_cases = [
             {
@@ -53,7 +55,7 @@ class TestScopedPackageParsing:
                 result == case["expected"]
             ), f"Failed for path: {case['path']}"
 
-    def test_extract_scoped_package_name(self):
+    def test_extract_scoped_package_name(self) -> None:
         """Test extraction of scoped package names."""
         test_cases = [
             {
@@ -91,7 +93,7 @@ class TestScopedPackageParsing:
                 result == case["expected"]
             ), f"Failed for path: {case['path']}"
 
-    def test_extract_nested_scoped_package_name(self):
+    def test_extract_nested_scoped_package_name(self) -> None:
         """Test extraction of nested scoped package names."""
         test_cases = [
             {
@@ -114,7 +116,7 @@ class TestScopedPackageParsing:
                 result == case["expected"]
             ), f"Failed for path: {case['path']}"
 
-    def test_extract_package_name_with_explicit_name(self):
+    def test_extract_package_name_with_explicit_name(self) -> None:
         """Test extraction when package info contains explicit name field."""
         test_cases = [
             {
@@ -137,7 +139,7 @@ class TestScopedPackageParsing:
                 result == case["expected"]
             ), f"Failed for path: {case['path']}"
 
-    def test_extract_incomplete_scoped_package(self):
+    def test_extract_incomplete_scoped_package(self) -> None:
         """Test extraction of incomplete scoped package paths."""
         test_cases = [
             {
@@ -155,7 +157,7 @@ class TestScopedPackageParsing:
                 result == case["expected"]
             ), f"Failed for path: {case['path']}"
 
-    def test_extract_invalid_paths(self):
+    def test_extract_invalid_paths(self) -> None:
         """Test extraction with invalid or malformed paths."""
         test_cases = [
             {
@@ -179,7 +181,7 @@ class TestScopedPackageParsing:
                 result == case["expected"]
             ), f"Failed for path: {case['path']}"
 
-    def test_extract_missing_version(self):
+    def test_extract_missing_version(self) -> None:
         """Test extraction when version is missing."""
         test_cases = [
             {
@@ -202,7 +204,7 @@ class TestScopedPackageParsing:
                 result == case["expected"]
             ), f"Failed for path: {case['path']}"
 
-    def test_real_world_scoped_packages(self):
+    def test_real_world_scoped_packages(self) -> None:
         """Test with real-world scoped package examples."""
         real_world_cases = [
             # Common TypeScript packages
@@ -245,7 +247,7 @@ class TestScopedPackageParsing:
                 result == expected
             ), f"Failed for real-world case: {path} -> expected {expected}, got {result}"
 
-    def test_edge_cases(self):
+    def test_edge_cases(self) -> None:
         """Test edge cases and boundary conditions."""
         edge_cases = [
             # Very long scoped package names
@@ -285,9 +287,11 @@ class TestPackageLockProcessing:
         self.package_service = PackageLockParsingService()
         # Mock the operations that the service needs
         self.package_service._package_ops = Mock()
-        self.package_service._package_ops.get_by_name_version.return_value = None
+        self.package_service._package_ops.get_by_name_version.return_value = (
+            None
+        )
 
-    def test_process_scoped_package_lock(self):
+    def test_process_scoped_package_lock(self) -> None:
         """Test processing a package-lock.json with scoped packages."""
         package_lock_data = {
             "name": "test-project",
@@ -342,7 +346,7 @@ class TestPackageLockProcessing:
             elif pkg["name"] == "@babel/core":
                 assert pkg["version"] == "7.22.0"
 
-    def test_deduplication_with_scoped_packages(self):
+    def test_deduplication_with_scoped_packages(self) -> None:
         """Test that scoped packages are properly deduplicated."""
         package_lock_data = {
             "name": "test-project",

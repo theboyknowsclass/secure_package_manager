@@ -22,7 +22,9 @@ class PackageStatus(Base):
     status = Column(String(50), default="Checking Licence", nullable=False)
     file_size = Column(BigInteger)
     checksum = Column(String(255))
-    cache_path = Column(String(500))  # Actual cache directory path where package is stored
+    cache_path = Column(
+        String(500)
+    )  # Actual cache directory path where package is stored
     license_score = Column(Integer)
     security_score = Column(Integer)
     security_scan_status = Column(
@@ -102,12 +104,12 @@ class PackageStatus(Base):
     def is_final_status(self) -> bool:
         """Check if package is in a final status (approved, rejected, or failed)"""
         return self.status in {
-            "Approved", 
+            "Approved",
             "Rejected",
             "Parse Failed",
-            "Licence Check Failed", 
+            "Licence Check Failed",
             "Download Failed",
-            "Security Scan Failed"
+            "Security Scan Failed",
         }
 
     def get_processing_stage(self) -> str:

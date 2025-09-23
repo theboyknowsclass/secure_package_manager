@@ -28,7 +28,9 @@ class SecurityScan(Base):
     scan_duration_ms = Column(Integer)  # Scan duration in milliseconds
     trivy_version = Column(String(50))  # Version of Trivy used for the scan
     created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
     completed_at = Column(DateTime)
 
     def get_total_vulnerabilities(self) -> int:

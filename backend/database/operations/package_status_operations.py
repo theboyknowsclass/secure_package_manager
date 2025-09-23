@@ -1,7 +1,7 @@
 """Database operations for PackageStatus entities."""
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Type, List, Optional, Type
 
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
@@ -121,7 +121,7 @@ class PackageStatusOperations(BaseOperations):
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_all(self) -> List[PackageStatus]:
+    def get_all(self, model_class: Type[PackageStatus]) -> List[PackageStatus]:
         """Get all package statuses.
 
         Returns:
@@ -129,7 +129,9 @@ class PackageStatusOperations(BaseOperations):
         """
         return super().get_all(PackageStatus)
 
-    def update_package_publish_status(self, package_id: int, publish_status: str) -> bool:
+    def update_package_publish_status(
+        self, package_id: int, publish_status: str
+    ) -> bool:
         """Update package publish status.
 
         Args:
@@ -165,7 +167,9 @@ class PackageStatusOperations(BaseOperations):
         status.updated_at = datetime.utcnow()
         return True
 
-    def mark_package_publish_failed(self, package_id: int, error_message: str) -> bool:
+    def mark_package_publish_failed(
+        self, package_id: int, error_message: str
+    ) -> bool:
         """Mark package as publish failed.
 
         Args:
@@ -199,7 +203,9 @@ class PackageStatusOperations(BaseOperations):
         status.updated_at = datetime.utcnow()
         return True
 
-    def update_security_scan_status(self, package_id: int, scan_status: str) -> bool:
+    def update_security_scan_status(
+        self, package_id: int, scan_status: str
+    ) -> bool:
         """Update package security scan status.
 
         Args:
@@ -217,7 +223,9 @@ class PackageStatusOperations(BaseOperations):
         status.updated_at = datetime.utcnow()
         return True
 
-    def update_security_score(self, package_id: int, security_score: float) -> bool:
+    def update_security_score(
+        self, package_id: int, security_score: float
+    ) -> bool:
         """Update package security score.
 
         Args:
@@ -235,7 +243,9 @@ class PackageStatusOperations(BaseOperations):
         status.updated_at = datetime.utcnow()
         return True
 
-    def update_license_info(self, package_id: int, license_score: int, license_status: str) -> bool:
+    def update_license_info(
+        self, package_id: int, license_score: int, license_status: str
+    ) -> bool:
         """Update package license information.
 
         Args:
@@ -251,11 +261,19 @@ class PackageStatusOperations(BaseOperations):
             return False
 
         status.license_score = license_score
-        status.license_status = license_status  # Use exact value to match database constraints
+        status.license_status = (
+            license_status  # Use exact value to match database constraints
+        )
         status.updated_at = datetime.utcnow()
         return True
 
-    def update_download_info(self, package_id: int, cache_path: Optional[str] = None, file_size: Optional[int] = None, checksum: Optional[str] = None) -> bool:
+    def update_download_info(
+        self,
+        package_id: int,
+        cache_path: Optional[str] = None,
+        file_size: Optional[int] = None,
+        checksum: Optional[str] = None,
+    ) -> bool:
         """Update package download-related fields in a single operation.
 
         Args:
@@ -277,12 +295,16 @@ class PackageStatusOperations(BaseOperations):
             status.file_size = file_size
         if checksum is not None:
             status.checksum = checksum
-        
+
         status.updated_at = datetime.utcnow()
         return True
 
-    def update_security_scan_info(self, package_id: int, security_score: int = None, 
-                                 security_scan_status: str = None) -> bool:
+    def update_security_scan_info(
+        self,
+        package_id: int,
+        security_score: Optional[int] = None,
+        security_scan_status: Optional[str] = None,
+    ) -> bool:
         """Update package security scan-related fields in a single operation.
 
         Args:
@@ -301,12 +323,18 @@ class PackageStatusOperations(BaseOperations):
             status.security_score = security_score
         if security_scan_status is not None:
             status.security_scan_status = security_scan_status
-        
+
         status.updated_at = datetime.utcnow()
         return True
 
-    def update_approval_info(self, package_id: int, approver_id: int = None, rejector_id: int = None,
-                           published_at: datetime = None, publish_status: str = None) -> bool:
+    def update_approval_info(
+        self,
+        package_id: int,
+        approver_id: Optional[int] = None,
+        rejector_id: Optional[int] = None,
+        published_at: Optional[datetime] = None,
+        publish_status: Optional[str] = None,
+    ) -> bool:
         """Update package approval-related fields in a single operation.
 
         Args:
@@ -331,7 +359,7 @@ class PackageStatusOperations(BaseOperations):
             status.published_at = published_at
         if publish_status is not None:
             status.publish_status = publish_status
-        
+
         status.updated_at = datetime.utcnow()
         return True
 
@@ -355,32 +383,36 @@ class PackageStatusOperations(BaseOperations):
         # Define the workflow stages in order
         workflow_stages = [
             "Checking Licence",
-            "Licence Checked", 
+            "Licence Checked",
             "Downloading",
             "Downloaded",
             "Security Scanning",
             "Security Scanned",
             "Pending Approval",
             "Approved",
-            "Published"
+            "Published",
         ]
-        
+
         # Failed states are terminal and don't advance
         failed_states = {
             "Parse Failed",
             "Licence Check Failed",
-            "Download Failed", 
+            "Download Failed",
             "Security Scan Failed",
-            "Rejected"
+            "Rejected",
         }
 
         current_status = status.status
-        
+
         # Check if current status is a failed state - these don't advance
         if current_status in failed_states:
             return False
-            
-        current_index = workflow_stages.index(current_status) if current_status in workflow_stages else -1
+
+        current_index = (
+            workflow_stages.index(current_status)
+            if current_status in workflow_stages
+            else -1
+        )
 
         if current_index == -1:
             # Current status not in workflow - cannot advance

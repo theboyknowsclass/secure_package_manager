@@ -11,7 +11,9 @@ import os
 import sys
 
 # Configure logging - minimal output for production
-log_level = logging.ERROR if os.getenv("FLASK_ENV") == "production" else logging.INFO
+log_level = (
+    logging.ERROR if os.getenv("FLASK_ENV") == "production" else logging.INFO
+)
 logging.basicConfig(
     level=log_level,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -39,16 +41,16 @@ def get_worker_class_by_type(worker_type: str):
     # Define worker type to module mapping
     worker_modules = {
         "approval_worker": ("workers.approval_worker", "ApprovalWorker"),
-        "download_worker": ("workers.download_worker", "DownloadWorker"), 
+        "download_worker": ("workers.download_worker", "DownloadWorker"),
         "license_worker": ("workers.license_worker", "LicenseWorker"),
         "parse_worker": ("workers.parse_worker", "ParseWorker"),
         "package_publisher": ("workers.publish_worker", "PublishWorker"),
         "security_worker": ("workers.security_worker", "SecurityWorker"),
     }
-    
+
     if worker_type not in worker_modules:
         return None
-        
+
     module_name, class_name = worker_modules[worker_type]
     try:
         module = __import__(module_name, fromlist=[class_name])
@@ -63,7 +65,7 @@ def get_available_worker_types():
     # Return the predefined worker types without importing all modules
     return [
         "approval_worker",
-        "download_worker", 
+        "download_worker",
         "license_worker",
         "parse_worker",
         "package_publisher",

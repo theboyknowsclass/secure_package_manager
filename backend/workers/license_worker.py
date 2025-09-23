@@ -55,9 +55,7 @@ class LicenseWorker(BaseWorker):
                         "LicenseWorker heartbeat: No packages found needing license checking"
                     )
             else:
-                logger.error(
-                    f"Error in license processing: {result['error']}"
-                )
+                logger.error(f"Error in license processing: {result['error']}")
 
         except Exception as e:
             logger.error(

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from .audit_log_operations import AuditLogOperations
 from .base_operations import BaseOperations
+
 # CompositeOperations has been removed - use SessionHelper + individual entity operations instead
 from .package_operations import PackageOperations
 from .package_status_operations import PackageStatusOperations
@@ -45,7 +46,6 @@ class OperationsFactory:
             raise ValueError(f"Unknown entity type: {entity_type}")
 
         return cls._operations_classes[entity_type](session)
-
 
 
 # Convenience imports
