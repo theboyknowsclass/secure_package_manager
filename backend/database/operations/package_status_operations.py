@@ -1,7 +1,7 @@
 """Database operations for PackageStatus entities."""
 
 from datetime import datetime
-from typing import Type, List, Optional, Type
+from typing import List, Optional, Type
 
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session

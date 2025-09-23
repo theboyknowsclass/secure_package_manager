@@ -1,10 +1,22 @@
 import logging
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from database.models import User
 
 from database.models import User
 from database.operations.user_operations import UserOperations
 from database.session_helper import SessionHelper
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
+
+
+# Type assertion helper for authenticated requests
+def get_authenticated_user() -> "User":
+    """Get the authenticated user from the request context."""
+    return request.user  # type: ignore[attr-defined]
+
+
 from services.auth_service import AuthService
 
 logger = logging.getLogger(__name__)
@@ -78,8 +90,10 @@ def login() -> ResponseReturnValue:
 def userinfo() -> ResponseReturnValue:
     """Get current user information."""
     try:
-        logger.info(f"UserInfo request from user: {request.user.username}")
-        return jsonify({"user": request.user.to_dict()}), 200
+        logger.info(
+            f"UserInfo request from user: {get_authenticated_user().username}"
+        )
+        return jsonify({"user": get_authenticated_user().to_dict()}), 200
     except Exception as e:
         logger.error(f"UserInfo error: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500

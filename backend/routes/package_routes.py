@@ -3,7 +3,10 @@ import logging
 import os
 import traceback
 from datetime import datetime
-from typing import Any, Dict, Union
+from typing import TYPE_CHECKING, Any, Dict, Union
+
+if TYPE_CHECKING:
+    from database.models import User
 
 from database.models import (
     AuditLog,
@@ -22,6 +25,14 @@ from database.operations.request_package_operations import (
 from database.session_helper import SessionHelper
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
+
+
+# Type assertion helper for authenticated requests
+def get_authenticated_user() -> "User":
+    """Get the authenticated user from the request context."""
+    return request.user  # type: ignore[attr-defined]
+
+
 from services.auth_service import AuthService
 from services.trivy_service import TrivyService
 
@@ -142,7 +153,7 @@ def _create_request_with_blob(package_data: Dict[str, Any]) -> Dict[str, Any]:
         request_record = Request(
             application_name=app_name,
             version=app_version,
-            requestor_id=request.user.id,
+            requestor_id=get_authenticated_user().id,
             raw_request_blob=json.dumps(package_data),  # Store raw JSON blob
         )
 
@@ -152,7 +163,7 @@ def _create_request_with_blob(package_data: Dict[str, Any]) -> Dict[str, Any]:
 
         # Log the request creation
         audit_log = AuditLog(
-            user_id=request.user.id,
+            user_id=get_authenticated_user().id,
             action="create_request",
             resource_type="request",
             resource_id=request_record.id,
@@ -211,8 +222,8 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
 
             # Check if user has access to this request
             if (
-                not request.user.is_admin()
-                and request_record.requestor_id != request.user.id
+                not get_authenticated_user().is_admin()
+                and request_record.requestor_id != get_authenticated_user().id
             ):
                 return jsonify({"error": "Access denied"}), 403
 
@@ -346,10 +357,12 @@ def list_package_requests() -> ResponseReturnValue:
     try:
         with SessionHelper.get_session() as db:
             request_ops = RequestOperations(db.session)
-            if request.user.is_admin():
+            if get_authenticated_user().is_admin():
                 requests = request_ops.get_all()
             else:
-                requests = request_ops.get_by_requestor(request.user.id)
+                requests = request_ops.get_by_requestor(
+                    get_authenticated_user().id
+                )
 
             result_requests = []
             for req in requests:
@@ -404,12 +417,12 @@ def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
                 return jsonify({"error": "Package not found"}), 404
 
         # Check if user has access to this package
-        if not request.user.is_admin():
+        if not get_authenticated_user().is_admin():
             # Check if user has access through any request
             with SessionHelper.get_session() as db:
                 request_package_ops = RequestPackageOperations(db.session)
                 has_access = request_package_ops.check_user_access(
-                    package_id, request.user.id
+                    package_id, get_authenticated_user().id
                 )
 
             if not has_access:
@@ -453,12 +466,12 @@ def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
                 return jsonify({"error": "Package not found"}), 404
 
         # Check if user has access to this package
-        if not request.user.is_admin():
+        if not get_authenticated_user().is_admin():
             # Check if user has access through any request
             with SessionHelper.get_session() as db:
                 request_package_ops = RequestPackageOperations(db.session)
                 has_access = request_package_ops.check_user_access(
-                    package_id, request.user.id
+                    package_id, get_authenticated_user().id
                 )
 
             if not has_access:
@@ -504,12 +517,12 @@ def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
                 return jsonify({"error": "Package not found"}), 404
 
         # Check if user has access to this package
-        if not request.user.is_admin():
+        if not get_authenticated_user().is_admin():
             # Check if user has access through any request
             with SessionHelper.get_session() as db:
                 request_package_ops = RequestPackageOperations(db.session)
                 has_access = request_package_ops.check_user_access(
-                    package_id, request.user.id
+                    package_id, get_authenticated_user().id
                 )
 
             if not has_access:
@@ -607,7 +620,7 @@ def retry_failed_packages() -> ResponseReturnValue:
         request_id = data.get("request_id")
 
         # Only admins can retry packages
-        if not request.user.is_admin():
+        if not get_authenticated_user().is_admin():
             return jsonify({"error": "Admin access required"}), 403
 
         # Build query for failed packages
@@ -666,7 +679,10 @@ def get_audit_data() -> ResponseReturnValue:
     """Get audit data for approved packages."""
     try:
         # Only admins and approvers can view audit data
-        if not (request.user.is_admin() or request.user.is_approver()):
+        if not (
+            get_authenticated_user().is_admin()
+            or get_authenticated_user().is_approver()
+        ):
             return jsonify({"error": "Access denied"}), 403
 
         with SessionHelper.get_session() as db:

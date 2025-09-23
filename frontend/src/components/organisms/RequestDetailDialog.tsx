@@ -32,6 +32,49 @@ interface RequestDetailDialogProps {
   refetchInterval?: number;
 }
 
+// Memoized cell components to prevent re-renders
+const StatusCell = React.memo(({ status }: { status: string }) => (
+  <PackageStatusChip status={status} />
+));
+
+const LicenseCell = React.memo(({ 
+  identifier, 
+  score 
+}: { 
+  identifier: string | null; 
+  score: number | null;
+}) => (
+  <LicenseChip identifier={identifier} score={score} />
+));
+
+const LicenseScoreCell = React.memo(({ score }: { score: number | null }) => (
+  <LicenseScoreChip score={score} />
+));
+
+const SecurityScoreCell = React.memo(({ 
+  score, 
+  scanStatus, 
+  scanResult 
+}: { 
+  score: number | null; 
+  scanStatus: SecurityScanStatus; 
+  scanResult: any;
+}) => (
+  <SecurityScoreChip
+    score={score}
+    scanStatus={scanStatus}
+    scanResult={scanResult}
+  />
+));
+
+const VulnerabilityCell = React.memo(({ scanResult }: { scanResult: any }) => (
+  <VulnerabilityChip scanResult={scanResult} />
+));
+
+const TypeCell = React.memo(({ type }: { type: string }) => (
+  <PackageTypeChip type={type === "existing" ? "existing" : "new"} />
+));
+
 // Memoized column definitions to prevent recreation on every render
 const packageColumns: MRT_ColumnDef<Package>[] = [
   {
@@ -49,29 +92,26 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
     header: "Status",
     size: 120,
     Cell: ({ row }: { row: any }) => (
-      <PackageStatusChip status={row.original.status} />
+      <StatusCell status={row.original.status} />
     ),
   },
   {
     accessorKey: "license_identifier",
     header: "License",
     size: 120,
-    Cell: ({ row }: { row: any }) => {
-      const pkg = row.original;
-      return (
-        <LicenseChip
-          identifier={pkg.license_identifier}
-          score={pkg.license_score}
-        />
-      );
-    },
+    Cell: ({ row }: { row: any }) => (
+      <LicenseCell 
+        identifier={row.original.license_identifier}
+        score={row.original.license_score}
+      />
+    ),
   },
   {
     accessorKey: "license_score",
     header: "License Score",
     size: 120,
     Cell: ({ row }: { row: any }) => (
-      <LicenseScoreChip score={row.original.license_score} />
+      <LicenseScoreCell score={row.original.license_score} />
     ),
   },
   {
@@ -85,36 +125,29 @@ const packageColumns: MRT_ColumnDef<Package>[] = [
         },
       },
     },
-    Cell: ({ row }: { row: any }) => {
-      const pkg = row.original;
-      return (
-        <SecurityScoreChip
-          score={pkg.security_score}
-          scanStatus={pkg.security_scan_status as SecurityScanStatus}
-          scanResult={pkg.scan_result}
-        />
-      );
-    },
+    Cell: ({ row }: { row: any }) => (
+      <SecurityScoreCell
+        score={row.original.security_score}
+        scanStatus={row.original.security_scan_status as SecurityScanStatus}
+        scanResult={row.original.scan_result}
+      />
+    ),
   },
   {
     accessorKey: "scan_result",
     header: "Vulnerabilities",
     size: 120,
-    Cell: ({ row }: { row: any }) => {
-      const pkg = row.original;
-      return <VulnerabilityChip scanResult={pkg.scan_result} />;
-    },
+    Cell: ({ row }: { row: any }) => (
+      <VulnerabilityCell scanResult={row.original.scan_result} />
+    ),
   },
   {
     accessorKey: "type",
     header: "Type",
     size: 80,
-    Cell: ({ row }: { row: any }) => {
-      const type = row.original.type;
-      return (
-        <PackageTypeChip type={type === "existing" ? "existing" : "new"} />
-      );
-    },
+    Cell: ({ row }: { row: any }) => (
+      <TypeCell type={row.original.type} />
+    ),
   },
 ];
 
@@ -181,6 +214,7 @@ export default function RequestDetailDialog({
               enableColumnFilterModes={false}
               enableRowActions={false}
               enableRowSelection={false}
+              enableVirtualization={selectedRequest.packages.length > 50}
               muiTableProps={{
                 sx: {
                   tableLayout: "fixed",

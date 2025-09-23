@@ -5,7 +5,7 @@ files. This worker delegates all business logic to PackageLockParsingService.
 """
 
 import logging
-from typing import Optional, List, Optional
+from typing import List, Optional
 
 from services.package_lock_parsing_service import PackageLockParsingService
 from workers.base_worker import BaseWorker

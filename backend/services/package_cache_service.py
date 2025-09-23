@@ -4,10 +4,11 @@ Handles local package cache operations including storage, retrieval, and managem
 of downloaded packages in the local cache directory.
 """
 
+import io
 import logging
 import os
 import tarfile
-from typing import Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class PackageCacheService:
         os.makedirs(self.package_cache_dir, exist_ok=True)
 
     def store_package_from_tarball(
-        self, package, tarball_content: bytes
+        self, package: Any, tarball_content: bytes
     ) -> Optional[str]:
         """Store a package in the cache from tarball content.
 
@@ -42,7 +43,7 @@ class PackageCacheService:
 
             # Extract tarball to package cache directory
             tarball_buffer = tarfile.open(
-                fileobj=tarfile.io.BytesIO(tarball_content), mode="r:gz"
+                fileobj=io.BytesIO(tarball_content), mode="r:gz"
             )
             tarball_buffer.extractall(package_dir)
             tarball_buffer.close()

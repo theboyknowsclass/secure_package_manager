@@ -100,7 +100,9 @@ class TestDownloadService(unittest.TestCase):
             )
             self.assertEqual(url, expected_url)
 
-    def test_construct_download_url_scoped_package_custom_registry(self) -> None:
+    def test_construct_download_url_scoped_package_custom_registry(
+        self,
+    ) -> None:
         """Test URL construction for scoped packages with custom registry."""
         # Create a mock package with custom registry
         with patch.dict(

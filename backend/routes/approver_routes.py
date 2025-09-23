@@ -1,4 +1,8 @@
 import logging
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from database.models import User
 
 from database.models import (
     AuditLog,
@@ -15,6 +19,14 @@ from database.operations.request_package_operations import (
 from database.session_helper import SessionHelper
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
+
+
+# Type assertion helper for authenticated requests
+def get_authenticated_user() -> "User":
+    """Get the authenticated user from the request context."""
+    return request.user  # type: ignore[attr-defined]
+
+
 from services.auth_service import AuthService
 from services.npm_registry_publishing_service import (
     NpmRegistryPublishingService,
@@ -62,7 +74,7 @@ def publish_package(package_id: int) -> ResponseReturnValue:
         if success:
             # Log the action
             audit_log = AuditLog(
-                user_id=request.user.id,
+                user_id=get_authenticated_user().id,
                 action="publish_package",
                 resource_type="package",
                 resource_id=package.id,
@@ -107,7 +119,7 @@ def batch_approve_packages() -> ResponseReturnValue:
 
         for package_id in package_ids:
             result = _process_package_approval(
-                package_id, request.user, reason
+                package_id, get_authenticated_user(), reason
             )
             if result["success"]:
                 approved_count += 1
@@ -116,14 +128,14 @@ def batch_approve_packages() -> ResponseReturnValue:
 
         # Create a summary audit log for the batch operation
         summary_audit_log = AuditLog(
-            user_id=request.user.id,
+            user_id=get_authenticated_user().id,
             action="batch_approve_packages",
             resource_type="batch_operation",
             resource_id=None,  # No single resource ID for batch operations
             details=(
                 f"Batch approval: {approved_count}/"
                 f"{len(package_ids)} packages "
-                f"approved by {request.user.username}. Package IDs: "
+                f"approved by {get_authenticated_user().username}. Package IDs: "
                 f"{list(package_ids)}. Reason: {reason}"
             ),
         )
@@ -149,7 +161,7 @@ def batch_approve_packages() -> ResponseReturnValue:
             "approved_count": approved_count,
             "total_requested": len(package_ids),
             "package_ids": list(package_ids),
-            "approved_by": request.user.username,
+            "approved_by": get_authenticated_user().username,
             "note": (
                 "Packages are approved and ready for publishing. Publishing "
                 "can be done separately for better performance."
@@ -193,7 +205,7 @@ def batch_reject_packages() -> ResponseReturnValue:
 
         for package_id in package_ids:
             result = _process_package_rejection(
-                package_id, request.user, reason
+                package_id, get_authenticated_user(), reason
             )
             if result["success"]:
                 rejected_count += 1
@@ -202,13 +214,13 @@ def batch_reject_packages() -> ResponseReturnValue:
 
         # Create a summary audit log for the batch operation
         summary_audit_log = AuditLog(
-            user_id=request.user.id,
+            user_id=get_authenticated_user().id,
             action="batch_reject_packages",
             resource_type="batch_operation",
             resource_id=None,  # No single resource ID for batch operations
             details=(
                 f"Batch rejection: {rejected_count}/{len(package_ids)} packages rejected by "
-                f"{request.user.username}. Package IDs: {list(package_ids)}. Reason: {reason}"
+                f"{get_authenticated_user().username}. Package IDs: {list(package_ids)}. Reason: {reason}"
             ),
         )
         with SessionHelper.get_session() as db:
@@ -221,7 +233,7 @@ def batch_reject_packages() -> ResponseReturnValue:
             "rejected_count": rejected_count,
             "total_requested": len(package_ids),
             "package_ids": list(package_ids),
-            "rejected_by": request.user.username,
+            "rejected_by": get_authenticated_user().username,
         }
 
         if failed_packages:

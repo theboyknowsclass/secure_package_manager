@@ -17,6 +17,35 @@ export default function AuditDashboard() {
     error,
   } = useAuditData();
 
+  // Memoized cell components to prevent re-renders
+  const PackageNameCell = React.memo(({ value }: { value: string }) => (
+    <Typography variant="body2" sx={{ fontWeight: "medium" }}>
+      {value}
+    </Typography>
+  ));
+
+  const VersionCell = React.memo(({ value }: { value: string }) => (
+    <Typography variant="body2">{value}</Typography>
+  ));
+
+  const LicenseCell = React.memo(({ value }: { value: string | null }) => {
+    if (!value) {
+      return (
+        <Typography variant="body2" color="textSecondary">
+          Unknown
+        </Typography>
+      );
+    }
+
+    return (
+      <Chip
+        label={value}
+        color={getLicenseStatusColor(value)}
+        size="small"
+      />
+    );
+  });
+
   // Define columns for the audit table
   const columns = useMemo<MRT_ColumnDef<AuditDataItem>[]>(
     () => [
@@ -24,42 +53,19 @@ export default function AuditDashboard() {
         accessorKey: "package.name",
         header: "Package Name",
         size: 200,
-        Cell: ({ row }) => (
-          <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-            {row.original.package.name}
-          </Typography>
-        ),
+        Cell: ({ row }) => <PackageNameCell value={row.original.package.name} />,
       },
       {
         accessorKey: "package.version",
         header: "Version",
         size: 120,
-        Cell: ({ row }) => (
-          <Typography variant="body2">{row.original.package.version}</Typography>
-        ),
+        Cell: ({ row }) => <VersionCell value={row.original.package.version} />,
       },
       {
         accessorKey: "package.license_identifier",
         header: "License",
         size: 150,
-        Cell: ({ row }) => {
-          const license = row.original.package.license_identifier;
-          if (!license) {
-            return (
-              <Typography variant="body2" color="textSecondary">
-                Unknown
-              </Typography>
-            );
-          }
-
-          return (
-            <Chip
-              label={license}
-              color={getLicenseStatusColor(license)}
-              size="small"
-            />
-          );
-        },
+        Cell: ({ row }) => <LicenseCell value={row.original.package.license_identifier} />,
       },
       {
         accessorKey: "approval.approver",
@@ -237,6 +243,7 @@ export default function AuditDashboard() {
           enableSorting
           enableColumnResizing
           enablePagination
+          enableVirtualization={auditData.length > 100}
           muiTableProps={{
             sx: {
               tableLayout: "fixed",

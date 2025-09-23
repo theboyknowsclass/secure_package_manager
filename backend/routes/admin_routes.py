@@ -1,4 +1,8 @@
 import logging
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from database.models import User
 
 from database.models import AuditLog, SupportedLicense
 from database.operations.audit_log_operations import AuditLogOperations
@@ -8,6 +12,14 @@ from database.operations.supported_license_operations import (
 from database.session_helper import SessionHelper
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
+
+
+# Type assertion helper for authenticated requests
+def get_authenticated_user() -> "User":
+    """Get the authenticated user from the request context."""
+    return request.user  # type: ignore[attr-defined]
+
+
 from services.auth_service import AuthService
 from services.configuration_service import ConfigurationService
 
@@ -49,7 +61,7 @@ def get_supported_licenses() -> ResponseReturnValue:
 def create_supported_license() -> ResponseReturnValue:
     """Create a new supported license."""
     try:
-        if not request.user.is_admin():
+        if not get_authenticated_user().is_admin():
             return jsonify({"error": "Admin access required"}), 403
 
         data = request.get_json()
@@ -70,7 +82,7 @@ def create_supported_license() -> ResponseReturnValue:
             name=data["name"],
             identifier=data["identifier"],
             status=data.get("status", "allowed"),
-            created_by=request.user.id,
+            created_by=get_authenticated_user().id,
         )
 
         with SessionHelper.get_session() as db:
@@ -80,7 +92,7 @@ def create_supported_license() -> ResponseReturnValue:
 
             # Log the action
             audit_log = AuditLog(
-                user_id=request.user.id,
+                user_id=get_authenticated_user().id,
                 action="create_license",
                 resource_type="license",
                 resource_id=license.id,
@@ -114,7 +126,7 @@ def create_supported_license() -> ResponseReturnValue:
 def update_supported_license(license_id: int) -> ResponseReturnValue:
     """Update a supported license."""
     try:
-        if not request.user.is_admin():
+        if not get_authenticated_user().is_admin():
             return jsonify({"error": "Admin access required"}), 403
 
         with SessionHelper.get_session() as db:
@@ -135,7 +147,7 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
 
             # Log the action
             audit_log = AuditLog(
-                user_id=request.user.id,
+                user_id=get_authenticated_user().id,
                 action="update_license",
                 resource_type="license",
                 resource_id=license.id,
@@ -165,7 +177,7 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
 def delete_supported_license(license_id: int) -> ResponseReturnValue:
     """Delete a supported license."""
     try:
-        if not request.user.is_admin():
+        if not get_authenticated_user().is_admin():
             return jsonify({"error": "Admin access required"}), 403
 
         with SessionHelper.get_session() as db:
@@ -200,7 +212,7 @@ def delete_supported_license(license_id: int) -> ResponseReturnValue:
 
             # Log the action
             audit_log = AuditLog(
-                user_id=request.user.id,
+                user_id=get_authenticated_user().id,
                 action="delete_license",
                 resource_type="license",
                 resource_id=license_id,

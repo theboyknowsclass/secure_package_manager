@@ -36,7 +36,7 @@ logging.getLogger("sqlalchemy.pool").setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
 
 
-def get_worker_class_by_type(worker_type: str):
+def get_worker_class_by_type(worker_type: str) -> type:
     """Get worker class by type using dynamic import - only load the specific worker needed."""
     # Define worker type to module mapping
     worker_modules = {
@@ -60,7 +60,7 @@ def get_worker_class_by_type(worker_type: str):
         return None
 
 
-def get_available_worker_types():
+def get_available_worker_types() -> list[str]:
     """Get list of all available worker types."""
     # Return the predefined worker types without importing all modules
     return [
@@ -73,7 +73,7 @@ def get_available_worker_types():
     ]
 
 
-def main():
+def main() -> None:
     """Main entry point for the worker."""
     # Get worker type from environment
     worker_type = os.getenv("WORKER_TYPE", "parse_worker")

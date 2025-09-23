@@ -113,7 +113,9 @@ class TestLicenseServiceOptimized:
                 assert result["score"] == 0
                 assert "Unknown license" in result["errors"][0]
 
-    def test_process_license_group_work_returns_correct_structure(self) -> None:
+    def test_process_license_group_work_returns_correct_structure(
+        self,
+    ) -> None:
         """Test that _process_license_group_work returns the expected data structure."""
         # Mock packages
         mock_package1 = Mock()
@@ -163,7 +165,9 @@ class TestLicenseServiceOptimized:
                 assert result["license_status"] == "allowed"
                 assert result["score"] == 75
 
-    def test_process_license_group_work_handles_validation_failure(self) -> None:
+    def test_process_license_group_work_handles_validation_failure(
+        self,
+    ) -> None:
         """Test that _process_license_group_work handles validation failure correctly."""
         mock_package = Mock()
         mock_package.id = 1

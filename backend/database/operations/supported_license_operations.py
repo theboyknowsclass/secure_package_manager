@@ -1,6 +1,6 @@
 """Database operations for SupportedLicense entities."""
 
-from typing import Type, List, Optional, Type
+from typing import List, Optional, Type
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session

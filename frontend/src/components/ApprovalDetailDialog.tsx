@@ -34,6 +34,100 @@ interface ApprovalDetailDialogProps {
   onApprovalComplete: () => void;
 }
 
+// Memoized cell components for better performance
+const SelectCell = React.memo(({ 
+  selected, 
+  isPendingApproval, 
+  onSelectChange 
+}: { 
+  selected: boolean; 
+  isPendingApproval: boolean;
+  onSelectChange?: (selected: boolean) => void;
+}) => (
+  <input
+    type="checkbox"
+    checked={selected}
+    disabled={!isPendingApproval}
+    onChange={e => {
+      if (onSelectChange && isPendingApproval) {
+        onSelectChange(e.target.checked);
+      }
+    }}
+    style={{
+      opacity: isPendingApproval ? 1 : 0.5,
+      cursor: isPendingApproval ? "pointer" : "not-allowed",
+    }}
+  />
+));
+
+const PackageNameCell = React.memo(({ name }: { name: string }) => (
+  <Typography variant="body2" sx={{ fontWeight: "medium" }}>
+    {name}
+  </Typography>
+));
+
+const VersionCell = React.memo(({ version }: { version: string }) => (
+  <Typography variant="body2">{version}</Typography>
+));
+
+const StatusCell = React.memo(({ status }: { status: string }) => (
+  <Chip
+    label={getPackageStatusLabel(status)}
+    color={getPackageStatusColor(status)}
+    size="small"
+  />
+));
+
+// Memoized license parsing function
+const parseLicenseExpression = (expression: string): string[] => {
+  return expression
+    .replace(/[()]/g, "")
+    .split(/\s+(?:OR|AND)\s+/i)
+    .map(license => license.trim())
+    .filter(license => license.length > 0);
+};
+
+const LicenseCell = React.memo(({ 
+  licenseIdentifier, 
+  licenseStatus 
+}: { 
+  licenseIdentifier: string | null; 
+  licenseStatus?: string;
+}) => {
+  if (!licenseIdentifier) {
+    return (
+      <Typography variant="body2" color="textSecondary">
+        Unknown
+      </Typography>
+    );
+  }
+
+  const licenses = parseLicenseExpression(licenseIdentifier);
+
+  if (licenses.length === 1) {
+    return (
+      <Chip
+        label={licenses[0]}
+        color={getLicenseStatusColor(licenses[0], licenseStatus)}
+        size="small"
+      />
+    );
+  }
+
+  return (
+    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+      {licenses.map((license, index) => (
+        <Chip
+          key={index}
+          label={license}
+          color={getLicenseStatusColor(license, licenseStatus)}
+          size="small"
+        />
+      ))}
+    </Box>
+  );
+});
+
 // Define columns for package details table with selection
 const packageColumns: MRT_ColumnDef<
   Package & { selected?: boolean; onSelectChange?: (selected: boolean) => void }
@@ -42,111 +136,42 @@ const packageColumns: MRT_ColumnDef<
     accessorKey: "select",
     header: "Select",
     size: 60,
-    Cell: ({ row }) => {
-      const isPendingApproval =
-        row.original.status === PACKAGE_STATUS.PENDING_APPROVAL;
-      return (
-        <input
-          type="checkbox"
-          checked={row.original.selected || false}
-          disabled={!isPendingApproval}
-          onChange={e => {
-            if (row.original.onSelectChange && isPendingApproval) {
-              row.original.onSelectChange(e.target.checked);
-            }
-          }}
-          style={{
-            opacity: isPendingApproval ? 1 : 0.5,
-            cursor: isPendingApproval ? "pointer" : "not-allowed",
-          }}
-        />
-      );
-    },
+    Cell: ({ row }) => (
+      <SelectCell 
+        selected={row.original.selected || false}
+        isPendingApproval={row.original.status === PACKAGE_STATUS.PENDING_APPROVAL}
+        onSelectChange={row.original.onSelectChange}
+      />
+    ),
   },
   {
     accessorKey: "name",
     header: "Package",
     size: 200,
-    Cell: ({ row }) => (
-      <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-        {row.original.name}
-      </Typography>
-    ),
+    Cell: ({ row }) => <PackageNameCell name={row.original.name} />,
   },
   {
     accessorKey: "version",
     header: "Version",
     size: 120,
-    Cell: ({ row }) => (
-      <Typography variant="body2">{row.original.version}</Typography>
-    ),
+    Cell: ({ row }) => <VersionCell version={row.original.version} />,
   },
   {
     accessorKey: "status",
     header: "Status",
     size: 120,
-    Cell: ({ row }) => (
-      <Chip
-        label={getPackageStatusLabel(row.original.status)}
-        color={getPackageStatusColor(row.original.status)}
-        size="small"
-      />
-    ),
+    Cell: ({ row }) => <StatusCell status={row.original.status} />,
   },
   {
     accessorKey: "license_identifier",
     header: "License",
     size: 150,
-    Cell: ({ row }) => {
-      const pkg = row.original;
-      if (!pkg.license_identifier) {
-        return (
-          <Typography variant="body2" color="textSecondary">
-            Unknown
-          </Typography>
-        );
-      }
-
-      // Parse license expression to separate individual licenses
-      const parseLicenseExpression = (expression: string): string[] => {
-        return expression
-          .replace(/[()]/g, "")
-          .split(/\s+(?:OR|AND)\s+/i)
-          .map(license => license.trim())
-          .filter(license => license.length > 0);
-      };
-
-      const licenses = parseLicenseExpression(pkg.license_identifier);
-
-      if (licenses.length === 1) {
-        return (
-          <Chip
-            label={licenses[0]}
-            color={getLicenseStatusColor(
-              licenses[0],
-              pkg.license_status || undefined
-            )}
-            size="small"
-          />
-        );
-      }
-
-      return (
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-          {licenses.map((license, index) => (
-            <Chip
-              key={index}
-              label={license}
-              color={getLicenseStatusColor(
-                license,
-                pkg.license_status || undefined
-              )}
-              size="small"
-            />
-          ))}
-        </Box>
-      );
-    },
+    Cell: ({ row }) => (
+      <LicenseCell 
+        licenseIdentifier={row.original.license_identifier}
+        licenseStatus={row.original.license_status}
+      />
+    ),
   },
   {
     accessorKey: "security_score",
@@ -630,6 +655,7 @@ export default function ApprovalDetailDialog({
               enableTopToolbar={false}
               enableBottomToolbar={false}
               enableColumnFilterModes={false}
+              enableVirtualization={selectedRequest.packages.length > 50}
               muiTableProps={{
                 sx: {
                   tableLayout: "fixed",
