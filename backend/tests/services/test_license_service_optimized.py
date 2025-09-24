@@ -3,7 +3,7 @@
 Tests the new 3-phase pattern implementation with proper data validation.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -111,7 +111,11 @@ class TestLicenseServiceOptimized:
 
                 assert result["valid"] is False
                 assert result["score"] == 0
-                assert "Unknown license" in result["errors"][0]
+                errors = result["errors"]
+                if isinstance(errors, list) and errors:
+                    assert "Unknown license" in errors[0]
+                else:
+                    assert "Unknown license" in str(errors)
 
     def test_process_license_group_work_returns_correct_structure(
         self,
@@ -207,7 +211,7 @@ class TestLicenseServiceOptimized:
         del invalid_package.id  # Remove required attribute
 
         # Test with invalid result object
-        invalid_result = {"invalid": "data", "score": 0}  # Missing "status" field but has score
+        invalid_result: Dict[str, Union[str, int]] = {"invalid": "data", "score": 0}  # Missing "status" field but has score
 
         license_results = [(invalid_package, invalid_result)]
 
@@ -245,7 +249,7 @@ class TestLicenseServiceOptimized:
         mock_package.version = "1.0.0"
 
         # Test with invalid score type
-        invalid_score_result = {
+        invalid_score_result: Dict[str, Union[str, int]] = {
             "status": "success",
             "score": "invalid_score",  # String instead of int
             "license_status": "allowed",

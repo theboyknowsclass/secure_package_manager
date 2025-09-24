@@ -546,42 +546,45 @@ class LicenseService:
 
     def _process_license_group_work(
         self, license_string: str, packages: List[Any]
-    ) -> List[Tuple[Any, Dict[str, Union[str, int, List[str]]]]]:
+    ) -> List[Tuple[Any, Dict[str, Union[str, int]]]]:
         """Process a license group without database operations."""
-        results = []
+        results: List[Tuple[Any, Dict[str, Union[str, int]]]] = []
         license_validation = self.validate_package_license(
             {"license": license_string}
         )
 
         for package in packages:
             if license_validation["valid"]:
-                results.append(
-                    (
-                        package,
-                        {
-                            "status": "success",
-                            "license_status": license_validation[
-                                "license_status"
-                            ],
-                            "score": license_validation["score"],
-                        },
-                    )
-                )
+                score = license_validation["score"]
+                if isinstance(score, int):
+                    score_value = score
+                elif isinstance(score, str) and score.isdigit():
+                    score_value = int(score)
+                else:
+                    score_value = 0  # Default to 0 for invalid scores
+                
+                result_dict: Dict[str, Union[str, int]] = {
+                    "status": "success",
+                    "license_status": str(license_validation["license_status"]),
+                    "score": score_value,
+                }
+                results.append((package, result_dict))
             else:
-                results.append(
-                    (
-                        package,
-                        {
-                            "status": "failed",
-                            "error": (
-                                errors[0] if isinstance(errors := license_validation.get("errors", ["License validation failed"]), list) and errors
-                                else "License validation failed"
-                            ),
-                        },
-                    )
-                )
+                error_dict: Dict[str, Union[str, int]] = {
+                    "status": "failed",
+                    "error": self._get_first_error(license_validation),
+                }
+                results.append((package, error_dict))
 
         return results
+
+    def _get_first_error(self, license_validation: Dict[str, Any]) -> str:
+        """Extract the first error message from license validation result."""
+        errors = license_validation.get("errors", ["License validation failed"])
+        if isinstance(errors, list) and errors:
+            first_error = errors[0]
+            return str(first_error) if first_error is not None else "License validation failed"
+        return "License validation failed"
 
     def _update_license_results(
         self, license_results: List[Tuple[Any, Dict[str, Union[str, int]]]]

@@ -1,7 +1,7 @@
 """Database operations for PackageStatus entities."""
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type, Union
 
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
@@ -75,8 +75,8 @@ class PackageStatusOperations:
         Returns:
             Number of packages updated
         """
-        # Create update dict with string keys for SQLAlchemy update
-        update_dict: Dict[str, Any] = {
+        # Create update dict with proper types for SQLAlchemy update
+        update_dict: Dict[str, Union[str, int, datetime]] = {
             'status': new_status,
             'updated_at': datetime.utcnow(),
         }
@@ -90,11 +90,20 @@ class PackageStatusOperations:
             if key in valid_fields:
                 update_dict[key] = value
         
-        updated_count = (
-            self.session.query(PackageStatus)
-            .filter(PackageStatus.package_id.in_(package_ids))
-            .update(update_dict, synchronize_session=False)
+        # Use bulk update with proper SQLAlchemy syntax
+        stmt = (
+            select(PackageStatus)
+            .where(PackageStatus.package_id.in_(package_ids))
         )
+        packages = self.session.execute(stmt).scalars().all()
+        
+        updated_count = 0
+        for package in packages:
+            for key, value in update_dict.items():
+                setattr(package, key, value)
+            updated_count += 1
+        
+        self.session.commit()
 
         return updated_count
 
