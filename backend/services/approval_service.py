@@ -5,6 +5,7 @@ from I/O work for optimal performance.
 """
 
 import logging
+import os
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
@@ -12,7 +13,7 @@ from database.operations.package_operations import PackageOperations
 from database.operations.package_status_operations import (
     PackageStatusOperations,
 )
-from database.session_helper import SessionHelper
+from database.service import DatabaseService
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,10 @@ class ApprovalService:
     def __init__(self) -> None:
         """Initialize the approval service."""
         self.logger = logger
+        self.database_url = os.getenv("DATABASE_URL")
+        if not self.database_url:
+            raise ValueError("DATABASE_URL environment variable is required")
+        self.db_service = DatabaseService(self.database_url)
 
     def process_security_scanned_packages(
         self, max_packages: int = 50
@@ -79,8 +84,8 @@ class ApprovalService:
             Dict with approval statistics
         """
         try:
-            with SessionHelper.get_session() as db:
-                package_ops = PackageOperations(db.session)
+            with self.db_service.get_session() as session:
+                package_ops = PackageOperations(session)
 
                 # Get package counts by status
                 security_scanned_count = package_ops.count_packages_by_status(
@@ -134,8 +139,8 @@ class ApprovalService:
 
     def _get_packages_for_approval(self, max_packages: int) -> List[Any]:
         """Get packages that need approval transitions (short DB session)."""
-        with SessionHelper.get_session() as db:
-            package_ops = PackageOperations(db.session)
+        with self.db_service.get_session() as session:
+            package_ops = PackageOperations(session)
             return package_ops.get_by_status("Security Scanned")[:max_packages]
 
     def _perform_approval_batch(
@@ -162,9 +167,9 @@ class ApprovalService:
         """Update database with approval results (short DB session)."""
         processed_count = 0
 
-        with SessionHelper.get_session() as db:
-            package_ops = PackageOperations(db.session)
-            status_ops = PackageStatusOperations(db.session)
+        with self.db_service.get_session() as session:
+            package_ops = PackageOperations(session)
+            status_ops = PackageStatusOperations(session)
 
             for package, result in approval_results:
                 try:
@@ -189,7 +194,7 @@ class ApprovalService:
                         f"Error updating package {package.name}@{package.version}: {str(e)}"
                     )
 
-            db.commit()
+            session.commit()
 
         return {
             "success": True,

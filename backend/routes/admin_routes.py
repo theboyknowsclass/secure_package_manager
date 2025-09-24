@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -9,7 +10,7 @@ from database.operations.audit_log_operations import AuditLogOperations
 from database.operations.supported_license_operations import (
     SupportedLicenseOperations,
 )
-from database.session_helper import SessionHelper
+from database.service import DatabaseService
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 
@@ -42,12 +43,16 @@ def get_supported_licenses() -> ResponseReturnValue:
         status = request.args.get(
             "status"
         )  # 'always_allowed', 'allowed', 'avoid', 'blocked'
-        query = SupportedLicense.query
-
-        if status:
-            query = query.filter_by(status=status)
-
-        licenses = query.all()
+        
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            license_ops = SupportedLicenseOperations(session)
+            
+            if status:
+                licenses = license_ops.get_by_status(status)
+            else:
+                licenses = license_ops.get_all()
+                
         return jsonify(
             {"licenses": [license.to_dict() for license in licenses]}
         )
@@ -71,8 +76,9 @@ def create_supported_license() -> ResponseReturnValue:
             return jsonify({"error": "Name and identifier are required"}), 400
 
         # Check if identifier already exists
-        with SessionHelper.get_session() as db:
-            license_ops = SupportedLicenseOperations(db.session)
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            license_ops = SupportedLicenseOperations(session)
             existing = license_ops.get_by_identifier(data["identifier"])
         if existing:
             return jsonify({"error": "License identifier already exists"}), 400
@@ -85,10 +91,11 @@ def create_supported_license() -> ResponseReturnValue:
             created_by=get_authenticated_user().id,
         )
 
-        with SessionHelper.get_session() as db:
-            license_ops = SupportedLicenseOperations(db.session)
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            license_ops = SupportedLicenseOperations(session)
             license_ops.create(license)
-            db.commit()
+            session.commit()
 
             # Log the action
             audit_log = AuditLog(
@@ -98,9 +105,9 @@ def create_supported_license() -> ResponseReturnValue:
                 resource_id=license.id,
                 details=f"Created license: {license.name} ({license.identifier})",
             )
-            audit_ops = AuditLogOperations(db.session)
+            audit_ops = AuditLogOperations(session)
             audit_ops.create(audit_log)
-            db.commit()
+            session.commit()
 
         return (
             jsonify(
@@ -114,8 +121,9 @@ def create_supported_license() -> ResponseReturnValue:
 
     except Exception as e:
         logger.error(f"Create license error: {str(e)}")
-        with SessionHelper.get_session() as db:
-            db.rollback()
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            session.rollback()
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -129,8 +137,9 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
         if not get_authenticated_user().is_admin():
             return jsonify({"error": "Admin access required"}), 403
 
-        with SessionHelper.get_session() as db:
-            license_ops = SupportedLicenseOperations(db.session)
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            license_ops = SupportedLicenseOperations(session)
             license = license_ops.get_by_id(license_id)
             if not license:
                 return jsonify({"error": "License not found"}), 404
@@ -142,8 +151,9 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
         if "status" in data:
             license.status = data["status"]
 
-        with SessionHelper.get_session() as db:
-            db.commit()
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            session.commit()
 
             # Log the action
             audit_log = AuditLog(
@@ -153,9 +163,9 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
                 resource_id=license.id,
                 details=f"Updated license: {license.name} ({license.identifier})",
             )
-            audit_ops = AuditLogOperations(db.session)
+            audit_ops = AuditLogOperations(session)
             audit_ops.create(audit_log)
-            db.commit()
+            session.commit()
 
         return jsonify(
             {
@@ -165,8 +175,9 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
         )
     except Exception as e:
         logger.error(f"Update license error: {str(e)}")
-        with SessionHelper.get_session() as db:
-            db.rollback()
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            session.rollback()
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -180,18 +191,24 @@ def delete_supported_license(license_id: int) -> ResponseReturnValue:
         if not get_authenticated_user().is_admin():
             return jsonify({"error": "Admin access required"}), 403
 
-        with SessionHelper.get_session() as db:
-            license_ops = SupportedLicenseOperations(db.session)
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            license_ops = SupportedLicenseOperations(session)
             license = license_ops.get_by_id(license_id)
             if not license:
                 return jsonify({"error": "License not found"}), 404
 
         # Check if license is being used by any packages
-        with SessionHelper.get_session() as db:
-            license_ops = SupportedLicenseOperations(db.session)
-            package_count = license_ops.count_packages_by_license(
-                license.identifier
-            )
+        if license.identifier is None:
+            # Skip licenses without identifier - they can be deleted safely
+            package_count = 0
+        else:
+            db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+            with db_service.get_session() as session:
+                license_ops = SupportedLicenseOperations(session)
+                package_count = license_ops.count_packages_by_license(
+                    license.identifier
+                )
         if package_count > 0:
             return (
                 jsonify(
@@ -205,10 +222,11 @@ def delete_supported_license(license_id: int) -> ResponseReturnValue:
                 400,
             )
 
-        with SessionHelper.get_session() as db:
-            license_ops = SupportedLicenseOperations(db.session)
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            license_ops = SupportedLicenseOperations(session)
             license_ops.delete(license)
-            db.commit()
+            session.commit()
 
             # Log the action
             audit_log = AuditLog(
@@ -218,15 +236,16 @@ def delete_supported_license(license_id: int) -> ResponseReturnValue:
                 resource_id=license_id,
                 details=f"Deleted license: {license.name} ({license.identifier})",
             )
-            audit_ops = AuditLogOperations(db.session)
+            audit_ops = AuditLogOperations(session)
             audit_ops.create(audit_log)
-            db.commit()
+            session.commit()
 
         return jsonify({"message": "License deleted successfully"})
     except Exception as e:
         logger.error(f"Delete license error: {str(e)}")
-        with SessionHelper.get_session() as db:
-            db.rollback()
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            session.rollback()
         return jsonify({"error": "Internal server error"}), 500
 
 

@@ -1,12 +1,18 @@
 """Request model for managing package requests."""
 
+from __future__ import annotations
+
 from datetime import datetime
-from typing import Any
+from typing import Any, List, TYPE_CHECKING
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, relationship
 
 from .base import Base
+
+if TYPE_CHECKING:
+    from .request_package import RequestPackage
+    from .user import User
 
 
 class Request(Base):
@@ -20,9 +26,10 @@ class Request(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    request_packages = relationship(
+    request_packages: Mapped[List["RequestPackage"]] = relationship(
         "RequestPackage", back_populates="request", lazy=True
     )
+    requestor: Mapped["User"] = relationship("User", back_populates="requests", lazy=True)
 
     def to_dict(self) -> dict[str, Any]:
         return {

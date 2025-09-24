@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -6,7 +7,7 @@ if TYPE_CHECKING:
 
 from database.models import User
 from database.operations.user_operations import UserOperations
-from database.session_helper import SessionHelper
+from database.service import DatabaseService
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 
@@ -51,8 +52,9 @@ def login() -> ResponseReturnValue:
         # Authentication - validates against mock-idp in dev, ADFS in
         # production
         if username == "admin" and password == "admin":
-            with SessionHelper.get_session() as db:
-                user_ops = UserOperations(db.session)
+            db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+            with db_service.get_session() as session:
+                user_ops = UserOperations(session)
                 user = user_ops.get_by_username(username)
             if not user:
                 user_data = {
@@ -61,8 +63,9 @@ def login() -> ResponseReturnValue:
                     "full_name": "Admin User",
                     "role": "admin",
                 }
-                with SessionHelper.get_session() as db:
-                    user_ops = UserOperations(db.session)
+                db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+                with db_service.get_session() as session:
+                    user_ops = UserOperations(session)
                     user = user_ops.create_user(user_data)
 
             logger.info("Generating token...")

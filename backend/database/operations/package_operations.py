@@ -6,11 +6,18 @@ from sqlalchemy import and_, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..models import Package, PackageStatus
-from .base_operations import BaseOperations
 
 
-class PackageOperations(BaseOperations):
+class PackageOperations:
     """Database operations for Package entities."""
+
+    def __init__(self, session: Session):
+        """Initialize with a database session.
+
+        Args:
+            session: SQLAlchemy session for database operations
+        """
+        self.session = session
 
     def get_by_name_version(
         self, name: str, version: str
@@ -115,11 +122,10 @@ class PackageOperations(BaseOperations):
         self.session.flush()  # Get package ID
 
         # Create package status
-        package_status = PackageStatus(
-            package_id=package.id,
-            status=status,
-            security_scan_status="pending",
-        )
+        package_status = PackageStatus()
+        package_status.package_id = package.id
+        package_status.status = status
+        package_status.security_scan_status = "pending"
         self.session.add(package_status)
 
         return package
@@ -140,7 +146,7 @@ class PackageOperations(BaseOperations):
         Returns:
             True if update was successful, False otherwise
         """
-        package = self.get_by_id(Package, package_id)
+        package = self.get_by_id(package_id)
         if not package:
             return False
 
@@ -150,7 +156,7 @@ class PackageOperations(BaseOperations):
         if license_text is not None:
             package.license_text = license_text
 
-        self.update(package)
+        self.session.flush()
         return True
 
     def batch_create_with_status(
@@ -177,18 +183,18 @@ class PackageOperations(BaseOperations):
         Returns:
             List of all packages
         """
-        return super().get_all(Package)
+        return list(self.session.query(Package).all())
 
     def get_by_id(self, package_id: int) -> Optional[Package]:
         """Get package by ID.
 
         Args:
-            package_id: The ID of the package
+            package_id: The ID of the package to retrieve
 
         Returns:
             The package if found, None otherwise
         """
-        return super().get_by_id(Package, package_id)
+        return self.session.get(Package, package_id)
 
     def get_packages_needing_publishing(self, limit: int = 3) -> List[Package]:
         """Get packages that need publishing.
@@ -270,7 +276,7 @@ class PackageOperations(BaseOperations):
             .join(PackageStatus)
             .where(PackageStatus.publish_status == publish_status)
         )
-        return self.session.execute(stmt).scalars().count()
+        return len(list(self.session.execute(stmt).scalars()))
 
     def count_packages_by_status(self, status: str) -> int:
         """Count packages by status.
@@ -286,7 +292,7 @@ class PackageOperations(BaseOperations):
             .join(PackageStatus)
             .where(PackageStatus.status == status)
         )
-        return self.session.execute(stmt).scalars().count()
+        return len(list(self.session.execute(stmt).scalars()))
 
     def get_stuck_packages_in_security_scanned(
         self, stuck_threshold: int
@@ -470,7 +476,7 @@ class PackageOperations(BaseOperations):
         stmt = select(Package).where(
             Package.license_identifier == license_identifier
         )
-        return self.session.execute(stmt).scalars().count()
+        return len(list(self.session.execute(stmt).scalars()))
 
     def get_packages_with_context_and_scans(
         self, request_id: int
@@ -525,9 +531,10 @@ class PackageOperations(BaseOperations):
         # Build results maintaining order
         results = []
         for rp in request_packages:
-            package = packages.get(rp.package_id)
-            if package:
-                scan = latest_scans.get(rp.package_id)
-                results.append((package, rp, scan))
+            if rp.package_id is not None:
+                package = packages.get(rp.package_id)
+                if package:
+                    scan = latest_scans.get(rp.package_id)
+                    results.append((package, rp, scan))
 
         return results

@@ -6,6 +6,7 @@ from package-lock.json paths, with special focus on scoped packages.
 
 import sys
 from pathlib import Path
+from typing import Any, Dict, List
 from unittest.mock import Mock
 
 import pytest
@@ -24,7 +25,7 @@ class TestScopedPackageParsing:
 
     def test_extract_regular_package_name(self) -> None:
         """Test extraction of regular (non-scoped) package names."""
-        test_cases = [
+        test_cases: List[Dict[str, Any]] = [
             {
                 "path": "node_modules/lodash",
                 "info": {"version": "4.17.21"},
@@ -52,7 +53,7 @@ class TestScopedPackageParsing:
 
     def test_extract_scoped_package_name(self) -> None:
         """Test extraction of scoped package names."""
-        test_cases = [
+        test_cases: List[Dict[str, Any]] = [
             {
                 "path": "node_modules/@types/node",
                 "info": {"version": "18.15.0"},
@@ -90,7 +91,7 @@ class TestScopedPackageParsing:
 
     def test_extract_nested_scoped_package_name(self) -> None:
         """Test extraction of nested scoped package names."""
-        test_cases = [
+        test_cases: List[Dict[str, Any]] = [
             {
                 "path": "node_modules/express/node_modules/@types/express",
                 "info": {"version": "4.17.17"},
@@ -113,7 +114,7 @@ class TestScopedPackageParsing:
 
     def test_extract_package_name_with_explicit_name(self) -> None:
         """Test extraction when package info contains explicit name field."""
-        test_cases = [
+        test_cases: List[Dict[str, Any]] = [
             {
                 "path": "node_modules/@types/node",
                 "info": {"name": "@types/node", "version": "18.15.0"},
@@ -136,7 +137,7 @@ class TestScopedPackageParsing:
 
     def test_extract_incomplete_scoped_package(self) -> None:
         """Test extraction of incomplete scoped package paths."""
-        test_cases = [
+        test_cases: List[Dict[str, Any]] = [
             {
                 "path": "node_modules/@types",
                 "info": {"version": "1.0.0"},
@@ -154,7 +155,7 @@ class TestScopedPackageParsing:
 
     def test_extract_invalid_paths(self) -> None:
         """Test extraction with invalid or malformed paths."""
-        test_cases = [
+        test_cases: List[Dict[str, Any]] = [
             {
                 "path": "not_node_modules/package",
                 "info": {"version": "1.0.0"},
@@ -178,7 +179,7 @@ class TestScopedPackageParsing:
 
     def test_extract_missing_version(self) -> None:
         """Test extraction when version is missing."""
-        test_cases = [
+        test_cases: List[Dict[str, Any]] = [
             {
                 "path": "node_modules/lodash",
                 "info": {},  # No version
@@ -244,7 +245,7 @@ class TestScopedPackageParsing:
 
     def test_edge_cases(self) -> None:
         """Test edge cases and boundary conditions."""
-        edge_cases = [
+        edge_cases: List[Dict[str, Any]] = [
             # Very long scoped package names
             {
                 "path": "node_modules/@very-long-scope-name/very-long-package-name",

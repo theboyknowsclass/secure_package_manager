@@ -5,7 +5,7 @@ This worker delegates all business logic to DownloadService.
 """
 
 import logging
-from typing import List
+from typing import List, Optional
 
 from services.download_service import DownloadService
 from workers.base_worker import BaseWorker
@@ -30,7 +30,7 @@ class DownloadWorker(BaseWorker):
 
     def __init__(self, sleep_interval: int = 10):
         super().__init__("DownloadWorker", sleep_interval)
-        self.download_service = None
+        self.download_service: DownloadService
         self.max_packages_per_cycle = 10
 
     def initialize(self) -> None:

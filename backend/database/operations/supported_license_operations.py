@@ -6,11 +6,39 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..models import SupportedLicense
-from .base_operations import BaseOperations
 
 
-class SupportedLicenseOperations(BaseOperations):
+class SupportedLicenseOperations:
     """Database operations for SupportedLicense entities."""
+
+    def __init__(self, session: Session):
+        """Initialize with a database session.
+
+        Args:
+            session: SQLAlchemy session for database operations
+        """
+        self.session = session
+
+    def create(self, supported_license: SupportedLicense) -> SupportedLicense:
+        """Create a new supported license.
+
+        Args:
+            supported_license: The supported license to create
+
+        Returns:
+            The created supported license (with ID populated)
+        """
+        self.session.add(supported_license)
+        self.session.flush()
+        return supported_license
+
+    def delete(self, supported_license: SupportedLicense) -> None:
+        """Delete a supported license.
+
+        Args:
+            supported_license: The supported license to delete
+        """
+        self.session.delete(supported_license)
 
     def get_by_identifier(self, identifier: str) -> Optional[SupportedLicense]:
         """Get supported license by SPDX identifier.
@@ -62,7 +90,18 @@ class SupportedLicenseOperations(BaseOperations):
         Returns:
             List of all supported licenses
         """
-        return super().get_all(SupportedLicense)
+        return list(self.session.query(SupportedLicense).all())
+
+    def get_by_id(self, supported_license_id: int) -> Optional[SupportedLicense]:
+        """Get supported license by ID.
+
+        Args:
+            supported_license_id: The ID of the supported license to retrieve
+
+        Returns:
+            The supported license if found, None otherwise
+        """
+        return self.session.get(SupportedLicense, supported_license_id)
 
     def count_packages_by_license(self, identifier: str) -> int:
         """Count packages using a specific license.
@@ -76,4 +115,4 @@ class SupportedLicenseOperations(BaseOperations):
         from ..models import Package
 
         stmt = select(Package).where(Package.license_identifier == identifier)
-        return self.session.execute(stmt).scalars().count()
+        return len(list(self.session.execute(stmt).scalars()))

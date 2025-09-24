@@ -5,6 +5,7 @@ from I/O work for optimal performance.
 """
 
 import logging
+import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -13,7 +14,8 @@ from database.operations.package_status_operations import (
     PackageStatusOperations,
 )
 from database.operations.security_scan_operations import SecurityScanOperations
-from database.session_helper import SessionHelper
+from database.service import DatabaseService
+from services.trivy_service import TrivyService
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,9 @@ class SecurityService:
     def __init__(self) -> None:
         """Initialize the security service."""
         self.logger = logger
+        self.trivy_service = TrivyService()
+        self.database_url = os.getenv("DATABASE_URL", "")
+        self.db_service = DatabaseService(self.database_url)
 
     def process_package_batch(self, max_packages: int = 5) -> Dict[str, Any]:
         """Process a batch of packages for security scanning.
@@ -84,8 +89,8 @@ class SecurityService:
         Returns:
             List of packages that need security scanning
         """
-        with SessionHelper.get_session() as db:
-            package_ops = PackageOperations(db.session)
+        with self.db_service.get_session() as session:
+            package_ops = PackageOperations(session)
             return package_ops.get_by_status("Downloaded")[:max_packages]
 
     def _perform_security_scan_batch(
@@ -169,10 +174,10 @@ class SecurityService:
         successful_count = 0
         failed_count = 0
 
-        with SessionHelper.get_session() as db:
-            package_ops = PackageOperations(db.session)
-            status_ops = PackageStatusOperations(db.session)
-            security_scan_ops = SecurityScanOperations(db.session)
+        with self.db_service.get_session() as session:
+            package_ops = PackageOperations(session)
+            status_ops = PackageStatusOperations(session)
+            security_scan_ops = SecurityScanOperations(session)
 
             for package, result in scan_results:
                 try:
@@ -231,7 +236,7 @@ class SecurityService:
                     )
                     failed_count += 1
 
-            db.commit()
+            session.commit()
 
         # Log batch summary
         if successful_count > 0 or failed_count > 0:

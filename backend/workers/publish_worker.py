@@ -5,7 +5,7 @@ repository. This worker delegates all business logic to PublishingService.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from services.publishing_service import PublishingService
 from workers.base_worker import BaseWorker
@@ -30,7 +30,7 @@ class PublishWorker(BaseWorker):
 
     def __init__(self, sleep_interval: int = 30):
         super().__init__("PackagePublisher", sleep_interval)
-        self.publishing_service = None
+        self.publishing_service: PublishingService
         self.max_packages_per_cycle = (
             3  # Process max 3 packages per cycle (publishing is slow)
         )

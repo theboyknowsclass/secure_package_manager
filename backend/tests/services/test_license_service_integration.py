@@ -350,7 +350,7 @@ class TestLicenseServiceIntegration:
                     return_value=mock_status_ops,
                 ):
                     # Mock license validation with different results
-                    def mock_lookup_side_effect(license_identifier: str) -> dict[str, str]:
+                    def mock_lookup_side_effect(license_identifier: str) -> dict[str, str] | None:
                         if license_identifier == "MIT":
                             return {
                                 "status": "allowed",

@@ -1,11 +1,17 @@
 """RequestPackage model for linking requests to packages."""
 
-from typing import Any
+from __future__ import annotations
+
+from typing import Any, Optional, TYPE_CHECKING
 
 from sqlalchemy import Column, ForeignKey, Integer, String
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, relationship
 
 from .base import Base
+
+if TYPE_CHECKING:
+    from .package import Package
+    from .request import Request
 
 
 class RequestPackage(Base):
@@ -16,8 +22,8 @@ class RequestPackage(Base):
     package_type = Column(String(20), default="new", nullable=False)
 
     # Relationships
-    request = relationship("Request", back_populates="request_packages")
-    package = relationship("Package", back_populates="request_packages")
+    request: Mapped["Request"] = relationship("Request", back_populates="request_packages")
+    package: Mapped["Package"] = relationship("Package", back_populates="request_packages")
 
     def to_dict(self) -> dict[str, Any]:
         return {

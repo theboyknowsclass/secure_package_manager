@@ -1,12 +1,19 @@
 """User model for managing application users."""
 
+from __future__ import annotations
+
 from datetime import datetime
-from typing import Any
+from typing import Any, List, TYPE_CHECKING
 
 from sqlalchemy import Column, DateTime, Integer, String
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, relationship
 
 from .base import Base
+
+if TYPE_CHECKING:
+    from .audit_log import AuditLog
+    from .request import Request
+    from .supported_license import SupportedLicense
 
 
 class User(Base):
@@ -25,9 +32,9 @@ class User(Base):
     )
 
     # Relationships
-    requests = relationship("Request", backref="requestor", lazy=True)
-    audit_logs = relationship("AuditLog", backref="user", lazy=True)
-    supported_licenses = relationship(
+    requests: Mapped[List["Request"]] = relationship("Request", back_populates="requestor", lazy=True)
+    audit_logs: Mapped[List["AuditLog"]] = relationship("AuditLog", backref="user", lazy=True)
+    supported_licenses: Mapped[List["SupportedLicense"]] = relationship(
         "SupportedLicense", backref="creator", lazy=True
     )
 
@@ -61,7 +68,7 @@ class User(Base):
                 "view_admin",
             ],
         }
-        return permission in role_hierarchy.get(self.role, [])
+        return permission in role_hierarchy.get(self.role or "", [])
 
     def to_dict(self) -> dict[str, Any]:
         return {

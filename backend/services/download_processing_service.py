@@ -10,11 +10,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import requests
+from database.models import Package
 from database.operations.package_operations import PackageOperations
 from database.operations.package_status_operations import (
     PackageStatusOperations,
 )
-from database.session_helper import SessionHelper
+from database.service import DatabaseService
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +31,11 @@ class DownloadService:
         """Initialize the download service."""
         self.logger = logger
         # Operations instances (set up in _setup_operations)
-        self._session = None
-        self._package_ops = None
-        self._status_ops = None
+        self._session: Optional[Any] = None
+        self._package_ops: Optional[PackageOperations] = None
+        self._status_ops: Optional[PackageStatusOperations] = None
+        self.database_url = os.getenv("DATABASE_URL", "")
+        self.db_service = DatabaseService(self.database_url)
 
         # Download configuration
         self.download_timeout = int(os.getenv("DOWNLOAD_TIMEOUT", "60"))
@@ -40,7 +43,7 @@ class DownloadService:
             "SOURCE_REPOSITORY_URL", "https://registry.npmjs.org"
         )
 
-    def _setup_operations() -> None:
+    def _setup_operations(self, session: Any) -> None:
         """Set up operations instances for the current session."""
         self._session = session
         self._package_ops = PackageOperations(session)
@@ -56,9 +59,13 @@ class DownloadService:
             Dict with processing results
         """
         try:
-            with SessionHelper.get_session() as db:
+            with self.db_service.get_session() as session:
                 # Set up operations
-                self._setup_operations(db.session)
+                self._setup_operations(session)
+                
+                # MyPy assertion - operations are guaranteed to be set after _setup_operations
+                assert self._package_ops is not None
+                assert self._status_ops is not None
 
                 # Find packages that need downloading
                 ready_packages = self._package_ops.get_by_status(
@@ -87,7 +94,7 @@ class DownloadService:
                     else:
                         failed_downloads += 1
 
-                db.commit()
+                session.commit()
 
                 return {
                     "success": True,
@@ -203,12 +210,12 @@ class DownloadService:
                 return False
 
             # Update package with download information (cache_path, size, checksum)
-            with SessionHelper.get_session() as db:
+            with self.db_service.get_session() as session:
                 from database.operations.package_status_operations import (
                     PackageStatusOperations,
                 )
 
-                status_ops = PackageStatusOperations(db.session)
+                status_ops = PackageStatusOperations(session)
 
                 # Calculate file size and checksum
                 file_size = None
@@ -236,7 +243,7 @@ class DownloadService:
                 if status_ops.update_download_info(
                     package.id, cache_path, file_size, checksum
                 ):
-                    db.commit()
+                    session.commit()
                     self.logger.info(
                         f"Updated download info for {package.name}@{package.version}: cache_path={cache_path}, size={file_size}, checksum={checksum[:16] if checksum else 'None'}..."
                     )
@@ -282,7 +289,7 @@ class DownloadService:
             self.logger.info(
                 f"Successfully downloaded tarball for {package.name}@{package.version}"
             )
-            return response.content
+            return bytes(response.content)
 
         except requests.exceptions.RequestException as e:
             self.logger.error(
@@ -295,7 +302,7 @@ class DownloadService:
             )
             return None
 
-    def _construct_download_url(self, package: Any) -> str:
+    def _construct_download_url(self, package: Package) -> str:
         """Construct download URL using SOURCE_REPOSITORY_URL.
 
         Args:
@@ -312,12 +319,13 @@ class DownloadService:
 
         # Otherwise, use custom logic to construct the URL
         # Handle scoped packages (e.g., @babel/core)
-        if package.name.startswith("@"):
+        package_name = package.name
+        if package_name.startswith("@"):
             # For scoped packages: @scope/package -> @scope/package (no URL encoding needed)
-            return f"{self.source_repository_url}/{package.name}/-/{package.name.split('/')[-1]}-{package.version}.tgz"
+            return f"{self.source_repository_url}/{package_name}/-/{package_name.split('/')[-1]}-{package.version}.tgz"
         else:
             # For regular packages: package -> package
-            return f"{self.source_repository_url}/{package.name}/-/{package.name}-{package.version}.tgz"
+            return f"{self.source_repository_url}/{package_name}/-/{package_name}-{package.version}.tgz"
 
     def _mark_package_downloading(self, package: Any) -> None:
         """Mark package as downloading.
@@ -325,6 +333,7 @@ class DownloadService:
         Args:
             package: Package to update
         """
+        assert self._status_ops is not None
         if package.package_status:
             self._status_ops.go_to_next_stage(package.id)
 
@@ -334,6 +343,7 @@ class DownloadService:
         Args:
             package: Package to update
         """
+        assert self._status_ops is not None
         if package.package_status:
             self._status_ops.go_to_next_stage(package.id)
 
@@ -343,5 +353,6 @@ class DownloadService:
         Args:
             package: Package to update
         """
+        assert self._status_ops is not None
         if package.package_status:
             self._status_ops.update_status(package.id, "Download Failed")

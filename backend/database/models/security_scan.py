@@ -36,11 +36,11 @@ class SecurityScan(Base):
     def get_total_vulnerabilities(self) -> int:
         """Calculate total vulnerability count from granular counts."""
         return (
-            self.critical_count
-            + self.high_count
-            + self.medium_count
-            + self.low_count
-            + self.info_count
+            (self.critical_count or 0)
+            + (self.high_count or 0)
+            + (self.medium_count or 0)
+            + (self.low_count or 0)
+            + (self.info_count or 0)
         )
 
     def to_dict(self) -> dict[str, Any]:

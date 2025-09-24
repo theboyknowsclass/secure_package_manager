@@ -6,11 +6,31 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..models import SecurityScan
-from .base_operations import BaseOperations
 
 
-class SecurityScanOperations(BaseOperations):
+class SecurityScanOperations:
     """Database operations for SecurityScan entities."""
+
+    def __init__(self, session: Session):
+        """Initialize with a database session.
+
+        Args:
+            session: SQLAlchemy session for database operations
+        """
+        self.session = session
+
+    def create(self, security_scan: SecurityScan) -> SecurityScan:
+        """Create a new security scan.
+
+        Args:
+            security_scan: The security scan to create
+
+        Returns:
+            The created security scan (with ID populated)
+        """
+        self.session.add(security_scan)
+        self.session.flush()
+        return security_scan
 
     def get_by_package_id(self, package_id: int) -> List[SecurityScan]:
         """Get security scans by package ID.
@@ -64,4 +84,15 @@ class SecurityScanOperations(BaseOperations):
         Returns:
             List of all security scans
         """
-        return super().get_all(SecurityScan)
+        return list(self.session.query(SecurityScan).all())
+
+    def get_by_id(self, security_scan_id: int) -> Optional[SecurityScan]:
+        """Get security scan by ID.
+
+        Args:
+            security_scan_id: The ID of the security scan to retrieve
+
+        Returns:
+            The security scan if found, None otherwise
+        """
+        return self.session.get(SecurityScan, security_scan_id)

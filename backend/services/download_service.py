@@ -9,11 +9,12 @@ import os
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
+from database.models import Package
 from database.operations.package_operations import PackageOperations
 from database.operations.package_status_operations import (
     PackageStatusOperations,
 )
-from database.session_helper import SessionHelper
+from database.service import DatabaseService
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,8 @@ class DownloadService:
         self.source_repository_url = os.getenv(
             "SOURCE_REPOSITORY_URL", "https://registry.npmjs.org"
         )
+        self.database_url = os.getenv("DATABASE_URL", "")
+        self.db_service = DatabaseService(self.database_url)
 
     def process_package_batch(self, max_packages: int = 5) -> Dict[str, Any]:
         """Process a batch of packages for downloading.
@@ -90,8 +93,8 @@ class DownloadService:
         Returns:
             List of packages that need downloading
         """
-        with SessionHelper.get_session() as db:
-            package_ops = PackageOperations(db.session)
+        with self.db_service.get_session() as session:
+            package_ops = PackageOperations(session)
             return package_ops.get_by_status("Licence Checked")[:max_packages]
 
     def _perform_download_batch(
@@ -167,9 +170,9 @@ class DownloadService:
         failed_count = 0
         already_cached_count = 0
 
-        with SessionHelper.get_session() as db:
-            package_ops = PackageOperations(db.session)
-            status_ops = PackageStatusOperations(db.session)
+        with self.db_service.get_session() as session:
+            package_ops = PackageOperations(session)
+            status_ops = PackageStatusOperations(session)
 
             for package, result in download_results:
                 try:
@@ -199,7 +202,7 @@ class DownloadService:
                     )
                     failed_count += 1
 
-            db.commit()
+            session.commit()
 
         # Log batch summary
         if (
@@ -263,15 +266,16 @@ class DownloadService:
 
             # Store tarball in local cache
             cache_service = PackageCacheService()
-            return cache_service.store_package_from_tarball(
+            result = cache_service.store_package_from_tarball(
                 package, tarball_content
             )
+            return result is not None
 
         except Exception as e:
             self.logger.error(f"Error performing download: {str(e)}")
             return False
 
-    def _download_package_tarball(self, package: Any) -> Optional[bytes]:
+    def _download_package_tarball(self, package: Package) -> Optional[bytes]:
         """Download package tarball from npm registry.
 
         Args:
@@ -302,7 +306,7 @@ class DownloadService:
             self.logger.info(
                 f"Successfully downloaded tarball for {package.name}@{package.version}"
             )
-            return response.content
+            return bytes(response.content)
 
         except requests.exceptions.RequestException as e:
             self.logger.error(
@@ -315,7 +319,7 @@ class DownloadService:
             )
             return None
 
-    def _construct_download_url(self, package: Any) -> str:
+    def _construct_download_url(self, package: Package) -> str:
         """Construct download URL using SOURCE_REPOSITORY_URL.
 
         Args:
@@ -332,9 +336,10 @@ class DownloadService:
 
         # Otherwise, use custom logic to construct the URL
         # Handle scoped packages (e.g., @babel/core)
-        if package.name.startswith("@"):
+        package_name = package.name
+        if package_name.startswith("@"):
             # For scoped packages: @scope/package -> @scope/package (no URL encoding needed)
-            return f"{self.source_repository_url}/{package.name}/-/{package.name.split('/')[-1]}-{package.version}.tgz"
+            return f"{self.source_repository_url}/{package_name}/-/{package_name.split('/')[-1]}-{package.version}.tgz"
         else:
             # For regular packages: package -> package
-            return f"{self.source_repository_url}/{package.name}/-/{package.name}-{package.version}.tgz"
+            return f"{self.source_repository_url}/{package_name}/-/{package_name}-{package.version}.tgz"

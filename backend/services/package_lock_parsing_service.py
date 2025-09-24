@@ -9,6 +9,7 @@ proper separation of concerns.
 """
 
 import logging
+import os
 from typing import Any, Dict, List, Optional, Tuple
 
 from database.operations import (
@@ -18,7 +19,7 @@ from database.operations import (
     RequestOperations,
     RequestPackageOperations,
 )
-from database.session_helper import SessionHelper
+from database.service import DatabaseService
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,8 @@ class PackageLockParsingService:
 
     def __init__(self) -> None:
         """Initialize the parsing service."""
-        pass
+        self.database_url = os.getenv("DATABASE_URL", "")
+        self.db_service = DatabaseService(self.database_url)
 
     def process_requests(
         self, max_requests_per_cycle: int = 5
@@ -83,8 +85,8 @@ class PackageLockParsingService:
 
     def _get_requests_for_parsing(self, max_requests: int) -> List[Any]:
         """Get requests that need package lock parsing (short DB session)."""
-        with SessionHelper.get_session() as db:
-            request_ops = RequestOperations(db.session)
+        with self.db_service.get_session() as session:
+            request_ops = RequestOperations(session)
             requests = request_ops.get_needing_parsing()
             logger.info(f"Found {len(requests)} requests needing parsing")
             if requests:
@@ -122,12 +124,12 @@ class PackageLockParsingService:
         failed_count = 0
         total_packages = 0
 
-        with SessionHelper.get_session() as db:
-            request_ops = RequestOperations(db.session)
-            request_package_ops = RequestPackageOperations(db.session)
-            package_ops = PackageOperations(db.session)
-            package_status_ops = PackageStatusOperations(db.session)
-            audit_log_ops = AuditLogOperations(db.session)
+        with self.db_service.get_session() as session:
+            request_ops = RequestOperations(session)
+            request_package_ops = RequestPackageOperations(session)
+            package_ops = PackageOperations(session)
+            package_status_ops = PackageStatusOperations(session)
+            audit_log_ops = AuditLogOperations(session)
 
             for request, result in parsing_results:
                 try:
@@ -172,7 +174,7 @@ class PackageLockParsingService:
                     )
                     failed_count += 1
 
-            db.commit()
+            session.commit()
 
         return {
             "success": True,

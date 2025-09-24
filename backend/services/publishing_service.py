@@ -5,6 +5,7 @@ from I/O work for optimal performance.
 """
 
 import logging
+import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -12,7 +13,7 @@ from database.operations.package_operations import PackageOperations
 from database.operations.package_status_operations import (
     PackageStatusOperations,
 )
-from database.session_helper import SessionHelper
+from database.service import DatabaseService
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,8 @@ class PublishingService:
     def __init__(self) -> None:
         """Initialize the publishing service."""
         self.logger = logger
+        self.database_url = os.getenv("DATABASE_URL", "")
+        self.db_service = DatabaseService(self.database_url)
 
     def process_package_batch(self, max_packages: int = 3) -> Dict[str, Any]:
         """Process a batch of packages for publishing.
@@ -79,8 +82,8 @@ class PublishingService:
         Returns:
             List of packages that need publishing
         """
-        with SessionHelper.get_session() as db:
-            package_ops = PackageOperations(db.session)
+        with self.db_service.get_session() as session:
+            package_ops = PackageOperations(session)
             return package_ops.get_packages_needing_publishing(max_packages)
 
     def _perform_publish_batch(
@@ -141,9 +144,9 @@ class PublishingService:
         successful_count = 0
         failed_count = 0
 
-        with SessionHelper.get_session() as db:
-            package_ops = PackageOperations(db.session)
-            status_ops = PackageStatusOperations(db.session)
+        with self.db_service.get_session() as session:
+            package_ops = PackageOperations(session)
+            status_ops = PackageStatusOperations(session)
 
             for package, result in publish_results:
                 try:
@@ -169,7 +172,7 @@ class PublishingService:
                     )
                     failed_count += 1
 
-            db.commit()
+            session.commit()
 
         # Log batch summary
         if successful_count > 0 or failed_count > 0:
@@ -191,8 +194,8 @@ class PublishingService:
             Dict with publishing statistics
         """
         try:
-            with SessionHelper.get_session() as db:
-                package_ops = PackageOperations(db.session)
+            with self.db_service.get_session() as session:
+                package_ops = PackageOperations(session)
 
                 # Get package counts by status
                 approved_count = package_ops.count_packages_by_status(
@@ -226,9 +229,9 @@ class PublishingService:
             Dict with retry results
         """
         try:
-            with SessionHelper.get_session() as db:
-                package_ops = PackageOperations(db.session)
-                status_ops = PackageStatusOperations(db.session)
+            with self.db_service.get_session() as session:
+                package_ops = PackageOperations(session)
+                status_ops = PackageStatusOperations(session)
 
                 # Find packages that failed publishing
                 failed_packages = package_ops.get_by_status("Publish Failed")
@@ -244,14 +247,15 @@ class PublishingService:
                 for package in failed_packages:
                     try:
                         # Reset status to Approved to allow retry
-                        status_ops.update_status(package.id, "Approved")
-                        retried_count += 1
+                        if package.id is not None:
+                            status_ops.update_status(package.id, "Approved")
+                            retried_count += 1
                     except Exception as e:
                         self.logger.error(
                             f"Error retrying package {package.name}@{package.version}: {str(e)}"
                         )
 
-                db.commit()
+                session.commit()
 
                 return {
                     "success": True,

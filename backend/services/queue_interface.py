@@ -6,6 +6,7 @@ changing callers.
 """
 
 import logging
+import os
 from datetime import datetime
 from typing import Optional
 
@@ -13,7 +14,7 @@ from database.models import PackageStatus
 from database.operations.package_status_operations import (
     PackageStatusOperations,
 )
-from database.session_helper import SessionHelper
+from database.service import DatabaseService
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +22,15 @@ logger = logging.getLogger(__name__)
 class QueueInterface:
     """Thin queue abstraction for future Celery/Redis migration."""
 
+    def __init__(self) -> None:
+        """Initialize the queue interface."""
+        self.database_url = os.getenv("DATABASE_URL", "")
+        self.db_service = DatabaseService(self.database_url)
+
     def advance_status(self, package_id: int, next_status: str) -> bool:
         try:
-            with SessionHelper.get_session() as db:
-                status_ops = PackageStatusOperations(db.session)
+            with self.db_service.get_session() as session:
+                status_ops = PackageStatusOperations(session)
                 status = status_ops.get_by_package_id(package_id)
                 if not status:
                     logger.warning(
@@ -35,7 +41,7 @@ class QueueInterface:
                 prev_status = status.status
                 success = status_ops.update_status(package_id, next_status)
                 if success:
-                    db.commit()
+                    session.commit()
                     logger.info(
                         f"Status advanced: package_id={package_id} {prev_status} -> {next_status}"
                     )
@@ -46,6 +52,6 @@ class QueueInterface:
                 f"advance_status failed for package_id={package_id}: {str(e)}",
                 exc_info=True,
             )
-            with SessionHelper.get_session() as db:
-                db.rollback()
+            with self.db_service.get_session() as session:
+                session.rollback()
             return False

@@ -207,7 +207,7 @@ class TestLicenseServiceOptimized:
         del invalid_package.id  # Remove required attribute
 
         # Test with invalid result object
-        invalid_result = {"invalid": "data"}  # Missing "status" field
+        invalid_result = {"invalid": "data", "score": 0}  # Missing "status" field but has score
 
         license_results = [(invalid_package, invalid_result)]
 

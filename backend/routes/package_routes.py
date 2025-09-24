@@ -22,7 +22,7 @@ from database.operations.request_operations import RequestOperations
 from database.operations.request_package_operations import (
     RequestPackageOperations,
 )
-from database.session_helper import SessionHelper
+from database.service import DatabaseService
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 
@@ -91,6 +91,9 @@ def upload_package_lock() -> ResponseReturnValue:
             return package_data
 
         # Create request record with raw blob
+        if not isinstance(package_data, dict):
+            return jsonify({"error": "Invalid package data format"}), 400
+        
         request_data = _create_request_with_blob(package_data)
 
         return _create_success_response(request_data, package_data)
@@ -149,7 +152,8 @@ def _create_request_with_blob(package_data: Dict[str, Any]) -> Dict[str, Any]:
     app_name = package_data.get("name", "Unknown Application")
     app_version = package_data.get("version", "1.0.0")
 
-    with SessionHelper.get_session() as db:
+    db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+    with db_service.get_session() as session:
         request_record = Request(
             application_name=app_name,
             version=app_version,
@@ -157,9 +161,9 @@ def _create_request_with_blob(package_data: Dict[str, Any]) -> Dict[str, Any]:
             raw_request_blob=json.dumps(package_data),  # Store raw JSON blob
         )
 
-        request_ops = RequestOperations(db.session)
+        request_ops = RequestOperations(session)
         request_ops.create(request_record)
-        db.flush()  # Get the ID without committing
+        session.flush()  # Get the ID without committing
 
         # Log the request creation
         audit_log = AuditLog(
@@ -169,9 +173,9 @@ def _create_request_with_blob(package_data: Dict[str, Any]) -> Dict[str, Any]:
             resource_id=request_record.id,
             details=f"Created package request for {app_name}@{app_version}",
         )
-        audit_ops = AuditLogOperations(db.session)
+        audit_ops = AuditLogOperations(session)
         audit_ops.create(audit_log)
-        db.commit()
+        session.commit()
 
         # Return the essential data as a dictionary
         return {
@@ -214,8 +218,9 @@ def _create_success_response(
 def get_package_request(request_id: int) -> ResponseReturnValue:
     """Get package request details."""
     try:
-        with SessionHelper.get_session() as db:
-            request_ops = RequestOperations(db.session)
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            request_ops = RequestOperations(session)
             request_record = request_ops.get_by_id(request_id)
             if not request_record:
                 return jsonify({"error": "Request not found"}), 404
@@ -228,7 +233,7 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                 return jsonify({"error": "Access denied"}), 403
 
             # Get packages for this request with their creation context and scan results
-            package_ops = PackageOperations(db.session)
+            package_ops = PackageOperations(session)
             packages_with_context = (
                 package_ops.get_packages_with_context_and_scans(request_id)
             )
@@ -238,7 +243,7 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                 PackageRequestStatusManager,
             )
 
-            status_manager = PackageRequestStatusManager(db)
+            status_manager = PackageRequestStatusManager(session)
             status_summary = status_manager.get_request_status_summary(
                 request_id
             )
@@ -332,7 +337,7 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                             "completion_percentage": status_summary[
                                 "completion_percentage"
                             ],
-                            "created_at": request_record.created_at.isoformat(),
+                            "created_at": request_record.created_at.isoformat() if request_record.created_at else None,
                             "requestor": {
                                 "id": request_record.requestor.id,
                                 "username": request_record.requestor.username,
@@ -355,14 +360,17 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
 def list_package_requests() -> ResponseReturnValue:
     """List package requests for the user."""
     try:
-        with SessionHelper.get_session() as db:
-            request_ops = RequestOperations(db.session)
-            if get_authenticated_user().is_admin():
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            request_ops = RequestOperations(session)
+            user = get_authenticated_user()
+            if user.is_admin():
                 requests = request_ops.get_all()
             else:
-                requests = request_ops.get_by_requestor(
-                    get_authenticated_user().id
-                )
+                user_id = user.id
+                if user_id is None:
+                    return jsonify({"error": "User ID not found"}), 401
+                requests = request_ops.get_by_requestor(user_id)
 
             result_requests = []
             for req in requests:
@@ -373,6 +381,8 @@ def list_package_requests() -> ResponseReturnValue:
                 )
 
                 status_manager = PackageRequestStatusManager()
+                if req.id is None:
+                    continue  # Skip requests without ID
                 status_summary = status_manager.get_request_status_summary(
                     req.id
                 )
@@ -387,7 +397,7 @@ def list_package_requests() -> ResponseReturnValue:
                         "completion_percentage": status_summary[
                             "completion_percentage"
                         ],
-                        "created_at": req.created_at.isoformat(),
+                        "created_at": req.created_at.isoformat() if req.created_at else None,
                         "requestor": {
                             "id": req.requestor.id,
                             "username": req.requestor.username,
@@ -410,8 +420,9 @@ def list_package_requests() -> ResponseReturnValue:
 def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
     """Get security scan status for a package."""
     try:
-        with SessionHelper.get_session() as db:
-            package_ops = PackageOperations(db.session)
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            package_ops = PackageOperations(session)
             package = package_ops.get_by_id(package_id)
             if not package:
                 return jsonify({"error": "Package not found"}), 404
@@ -419,14 +430,19 @@ def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
         # Check if user has access to this package
         if not get_authenticated_user().is_admin():
             # Check if user has access through any request
-            with SessionHelper.get_session() as db:
-                request_package_ops = RequestPackageOperations(db.session)
+            db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+                request_package_ops = RequestPackageOperations(session)
+                user = get_authenticated_user()
+                user_id = user.id
+                if user_id is None:
+                    return jsonify({"error": "User ID not found"}), 401
                 has_access = request_package_ops.check_user_access(
-                    package_id, get_authenticated_user().id
+                    package_id, user_id
                 )
 
-            if not has_access:
-                return jsonify({"error": "Access denied"}), 403
+        if not has_access:
+            return jsonify({"error": "Access denied"}), 403
 
         scan_status = trivy_service.get_scan_status(package_id)
 
@@ -459,8 +475,9 @@ def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
 def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
     """Get detailed security scan report for a package."""
     try:
-        with SessionHelper.get_session() as db:
-            package_ops = PackageOperations(db.session)
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            package_ops = PackageOperations(session)
             package = package_ops.get_by_id(package_id)
             if not package:
                 return jsonify({"error": "Package not found"}), 404
@@ -468,14 +485,19 @@ def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
         # Check if user has access to this package
         if not get_authenticated_user().is_admin():
             # Check if user has access through any request
-            with SessionHelper.get_session() as db:
-                request_package_ops = RequestPackageOperations(db.session)
+            db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+                request_package_ops = RequestPackageOperations(session)
+                user = get_authenticated_user()
+                user_id = user.id
+                if user_id is None:
+                    return jsonify({"error": "User ID not found"}), 401
                 has_access = request_package_ops.check_user_access(
-                    package_id, get_authenticated_user().id
+                    package_id, user_id
                 )
 
-            if not has_access:
-                return jsonify({"error": "Access denied"}), 403
+        if not has_access:
+            return jsonify({"error": "Access denied"}), 403
 
         scan_report = trivy_service.get_scan_report(package_id)
 
@@ -510,8 +532,9 @@ def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
 def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
     """Trigger a new security scan for a package."""
     try:
-        with SessionHelper.get_session() as db:
-            package_ops = PackageOperations(db.session)
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            package_ops = PackageOperations(session)
             package = package_ops.get_by_id(package_id)
             if not package:
                 return jsonify({"error": "Package not found"}), 404
@@ -519,14 +542,19 @@ def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
         # Check if user has access to this package
         if not get_authenticated_user().is_admin():
             # Check if user has access through any request
-            with SessionHelper.get_session() as db:
-                request_package_ops = RequestPackageOperations(db.session)
+            db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+                request_package_ops = RequestPackageOperations(session)
+                user = get_authenticated_user()
+                user_id = user.id
+                if user_id is None:
+                    return jsonify({"error": "User ID not found"}), 401
                 has_access = request_package_ops.check_user_access(
-                    package_id, get_authenticated_user().id
+                    package_id, user_id
                 )
 
-            if not has_access:
-                return jsonify({"error": "Access denied"}), 403
+        if not has_access:
+            return jsonify({"error": "Access denied"}), 403
 
         # Trigger new scan
         scan_result = trivy_service.scan_package(package)
@@ -561,18 +589,20 @@ def get_processing_status() -> ResponseReturnValue:
             "Pending Approval",
             "Rejected",
         ]:
-            with SessionHelper.get_session() as db:
-                package_ops = PackageOperations(db.session)
+            db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+            with db_service.get_session() as session:
+                package_ops = PackageOperations(session)
                 count = package_ops.count_packages_by_status(status)
-            status_counts[status] = count
+                status_counts[status] = count
 
         # Count total requests
-        with SessionHelper.get_session() as db:
-            request_ops = RequestOperations(db.session)
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            request_ops = RequestOperations(session)
             total_requests = request_ops.count_total_requests()
 
             # Get recent activity (last 10 packages processed)
-            package_ops = PackageOperations(db.session)
+            package_ops = PackageOperations(session)
             recent_packages = package_ops.get_recent_packages(limit=10)
 
         recent_activity = []
@@ -624,8 +654,9 @@ def retry_failed_packages() -> ResponseReturnValue:
             return jsonify({"error": "Admin access required"}), 403
 
         # Build query for failed packages
-        with SessionHelper.get_session() as db:
-            package_ops = PackageOperations(db.session)
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            package_ops = PackageOperations(session)
             failed_packages = package_ops.get_by_status("Rejected")
 
             if request_id:
@@ -652,8 +683,9 @@ def retry_failed_packages() -> ResponseReturnValue:
                 package.package_status.updated_at = datetime.utcnow()
                 retried_count += 1
 
-        with SessionHelper.get_session() as db:
-            db.commit()
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            session.commit()
 
         logger.info(f"Retried {retried_count} failed packages")
         return (
@@ -668,8 +700,9 @@ def retry_failed_packages() -> ResponseReturnValue:
         )
 
     except Exception as e:
-        with SessionHelper.get_session() as db:
-            db.rollback()
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            session.rollback()
         return handle_error(e, "Retry failed packages")
 
 
@@ -685,14 +718,15 @@ def get_audit_data() -> ResponseReturnValue:
         ):
             return jsonify({"error": "Access denied"}), 403
 
-        with SessionHelper.get_session() as db:
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
             # Query for approved packages with their approval information
             from database.models import User
             from sqlalchemy.orm import joinedload
 
             # Get all approved packages with their relationships
             approved_packages = (
-                db.session.query(Package)
+                session.query(Package)
                 .join(PackageStatus, Package.id == PackageStatus.package_id)
                 .join(RequestPackage, Package.id == RequestPackage.package_id)
                 .join(Request, RequestPackage.request_id == Request.id)
@@ -716,7 +750,7 @@ def get_audit_data() -> ResponseReturnValue:
                     and package.package_status.approver_id
                 ):
                     approver = (
-                        db.session.query(User)
+                        session.query(User)
                         .filter(User.id == package.package_status.approver_id)
                         .first()
                     )

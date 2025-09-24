@@ -5,7 +5,7 @@ This worker delegates all business logic to SecurityService.
 """
 
 import logging
-from typing import List
+from typing import List, Optional
 
 from services.security_service import SecurityService
 from workers.base_worker import BaseWorker
@@ -32,7 +32,7 @@ class SecurityWorker(BaseWorker):
 
     def __init__(self, sleep_interval: int = 15):
         super().__init__("SecurityWorker", sleep_interval)
-        self.security_service = None
+        self.security_service: SecurityService
         self.max_packages_per_cycle = 10
 
     def initialize(self) -> None:

@@ -6,14 +6,13 @@ organized by entity to provide clear separation of concerns and better
 maintainability.
 """
 
-from typing import Dict, Type
+from typing import Any, Dict
 
 from sqlalchemy.orm import Session
 
 from .audit_log_operations import AuditLogOperations
-from .base_operations import BaseOperations
 
-# CompositeOperations has been removed - use SessionHelper + individual entity operations instead
+# CompositeOperations has been removed - use DatabaseService + individual entity operations instead
 from .package_operations import PackageOperations
 from .package_status_operations import PackageStatusOperations
 from .request_operations import RequestOperations
@@ -26,7 +25,7 @@ from .user_operations import UserOperations
 class OperationsFactory:
     """Factory for creating entity-specific operations."""
 
-    _operations_classes: Dict[str, Type[BaseOperations]] = {
+    _operations_classes: Dict[str, type] = {
         "package": PackageOperations,
         "request": RequestOperations,
         "user": UserOperations,
@@ -40,7 +39,7 @@ class OperationsFactory:
     @classmethod
     def create_operations(
         cls, entity_type: str, session: Session
-    ) -> BaseOperations:
+    ) -> Any:
         """Create operations instance for specific entity type."""
         if entity_type not in cls._operations_classes:
             raise ValueError(f"Unknown entity type: {entity_type}")
@@ -50,7 +49,6 @@ class OperationsFactory:
 
 # Convenience imports
 __all__ = [
-    "BaseOperations",
     "PackageOperations",
     "RequestOperations",
     "UserOperations",

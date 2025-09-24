@@ -6,11 +6,31 @@ from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from ..models import Request, RequestPackage
-from .base_operations import BaseOperations
 
 
-class RequestOperations(BaseOperations):
+class RequestOperations:
     """Database operations for Request entities."""
+
+    def __init__(self, session: Session):
+        """Initialize with a database session.
+
+        Args:
+            session: SQLAlchemy session for database operations
+        """
+        self.session = session
+
+    def create(self, request: Request) -> Request:
+        """Create a new request.
+
+        Args:
+            request: The request to create
+
+        Returns:
+            The created request (with ID populated)
+        """
+        self.session.add(request)
+        self.session.flush()
+        return request
 
     def get_needing_parsing(self) -> List[Request]:
         """Get requests that need package parsing.
@@ -58,18 +78,18 @@ class RequestOperations(BaseOperations):
         Returns:
             List of all requests
         """
-        return super().get_all(Request)
+        return list(self.session.query(Request).all())
 
     def get_by_id(self, request_id: int) -> Optional[Request]:
         """Get request by ID.
 
         Args:
-            request_id: The ID of the request
+            request_id: The ID of the request to retrieve
 
         Returns:
             The request if found, None otherwise
         """
-        return super().get_by_id(Request, request_id)
+        return self.session.get(Request, request_id)
 
     def count_total_requests(self) -> int:
         """Count total number of requests.
@@ -78,7 +98,7 @@ class RequestOperations(BaseOperations):
             Total number of requests
         """
         stmt = select(Request)
-        return self.session.execute(stmt).scalars().count()
+        return len(list(self.session.execute(stmt).scalars()))
 
     def get_with_packages_and_status(
         self, request_id: int

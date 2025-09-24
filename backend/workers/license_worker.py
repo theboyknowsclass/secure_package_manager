@@ -5,7 +5,7 @@ all business logic to LicenseService.
 """
 
 import logging
-from typing import List
+from typing import List, Optional
 
 from services.license_service import LicenseService
 from workers.base_worker import BaseWorker
@@ -25,7 +25,7 @@ class LicenseWorker(BaseWorker):
 
     def __init__(self, sleep_interval: int = 15):
         super().__init__("LicenseChecker", sleep_interval)
-        self.license_service = None
+        self.license_service: LicenseService
         self.max_license_groups_per_cycle = (
             20  # Process max 20 unique license groups per cycle
         )

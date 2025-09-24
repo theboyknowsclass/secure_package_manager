@@ -6,11 +6,31 @@ from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from ..models import AuditLog
-from .base_operations import BaseOperations
 
 
-class AuditLogOperations(BaseOperations):
+class AuditLogOperations:
     """Database operations for AuditLog entities."""
+
+    def __init__(self, session: Session):
+        """Initialize with a database session.
+
+        Args:
+            session: SQLAlchemy session for database operations
+        """
+        self.session = session
+
+    def create(self, audit_log: AuditLog) -> AuditLog:
+        """Create a new audit log entry.
+
+        Args:
+            audit_log: The audit log to create
+
+        Returns:
+            The created audit log (with ID populated)
+        """
+        self.session.add(audit_log)
+        self.session.flush()
+        return audit_log
 
     def log_action(
         self,
@@ -80,4 +100,15 @@ class AuditLogOperations(BaseOperations):
         Returns:
             List of all audit logs
         """
-        return super().get_all(AuditLog)
+        return list(self.session.query(AuditLog).all())
+
+    def get_by_id(self, audit_log_id: int) -> Optional[AuditLog]:
+        """Get audit log by ID.
+
+        Args:
+            audit_log_id: The ID of the audit log to retrieve
+
+        Returns:
+            The audit log if found, None otherwise
+        """
+        return self.session.get(AuditLog, audit_log_id)

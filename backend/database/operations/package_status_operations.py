@@ -1,17 +1,24 @@
 """Database operations for PackageStatus entities."""
 
 from datetime import datetime
-from typing import Any, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type
 
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from ..models import PackageStatus
-from .base_operations import BaseOperations
 
 
-class PackageStatusOperations(BaseOperations):
+class PackageStatusOperations:
     """Database operations for PackageStatus entities."""
+
+    def __init__(self, session: Session):
+        """Initialize with a database session.
+
+        Args:
+            session: SQLAlchemy session for database operations
+        """
+        self.session = session
 
     def get_by_package_id(self, package_id: int) -> Optional[PackageStatus]:
         """Get package status by package ID.
@@ -68,17 +75,25 @@ class PackageStatusOperations(BaseOperations):
         Returns:
             Number of packages updated
         """
+        # Create update dict with string keys for SQLAlchemy update
+        update_dict: Dict[str, Any] = {
+            'status': new_status,
+            'updated_at': datetime.utcnow(),
+        }
+        
+        # Add valid kwargs (filter to avoid SQLAlchemy type issues)
+        valid_fields = {
+            'license_score', 'security_score', 'license_status', 
+            'security_scan_status', 'publish_status', 'approver_id', 'rejector_id'
+        }
+        for key, value in kwargs.items():
+            if key in valid_fields:
+                update_dict[key] = value
+        
         updated_count = (
             self.session.query(PackageStatus)
             .filter(PackageStatus.package_id.in_(package_ids))
-            .update(
-                {
-                    PackageStatus.status: new_status,
-                    PackageStatus.updated_at: datetime.utcnow(),
-                    **kwargs,
-                },
-                synchronize_session=False,
-            )
+            .update(update_dict, synchronize_session=False)
         )
 
         return updated_count
@@ -127,7 +142,18 @@ class PackageStatusOperations(BaseOperations):
         Returns:
             List of all package statuses
         """
-        return super().get_all(PackageStatus)
+        return list(self.session.query(PackageStatus).all())
+
+    def get_by_id(self, package_status_id: int) -> Optional[PackageStatus]:
+        """Get package status by ID.
+
+        Args:
+            package_status_id: The ID of the package status to retrieve
+
+        Returns:
+            The package status if found, None otherwise
+        """
+        return self.session.get(PackageStatus, package_status_id)
 
     def update_package_publish_status(
         self, package_id: int, publish_status: str
@@ -239,7 +265,7 @@ class PackageStatusOperations(BaseOperations):
         if not status:
             return False
 
-        status.security_score = security_score
+        status.security_score = int(security_score)
         status.updated_at = datetime.utcnow()
         return True
 

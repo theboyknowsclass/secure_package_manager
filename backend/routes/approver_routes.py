@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -16,7 +17,7 @@ from database.operations.package_operations import PackageOperations
 from database.operations.request_package_operations import (
     RequestPackageOperations,
 )
-from database.session_helper import SessionHelper
+from database.service import DatabaseService
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 
@@ -51,8 +52,9 @@ publishing_service = NpmRegistryPublishingService()
 def publish_package(package_id: int) -> ResponseReturnValue:
     """Publish an approved package to the secure repository."""
     try:
-        with SessionHelper.get_session() as db:
-            package_ops = PackageOperations(db.session)
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            package_ops = PackageOperations(session)
             package = package_ops.get_by_id(package_id)
             if not package:
                 return jsonify({"error": "Package not found"}), 404
@@ -83,10 +85,11 @@ def publish_package(package_id: int) -> ResponseReturnValue:
                     f"secure repo"
                 ),
             )
-            with SessionHelper.get_session() as db:
-                audit_ops = AuditLogOperations(db.session)
+            db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+            with db_service.get_session() as session:
+                audit_ops = AuditLogOperations(session)
                 audit_ops.create(audit_log)
-                db.commit()
+                session.commit()
 
             return jsonify({"message": "Package published successfully"})
         else:
@@ -139,10 +142,11 @@ def batch_approve_packages() -> ResponseReturnValue:
                 f"{list(package_ids)}. Reason: {reason}"
             ),
         )
-        with SessionHelper.get_session() as db:
-            audit_ops = AuditLogOperations(db.session)
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            audit_ops = AuditLogOperations(session)
             audit_ops.create(summary_audit_log)
-            db.commit()
+            session.commit()
 
         # Packages are approved immediately and will be published by the
         # background worker
@@ -175,8 +179,9 @@ def batch_approve_packages() -> ResponseReturnValue:
 
     except Exception as e:
         logger.error(f"Batch approve packages error: {str(e)}")
-        with SessionHelper.get_session() as db:
-            db.rollback()
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            session.rollback()
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -223,10 +228,11 @@ def batch_reject_packages() -> ResponseReturnValue:
                 f"{get_authenticated_user().username}. Package IDs: {list(package_ids)}. Reason: {reason}"
             ),
         )
-        with SessionHelper.get_session() as db:
-            audit_ops = AuditLogOperations(db.session)
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            audit_ops = AuditLogOperations(session)
             audit_ops.create(summary_audit_log)
-            db.commit()
+            session.commit()
 
         response_data = {
             "message": "Batch rejection completed",
@@ -243,8 +249,9 @@ def batch_reject_packages() -> ResponseReturnValue:
 
     except Exception as e:
         logger.error(f"Batch reject packages error: {str(e)}")
-        with SessionHelper.get_session() as db:
-            db.rollback()
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            session.rollback()
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -255,8 +262,9 @@ def batch_reject_packages() -> ResponseReturnValue:
 def get_validated_packages() -> ResponseReturnValue:
     """Get all packages ready for admin review (pending approval)"""
     try:
-        with SessionHelper.get_session() as db:
-            package_ops = PackageOperations(db.session)
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            package_ops = PackageOperations(session)
             packages = package_ops.get_pending_approval()
 
         # Handle case when no packages exist
@@ -268,8 +276,9 @@ def get_validated_packages() -> ResponseReturnValue:
         for pkg in packages:
             try:
                 # Get request information for this package
-                with SessionHelper.get_session() as db:
-                    request_package_ops = RequestPackageOperations(db.session)
+                db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+                with db_service.get_session() as session:
+                    request_package_ops = RequestPackageOperations(session)
                     request_packages = request_package_ops.get_by_package_id(
                         pkg.id
                     )
@@ -283,7 +292,9 @@ def get_validated_packages() -> ResponseReturnValue:
                             RequestOperations,
                         )
 
-                        request_ops = RequestOperations(db.session)
+                        request_ops = RequestOperations(session)
+                        if request_package.request_id is None:
+                            continue  # Skip request packages without request ID
                         request_record = request_ops.get_by_id(
                             request_package.request_id
                         )
@@ -304,11 +315,9 @@ def get_validated_packages() -> ResponseReturnValue:
                         "id": pkg.id,
                         "name": pkg.name,
                         "version": pkg.version,
-                        "security_score": pkg.package_status.security_score
-                        or 0,
+                        "security_score": pkg.package_status.security_score or 0,
                         "license_score": pkg.package_status.license_score,
-                        "license_identifier": pkg.license_identifier
-                        or "Unknown",
+                        "license_identifier": pkg.license_identifier or "Unknown",
                         "license_status": pkg.package_status.license_status,
                         "security_scan_status": pkg.package_status.security_scan_status,
                         "type": package_type,
@@ -340,8 +349,9 @@ def _process_package_approval(package_id: int, user: Any, reason: str) -> dict:
         dict: {"success": bool, "error": dict or None}
     """
     try:
-        with SessionHelper.get_session() as db:
-            package_ops = PackageOperations(db.session)
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            package_ops = PackageOperations(session)
             package = package_ops.get_by_id(package_id)
 
             if not package:
@@ -383,9 +393,9 @@ def _process_package_approval(package_id: int, user: Any, reason: str) -> dict:
                     f"{reason}"
                 ),
             )
-            audit_ops = AuditLogOperations(db.session)
+            audit_ops = AuditLogOperations(session)
             audit_ops.create(audit_log)
-            db.commit()
+            session.commit()
 
         return {"success": True, "error": None}
 
@@ -404,8 +414,9 @@ def _process_package_rejection(package_id: int, user: Any, reason: str) -> dict:
         dict: {"success": bool, "error": dict or None}
     """
     try:
-        with SessionHelper.get_session() as db:
-            package_ops = PackageOperations(db.session)
+        db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
+        with db_service.get_session() as session:
+            package_ops = PackageOperations(session)
             package = package_ops.get_by_id(package_id)
 
             if not package:
@@ -447,9 +458,9 @@ def _process_package_rejection(package_id: int, user: Any, reason: str) -> dict:
                     f"{reason}"
                 ),
             )
-            audit_ops = AuditLogOperations(db.session)
+            audit_ops = AuditLogOperations(session)
             audit_ops.create(audit_log)
-            db.commit()
+            session.commit()
 
         return {"success": True, "error": None}
 

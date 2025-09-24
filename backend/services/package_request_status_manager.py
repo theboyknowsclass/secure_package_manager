@@ -5,6 +5,7 @@ statuses based on the states of individual packages within the request.
 """
 
 import logging
+import os
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
@@ -12,7 +13,7 @@ from sqlalchemy.orm import Session
 from database.models import Package, PackageStatus, Request, RequestPackage
 from database.operations.package_operations import PackageOperations
 from database.operations.request_operations import RequestOperations
-from database.session_helper import SessionHelper
+from database.service import DatabaseService
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,10 @@ class PackageRequestStatusManager:
     """Manages package request status updates based on package states."""
 
     def __init__(self, db_session: Any = None) -> None:
+        """Initialize the status manager."""
         self.db = db_session
+        self.database_url = os.getenv("DATABASE_URL", "")
+        self.db_service = DatabaseService(self.database_url)
 
     def update_request_status(self, request_id: int) -> Optional[str]:
         """
@@ -34,8 +38,8 @@ class PackageRequestStatusManager:
         Returns:
             The new status if updated, None if no change needed
         """
-        with SessionHelper.get_session() as db:
-            request_ops = RequestOperations(db.session)
+        with self.db_service.get_session() as session:
+            request_ops = RequestOperations(session)
             request = request_ops.get_by_id(request_id)
         if not request:
             logger.warning(f"Request {request_id} not found")
@@ -108,10 +112,9 @@ class PackageRequestStatusManager:
 
         # Use the existing session if available, otherwise create a new one
         if self.db:
-            session = self.db.session
+            session = self.db
         else:
-            with SessionHelper.get_session() as db:
-                session = db.session
+            with self.db_service.get_session() as session:
                 return self._get_package_counts_by_status_with_session(
                     request_id, session
                 )
@@ -229,7 +232,7 @@ class PackageRequestStatusManager:
         """
         # Use the existing session if available, otherwise create a new one
         if self.db:
-            session = self.db.session
+            session = self.db
             request_ops = RequestOperations(session)
             request = request_ops.get_by_id(request_id)
             if not request:
@@ -252,14 +255,14 @@ class PackageRequestStatusManager:
                 ),
             }
         else:
-            with SessionHelper.get_session() as db:
-                request_ops = RequestOperations(db.session)
+            with self.db_service.get_session() as session:
+                request_ops = RequestOperations(session)
                 request = request_ops.get_by_id(request_id)
                 if not request:
                     return {"error": f"Request {request_id} not found"}
 
                 counts = self._get_package_counts_by_status_with_session(
-                    request_id, db.session
+                    request_id, session
                 )
                 current_status = self._determine_request_status(
                     request_id, request
@@ -311,8 +314,8 @@ class PackageRequestStatusManager:
         Returns:
             List of packages with the specified status
         """
-        with SessionHelper.get_session() as db:
-            request_ops = RequestOperations(db.session)
+        with self.db_service.get_session() as session:
+            request_ops = RequestOperations(session)
             request_obj = request_ops.get_by_id(request_id)
             if not request_obj:
                 return []
@@ -356,8 +359,8 @@ class PackageRequestStatusManager:
         Returns:
             List of packages with the specified security scan status
         """
-        with SessionHelper.get_session() as db:
-            request_ops = RequestOperations(db.session)
+        with self.db_service.get_session() as session:
+            request_ops = RequestOperations(session)
             request_obj = request_ops.get_by_id(request_id)
             if not request_obj:
                 return []

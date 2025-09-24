@@ -6,10 +6,9 @@ from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from ..models import RequestPackage
-from .base_operations import BaseOperations
 
 
-class RequestPackageOperations(BaseOperations):
+class RequestPackageOperations:
     """Database operations for RequestPackage entities."""
 
     def get_by_request_id(self, request_id: int) -> List[RequestPackage]:
@@ -58,6 +57,14 @@ class RequestPackageOperations(BaseOperations):
         )
         return self.session.execute(stmt).scalar_one_or_none() is not None
 
+    def __init__(self, session: Session):
+        """Initialize with a database session.
+
+        Args:
+            session: SQLAlchemy session for database operations
+        """
+        self.session = session
+
     def create_link(
         self, request_id: int, package_id: int, package_type: str = "new"
     ) -> RequestPackage:
@@ -79,15 +86,24 @@ class RequestPackageOperations(BaseOperations):
         self.session.add(link)
         return link
 
-    def get_all(
-        self, model_class: Type[RequestPackage]
-    ) -> List[RequestPackage]:
+    def get_all(self) -> List[RequestPackage]:
         """Get all request-package links.
 
         Returns:
             List of all request-package links
         """
-        return super().get_all(RequestPackage)
+        return list(self.session.query(RequestPackage).all())
+
+    def get_all_for_request(self, request_id: int) -> List[RequestPackage]:
+        """Get all request-package links for a specific request.
+
+        Args:
+            request_id: The ID of the request
+
+        Returns:
+            List of all request-package links for the specified request
+        """
+        return list(self.session.query(RequestPackage).filter(RequestPackage.request_id == request_id).all())
 
     def check_user_access(self, package_id: int, user_id: int) -> bool:
         """Check if user has access to a package through any request.

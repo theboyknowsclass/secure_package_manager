@@ -1,16 +1,16 @@
 """PackageStatus model for tracking package processing status."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from sqlalchemy import (
     BigInteger,
-    Column,
     DateTime,
     ForeignKey,
     Integer,
     String,
 )
+from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base
 
@@ -18,35 +18,35 @@ from .base import Base
 class PackageStatus(Base):
     __tablename__ = "package_status"
 
-    package_id = Column(Integer, ForeignKey("packages.id"), primary_key=True)
-    status = Column(String(50), default="Checking Licence", nullable=False)
-    file_size = Column(BigInteger)
-    checksum = Column(String(255))
-    cache_path = Column(
+    package_id: Mapped[int] = mapped_column(Integer, ForeignKey("packages.id"), primary_key=True)
+    status: Mapped[str] = mapped_column(String(50), default="Checking Licence", nullable=False)
+    file_size: Mapped[Optional[int]] = mapped_column(BigInteger)
+    checksum: Mapped[Optional[str]] = mapped_column(String(255))
+    cache_path: Mapped[Optional[str]] = mapped_column(
         String(500)
     )  # Actual cache directory path where package is stored
-    license_score = Column(Integer)
-    security_score = Column(Integer)
-    security_scan_status = Column(
+    license_score: Mapped[Optional[int]] = mapped_column(Integer)
+    security_score: Mapped[Optional[int]] = mapped_column(Integer)
+    security_scan_status: Mapped[str] = mapped_column(
         String(50), default="pending", nullable=False
     )  # pending, running, completed, failed, skipped
-    license_status = Column(
+    license_status: Mapped[Optional[str]] = mapped_column(
         String(20)
     )  # Primary license status calculated from supported_licenses table
-    approver_id = Column(
+    approver_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True
     )  # User who approved the package
-    rejector_id = Column(
+    rejector_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True
     )  # User who rejected the package
-    published_at = Column(
+    published_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime, nullable=True
     )  # Timestamp when package was successfully published
-    publish_status = Column(
+    publish_status: Mapped[str] = mapped_column(
         String(20), default="pending", nullable=False
     )  # Publishing status: pending, publishing, published, failed
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
@@ -130,4 +130,4 @@ class PackageStatus(Base):
             "Download Failed": "Download Failed",
             "Security Scan Failed": "Security Scan Failed",
         }
-        return stage_mapping.get(self.status, "Unknown")
+        return stage_mapping.get(self.status or "", "Unknown")

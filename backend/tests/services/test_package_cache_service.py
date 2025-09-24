@@ -143,7 +143,7 @@ class TestPackageCacheService(unittest.TestCase):
 
         # Mock tarfile extraction
         mock_tar = Mock()
-        mock_tarfile_open.return_value = mock_tar
+        mock_tarfile_open = Mock(return_value=mock_tar)
 
         # Create the package directory and package.json after extraction
         package_dir = self.cache_service._get_package_cache_path(package)
@@ -173,7 +173,7 @@ class TestPackageCacheService(unittest.TestCase):
         tarball_content = b"fake tarball content"
 
         # Mock tarfile extraction error
-        mock_tarfile_open.side_effect = Exception("Extraction failed")
+        mock_tarfile_open = Mock(side_effect=Exception("Extraction failed"))
 
         result = self.cache_service.store_package_from_tarball(
             package, tarball_content

@@ -33,7 +33,7 @@ def load_test_package_lock(filename: str) -> dict:
     file_path = Path(__file__).parent / ".." / "test_data" / "package_locks" / filename
 
     with open(file_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+        return json.load(f)  # type: ignore[no-any-return]
 
 
 class TestPackageLockParsingService(unittest.TestCase):

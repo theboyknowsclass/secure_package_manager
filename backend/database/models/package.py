@@ -1,39 +1,46 @@
 """Package model for managing npm packages."""
 
-from datetime import datetime
-from typing import Any
+from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, Integer, String, Text
-from sqlalchemy.orm import relationship
+from datetime import datetime
+from typing import Any, List, Optional, TYPE_CHECKING
+
+from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
+
+if TYPE_CHECKING:
+    from .package_status import PackageStatus
+    from .request_package import RequestPackage
+    from .security_scan import SecurityScan
 
 
 class Package(Base):
     __tablename__ = "packages"
 
-    id = Column(Integer, primary_key=True)
-    name = Column(String(255), nullable=False)
-    version = Column(String(100), nullable=False)
-    npm_url = Column(String(500))  # URL from package-lock.json
-    local_path = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    version: Mapped[str] = mapped_column(String(100), nullable=False)
+    npm_url: Mapped[Optional[str]] = mapped_column(String(500))  # URL from package-lock.json
+    local_path: Mapped[Optional[str]] = mapped_column(
         String(500)
     )  # Input field from package-lock.json (readonly)
-    integrity = Column(String(255))  # Integrity hash from package-lock.json
-    license_identifier = Column(
+    integrity: Mapped[Optional[str]] = mapped_column(String(255))  # Integrity hash from package-lock.json
+    license_identifier: Mapped[Optional[str]] = mapped_column(
         String(100)
     )  # SPDX license identifier from package-lock.json
-    license_text = Column(Text)  # Full license text from package-lock.json
-    created_at = Column(DateTime, default=datetime.utcnow)
+    license_text: Mapped[Optional[str]] = mapped_column(Text)  # Full license text from package-lock.json
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    request_packages = relationship(
+    request_packages: Mapped[List["RequestPackage"]] = relationship(
         "RequestPackage", back_populates="package", lazy=True
     )
-    package_status = relationship(
+    package_status: Mapped["PackageStatus"] = relationship(
         "PackageStatus", backref="package", uselist=False, lazy=True
     )
-    security_scans = relationship("SecurityScan", backref="package", lazy=True)
+    security_scans: Mapped[List["SecurityScan"]] = relationship("SecurityScan", backref="package", lazy=True)
 
     def to_dict(self) -> dict[str, Any]:
         return {

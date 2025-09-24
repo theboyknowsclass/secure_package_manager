@@ -164,7 +164,7 @@ class TestDownloadService(unittest.TestCase):
             url, "https://registry.npmjs.org/react/-/react-18.2.0.tgz"
         )
 
-    def test_construct_download_url_ignores_npm_url_different_registry() -> (
+    def test_construct_download_url_ignores_npm_url_different_registry(self) -> (
         None
     ):
         """Test URL construction ignores npm_url when it doesn't match source repository."""
@@ -196,7 +196,7 @@ class TestDownloadService(unittest.TestCase):
         expected_url = "https://registry.npmjs.org/react/-/react-18.2.0.tgz"
         self.assertEqual(url, expected_url)
 
-    def test_construct_download_url_uses_existing_npm_url_scoped_package() -> (
+    def test_construct_download_url_uses_existing_npm_url_scoped_package(self) -> (
         None
     ):
         """Test URL construction uses existing npm_url for scoped packages."""
@@ -215,7 +215,7 @@ class TestDownloadService(unittest.TestCase):
             url, "https://registry.npmjs.org/@babel/core/-/core-7.22.0.tgz"
         )
 
-    def test_construct_download_url_different_npm_and_source_registry() -> (
+    def test_construct_download_url_different_npm_and_source_registry(self) -> (
         None
     ):
         """Test URL construction when npm_url and source_repository_url are different."""
@@ -233,7 +233,7 @@ class TestDownloadService(unittest.TestCase):
         expected_url = "https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz"
         self.assertEqual(url, expected_url)
 
-    def test_construct_download_url_different_npm_and_source_registry_scoped() -> (
+    def test_construct_download_url_different_npm_and_source_registry_scoped(self) -> (
         None
     ):
         """Test URL construction for scoped packages when npm_url and source_repository_url are different."""

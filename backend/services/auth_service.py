@@ -2,16 +2,20 @@ from functools import wraps
 from typing import Any, Callable, Dict, Optional
 
 import jwt
+import os
 from config.constants import JWT_SECRET, OAUTH_AUDIENCE, OAUTH_ISSUER
-from database.models import User
+from database.models.user import User
 from database.operations.user_operations import UserOperations
-from database.session_helper import SessionHelper
-from flask import jsonify, request
+from database.service import DatabaseService
+from flask import jsonify, request as flask_request
+from flask.wrappers import Request as FlaskRequest
 
 
 class AuthService:
     def __init__(self) -> None:
         self.secret_key = JWT_SECRET or ""
+        self.database_url = os.getenv("DATABASE_URL", "")
+        self.db_service = DatabaseService(self.database_url)
 
     def generate_token(self, user: User) -> str:
         """Generate JWT token for user."""
@@ -100,8 +104,8 @@ class AuthService:
             logger.error("No username found in OAuth2 token payload")
             return None
 
-        with SessionHelper.get_session() as db:
-            user_ops = UserOperations(db.session)
+        with self.db_service.get_session() as session:
+            user_ops = UserOperations(session)
             user = user_ops.get_by_username(username)
             if not user:
                 user = self._create_user_from_oauth2_payload(
@@ -126,8 +130,8 @@ class AuthService:
             logger.error("No user_id found in legacy token payload")
             return None
 
-        with SessionHelper.get_session() as db:
-            user_ops = UserOperations(db.session)
+        with self.db_service.get_session() as session:
+            user_ops = UserOperations(session)
             user = user_ops.get_by_id(user_id)
             if user:
                 logger.info(
@@ -196,8 +200,8 @@ class AuthService:
             token = None
 
             # Get token from header
-            if "Authorization" in request.headers:
-                auth_header = request.headers["Authorization"]
+            if "Authorization" in flask_request.headers:
+                auth_header = flask_request.headers["Authorization"]
                 try:
                     token = auth_header.split(" ")[1]
                 except IndexError:
@@ -221,7 +225,7 @@ class AuthService:
                 return jsonify({"error": "Invalid or expired token"}), 401
 
             # Add user to request context
-            request.user = user
+            flask_request.user = user  # type: ignore[attr-defined]
 
             try:
                 result = f(*args, **kwargs)
@@ -246,7 +250,7 @@ class AuthService:
                     return auth_result
 
             # Check if user is admin
-            if not request.user.is_admin():
+            if not flask_request.user.is_admin():  # type: ignore[attr-defined]
                 return jsonify({"error": "Admin privileges required"}), 403
 
             return f(*args, **kwargs)
@@ -267,7 +271,7 @@ class AuthService:
                     return auth_result
 
             # Check if user is approver or admin
-            if not (request.user.role in ["approver", "admin"]):
+            if not (flask_request.user.role in ["approver", "admin"]):  # type: ignore[attr-defined]
                 return (
                     jsonify(
                         {"error": "Approver or Admin privileges required"}
@@ -294,7 +298,7 @@ class AuthService:
                         return auth_result
 
                 # Check if user has permission
-                if not request.user.has_permission(permission):
+                if not flask_request.user.has_permission(permission):  # type: ignore[attr-defined]
                     return (
                         jsonify(
                             {"error": f"Permission required: {permission}"}
