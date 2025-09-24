@@ -1,6 +1,6 @@
 # Backend Tests
 
-This directory contains comprehensive test suites for the Secure Package Manager backend.
+This directory contains comprehensive test suites for the Secure Package Manager backend services.
 
 ## Test Structure
 
@@ -8,7 +8,6 @@ This directory contains comprehensive test suites for the Secure Package Manager
 backend/tests/
 ├── README.md                           # This file
 ├── run_backend_tests.py               # Main test runner for all backend tests
-├── run_worker_tests.py                # Worker-specific test runner
 ├── __init__.py                        # Test package initialization
 ├── test_data/                         # Test data files
 │   ├── __init__.py
@@ -19,12 +18,13 @@ backend/tests/
 │       ├── invalid_version.json       # Invalid lockfile version (v1)
 │       ├── missing_lockfile_version.json # Missing lockfile version
 │       └── empty_packages.json        # App with no dependencies
-├── workers/                           # Worker module unit tests
+├── services/                          # Service module tests
 │   ├── __init__.py
-│   └── test_parse_worker.py           # ✅ ParseWorker unit tests (12 tests)
-├── test_license_service.py            # License service tests
-├── test_license_integration.py        # License integration tests
-├── test_npm_license_formats.py        # NPM license format tests
+│   ├── test_download_service.py       # DownloadService tests
+│   ├── test_license_service.py        # LicenseService unit tests
+│   ├── test_license_service_integration.py # LicenseService integration tests
+│   ├── test_package_cache_service.py  # PackageCacheService tests
+│   └── test_package_lock_parsing_service.py # PackageLockParsingService tests
 └── test_scoped_package_parsing.py     # Scoped package parsing tests
 ```
 
@@ -36,130 +36,97 @@ cd backend/tests
 python run_backend_tests.py
 ```
 
-### Run Worker Unit Tests Only
-```bash
-cd backend/tests
-python run_worker_tests.py
-```
-
 ### Run Specific Test File
 ```bash
 cd backend/tests
-python run_backend_tests.py workers/test_parse_worker_standalone.py
+python run_backend_tests.py services/test_download_service.py
 ```
 
 ## Test Categories
 
-### 🚀 Worker Tests (`workers/`)
+### 🔧 Service Tests (`services/`)
 
-**ParseWorker Tests** - Test package-lock.json parsing and validation:
+**DownloadService Tests** - Test package downloading functionality:
+- **`test_download_service.py`** - URL construction, download logic, registry handling
 
-- **`test_parse_worker.py`** ✅ **12 passing tests**
-  - **Validation Tests**: package-lock.json validation logic using real files
-  - **Extraction Tests**: Package extraction from JSON using real files
-  - **Name Parsing Tests**: Package name extraction from paths using real files
-  - **Edge Cases**: Tests invalid versions, missing fields, empty packages
-  - **Real Scenarios**: Tests scoped packages, duplicate packages, complex structures
-  - **No Dependencies**: Runs without Flask app setup
-  - **Real Data**: Uses actual package-lock.json files from `test_data/package_locks/`
+**LicenseService Tests** - Test license validation and processing:
+- **`test_license_service.py`** - Unit tests for license processing methods
+- **`test_license_service_integration.py`** - Integration tests for license workflows
 
-**Usage:**
-```bash
-# Run all worker unit tests (fast, no dependencies)
-python run_worker_tests.py
-```
+**PackageCacheService Tests** - Test local package caching:
+- **`test_package_cache_service.py`** - Cache storage, retrieval, management
 
-### 📄 License Tests
+**PackageLockParsingService Tests** - Test package-lock.json parsing:
+- **`test_package_lock_parsing_service.py`** - JSON parsing, validation, extraction
 
-- **`test_license_service.py`** - License validation service tests
-- **`test_license_integration.py`** - License integration tests  
-- **`test_npm_license_formats.py`** - NPM license format parsing tests
-- **`test_scoped_package_parsing.py`** - Scoped package parsing tests
+### 📄 Package Parsing Tests
+- **`test_scoped_package_parsing.py`** - Scoped package name extraction and parsing
 
 ## Test Runners
 
 ### `run_backend_tests.py`
-- **Purpose**: Main test runner for all backend tests
+- **Purpose**: Main test runner for all backend service tests
 - **Usage**: `python run_backend_tests.py [test_file]`
 - **Features**: 
   - Discovers all `test_*.py` files
   - Can run specific test files
   - Verbose output with pass/fail summary
 
-### `run_worker_tests.py`
-- **Purpose**: Worker unit test runner
-- **Usage**: `python run_worker_tests.py` - Run all worker unit tests
-- **Features**:
-  - Focused on worker module unit tests
-  - Fast execution with no dependencies
-  - No environment setup required
-
 ## Development Workflow
 
-### For ParseWorker Development:
-1. **Unit Testing**: `python run_worker_tests.py` (fast, no dependencies)
-2. **All Tests**: `python run_backend_tests.py`
-
-### For License Service Development:
-1. **License Tests**: `python run_backend_tests.py test_license_service.py`
-2. **All Tests**: `python run_backend_tests.py`
+### For Service Development:
+1. **Run All Tests**: `python run_backend_tests.py`
+2. **Run Specific Service**: `python run_backend_tests.py services/test_<service_name>.py`
 
 ## Test Requirements
 
-### Unit Tests (No Setup Required)
-- ✅ `test_parse_worker.py` - 12 tests
-- Pure unit tests with no external dependencies
-- Fast execution, perfect for development
-- Use real package-lock.json files for testing
+### Environment Setup Required
+- **Database URL**: Tests require `DATABASE_URL` environment variable
+- **Dependencies**: All service dependencies must be available
+- **Test Data**: Uses real package-lock.json files for testing
 
-### Other Tests (May Require Setup)
-- License service tests
-- NPM license format tests
-- Scoped package parsing tests
+### Test Data
+- Tests use realistic package-lock.json structures from `test_data/package_locks/`
+- Covers various scenarios: simple apps, scoped packages, edge cases
 
 ## Best Practices
 
-1. **Start with Unit Tests**: Use `python run_worker_tests.py` for quick development feedback
-2. **Test Coverage**: Each module has comprehensive test coverage
+1. **Service Focus**: Tests focus on service functionality rather than worker orchestration
+2. **Test Coverage**: Each service has comprehensive test coverage
 3. **Isolation**: Tests are independent and don't rely on external state
 4. **Realistic Data**: Tests use realistic package-lock.json structures
 5. **Error Scenarios**: Both happy path and error conditions are tested
 
 ## Adding New Tests
 
-### For Worker Modules:
-1. Create test file in `workers/` directory
-2. Follow naming convention: `test_<module_name>.py`
-3. Use `Test<ClassName>` for test classes
-4. Add to `run_worker_tests.py` if needed
-
-### For Other Modules:
-1. Create test file in root `tests/` directory
-2. Follow same naming conventions
-3. Tests will be automatically discovered by `run_backend_tests.py`
+### For Service Modules:
+1. Create test file in `services/` directory
+2. Follow naming convention: `test_<service_name>.py`
+3. Use `Test<ServiceClassName>` for test classes
+4. Tests will be automatically discovered by `run_backend_tests.py`
 
 ## Troubleshooting
 
 ### Environment Issues:
-- Worker unit tests require no environment setup
-- Check that all required environment variables are set for other tests
-- Ensure database is running for integration tests
+- Set `DATABASE_URL` environment variable (e.g., `sqlite:///./test.db`)
+- Ensure all service dependencies are installed
+- Check that required environment variables are set
 
 ### Import Issues:
-- Unit tests don't require Flask app setup
-- Other tests require proper Python path configuration
+- Tests require proper Python path configuration
+- Services must be importable from the backend directory
 - Check that all dependencies are installed
 
 ## Test Results
 
 ### Current Status:
-- ✅ **12/12** ParseWorker unit tests passing
-- ✅ License service tests passing
-- ✅ NPM license format tests passing
-- ✅ Scoped package parsing tests passing
+- Service tests require proper environment setup
+- Tests focus on core service functionality
+- Database configuration needed for full test execution
 
 ### Coverage:
-- **ParseWorker**: Validation, extraction, name parsing, integration scenarios
-- **License Service**: Various license formats, complex expressions
-- **Package Parsing**: Scoped packages, edge cases
-- **Integration**: End-to-end workflows
+- **DownloadService**: URL construction, registry handling, download logic
+- **LicenseService**: License validation, processing, complex expressions
+- **PackageCacheService**: Cache operations, storage, retrieval
+- **PackageLockParsingService**: JSON parsing, validation, package extraction
+- **Package Parsing**: Scoped packages, edge cases, name extraction

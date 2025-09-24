@@ -37,17 +37,21 @@ class DatabaseService:
             # Create engine with appropriate configuration
             engine_kwargs: Dict[str, Any] = {
                 "echo": self.echo,
-                "pool_pre_ping": True,  # Verify connections before use
-                "pool_recycle": 3600,  # Recycle connections every hour
-                "pool_size": 5,  # Number of connections to maintain in pool
-                "max_overflow": 10,  # Additional connections beyond pool_size
-                "pool_timeout": 30,  # Seconds to wait for connection from pool
             }
 
             # Use StaticPool for SQLite, regular pool for PostgreSQL
             if self.database_url.startswith("sqlite"):
                 engine_kwargs["poolclass"] = StaticPool
                 engine_kwargs["connect_args"] = {"check_same_thread": False}
+            else:
+                # PostgreSQL pool settings
+                engine_kwargs.update({
+                    "pool_pre_ping": True,  # Verify connections before use
+                    "pool_recycle": 3600,  # Recycle connections every hour
+                    "pool_size": 5,  # Number of connections to maintain in pool
+                    "max_overflow": 10,  # Additional connections beyond pool_size
+                    "pool_timeout": 30,  # Seconds to wait for connection from pool
+                })
 
             self._engine = create_engine(self.database_url, **engine_kwargs)
             self._SessionLocal = sessionmaker(bind=self._engine)

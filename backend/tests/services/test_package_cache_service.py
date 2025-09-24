@@ -129,10 +129,10 @@ class TestPackageCacheService(unittest.TestCase):
         result = self.cache_service.get_package_path(package)
 
         expected_path = package_dir / "package"
-        self.assertEqual(result, expected_path)
+        self.assertEqual(str(result), str(expected_path))
 
     @patch("tarfile.open")
-    def test_store_package_from_tarball_success(self) -> None:
+    def test_store_package_from_tarball_success(self, mock_tarfile_open) -> None:
         """Test storing package from tarball successfully."""
         package = Mock()
         package.name = "test-package"
@@ -143,7 +143,7 @@ class TestPackageCacheService(unittest.TestCase):
 
         # Mock tarfile extraction
         mock_tar = Mock()
-        mock_tarfile_open = Mock(return_value=mock_tar)
+        mock_tarfile_open.return_value = mock_tar
 
         # Create the package directory and package.json after extraction
         package_dir = self.cache_service._get_package_cache_path(package)
@@ -163,7 +163,7 @@ class TestPackageCacheService(unittest.TestCase):
         mock_tar.extractall.assert_called_once()
 
     @patch("tarfile.open")
-    def test_store_package_from_tarball_extraction_error(self) -> None:
+    def test_store_package_from_tarball_extraction_error(self, mock_tarfile_open) -> None:
         """Test storing package from tarball with extraction error."""
         package = Mock()
         package.name = "test-package"
@@ -173,7 +173,7 @@ class TestPackageCacheService(unittest.TestCase):
         tarball_content = b"fake tarball content"
 
         # Mock tarfile extraction error
-        mock_tarfile_open = Mock(side_effect=Exception("Extraction failed"))
+        mock_tarfile_open.side_effect = Exception("Extraction failed")
 
         result = self.cache_service.store_package_from_tarball(
             package, tarball_content
@@ -258,7 +258,7 @@ class TestPackageCacheService(unittest.TestCase):
         self.assertEqual(len(packages), 1)
         self.assertEqual(packages[0]["name"], "test")
         self.assertEqual(packages[0]["version"], "1.0.0")
-        self.assertEqual(packages[0]["path"], package_dir)
+        self.assertEqual(str(packages[0]["path"]), str(package_dir))
 
 
 if __name__ == "__main__":

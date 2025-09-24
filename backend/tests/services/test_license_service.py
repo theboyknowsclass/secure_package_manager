@@ -1,6 +1,6 @@
-"""Unit tests for the optimized LicenseService.
+"""Unit tests for the LicenseService.
 
-Tests the new 3-phase pattern implementation with proper data validation.
+Tests the license service implementation with proper data validation.
 """
 
 from typing import Any, Dict, List, Union
@@ -10,8 +10,8 @@ import pytest
 from services.license_service import LicenseService
 
 
-class TestLicenseServiceOptimized:
-    """Test suite for the optimized LicenseService."""
+class TestLicenseService:
+    """Test suite for the LicenseService."""
 
     def setup_method(self) -> None:
         """Set up test fixtures."""

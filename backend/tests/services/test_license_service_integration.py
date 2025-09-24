@@ -1,4 +1,4 @@
-"""Integration tests for the optimized LicenseService.
+"""Integration tests for the LicenseService.
 
 Tests the complete license workflow end-to-end with real database interactions.
 """
@@ -11,7 +11,7 @@ from services.license_service import LicenseService
 
 
 class TestLicenseServiceIntegration:
-    """Integration test suite for the optimized LicenseService."""
+    """Integration test suite for the LicenseService."""
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
