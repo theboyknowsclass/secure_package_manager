@@ -1,6 +1,6 @@
 """Database operations for SupportedLicense entities."""
 
-from typing import List, Optional, Type
+from typing import List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -49,9 +49,7 @@ class SupportedLicenseOperations:
         Returns:
             The supported license if found, None otherwise
         """
-        stmt = select(SupportedLicense).where(
-            SupportedLicense.identifier == identifier
-        )
+        stmt = select(SupportedLicense).where(SupportedLicense.identifier == identifier)
         return self.session.execute(stmt).scalar_one_or_none()
 
     def get_by_status(self, status: str) -> List[SupportedLicense]:
@@ -63,9 +61,7 @@ class SupportedLicenseOperations:
         Returns:
             List of supported licenses with the specified status
         """
-        stmt = select(SupportedLicense).where(
-            SupportedLicense.status == status
-        )
+        stmt = select(SupportedLicense).where(SupportedLicense.status == status)
         return list(self.session.execute(stmt).scalars().all())
 
     def get_allowed_licenses(self) -> List[SupportedLicense]:

@@ -7,8 +7,6 @@ changing callers.
 
 import logging
 import os
-from datetime import datetime
-from typing import Optional
 
 from database.models import PackageStatus
 from database.operations.package_status_operations import (
@@ -33,18 +31,14 @@ class QueueInterface:
                 status_ops = PackageStatusOperations(session)
                 status = status_ops.get_by_package_id(package_id)
                 if not status:
-                    logger.warning(
-                        f"advance_status: no PackageStatus for package_id={package_id}"
-                    )
+                    logger.warning(f"advance_status: no PackageStatus for package_id={package_id}")
                     return False
 
                 prev_status = status.status
                 success = status_ops.update_status(package_id, next_status)
                 if success:
                     session.commit()
-                    logger.info(
-                        f"Status advanced: package_id={package_id} {prev_status} -> {next_status}"
-                    )
+                    logger.info(f"Status advanced: package_id={package_id} {prev_status} -> {next_status}")
                     return True
                 return False
         except Exception as e:

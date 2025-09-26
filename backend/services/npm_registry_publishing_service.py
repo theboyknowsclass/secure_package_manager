@@ -26,9 +26,7 @@ class NpmRegistryPublishingService:
     """Service for publishing packages to secure repository."""
 
     def __init__(self) -> None:
-        self.target_repo_url = os.getenv(
-            "TARGET_REPOSITORY_URL", TARGET_REPOSITORY_URL
-        )
+        self.target_repo_url = os.getenv("TARGET_REPOSITORY_URL", TARGET_REPOSITORY_URL)
 
     def publish_to_secure_repo(self, package: Package) -> bool:
         """Publish package to secure repository using direct HTTP API.
@@ -41,13 +39,9 @@ class NpmRegistryPublishingService:
         """
         try:
             if not self.target_repo_url:
-                raise ValueError(
-                    "TARGET_REPOSITORY_URL environment variable is required"
-                )
+                raise ValueError("TARGET_REPOSITORY_URL environment variable is required")
 
-            logger.info(
-                f"Publishing {package.name}@{package.version} to repository at {self.target_repo_url}"
-            )
+            logger.info(f"Publishing {package.name}@{package.version} to repository at {self.target_repo_url}")
 
             # Create package tarball
             tarball_path = self._create_package_tarball(package)
@@ -65,9 +59,7 @@ class NpmRegistryPublishingService:
             return success
 
         except Exception as e:
-            logger.error(
-                f"Error publishing package {package.name}@{package.version}: {str(e)}"
-            )
+            logger.error(f"Error publishing package {package.name}@{package.version}: {str(e)}")
             return False
 
     def _create_package_tarball(self, package: Package) -> Optional[str]:
@@ -102,11 +94,7 @@ class NpmRegistryPublishingService:
                     tar.add(
                         temp_dir,
                         arcname="package",
-                        filter=lambda tarinfo: (
-                            None
-                            if tarinfo.name == tarball_path.name
-                            else tarinfo
-                        ),
+                        filter=lambda tarinfo: (None if tarinfo.name == tarball_path.name else tarinfo),
                     )
 
                 # Move tarball to a permanent location
@@ -116,9 +104,7 @@ class NpmRegistryPublishingService:
                 return str(permanent_path)
 
         except Exception as e:
-            logger.error(
-                f"Error creating tarball for {package.name}@{package.version}: {str(e)}"
-            )
+            logger.error(f"Error creating tarball for {package.name}@{package.version}: {str(e)}")
             return None
 
     def _create_package_json(self, package: Package) -> dict:
@@ -146,9 +132,7 @@ class NpmRegistryPublishingService:
             f.write("module.exports = {\n")
             f.write(f'  name: "{package.name}",\n')
             f.write(f'  version: "{package.version}",\n')
-            f.write(
-                '  description: "This package has been validated and approved by the Secure Package Manager"\n'
-            )
+            f.write('  description: "This package has been validated and approved by the Secure Package Manager"\n')
             f.write("};\n")
 
     def _create_readme(self, package: Package, temp_dir: str) -> None:
@@ -157,19 +141,11 @@ class NpmRegistryPublishingService:
         with open(readme_path, "w") as f:
             f.write(f"# {package.name}\n\n")
             f.write(f"Version: {package.version}\n\n")
-            f.write(
-                "This package has been validated and approved by the Secure Package Manager.\n\n"
-            )
+            f.write("This package has been validated and approved by the Secure Package Manager.\n\n")
             f.write("## Security Information\n\n")
-            f.write(
-                f'- Security Score: {package.package_status.security_score if package.package_status else "N/A"}\n'
-            )
+            f.write(f'- Security Score: {package.package_status.security_score if package.package_status else "N/A"}\n')
             f.write(f'- License: {package.license_identifier or "N/A"}\n')
-            f.write(
-                (
-                    f"- Status: {package.package_status.status if package.package_status else 'N/A'}\n"
-                )
-            )
+            f.write((f"- Status: {package.package_status.status if package.package_status else 'N/A'}\n"))
 
     def _upload_to_registry(self, package: Package, tarball_path: str) -> bool:
         """Upload package to npm registry using direct HTTP API.
@@ -191,9 +167,7 @@ class NpmRegistryPublishingService:
             encoded_package_name = quote(package.name, safe="")
 
             # Create the npm publish payload
-            publish_payload = self._create_publish_payload(
-                package, tarball_b64, tarball_data
-            )
+            publish_payload = self._create_publish_payload(package, tarball_b64, tarball_data)
 
             # Upload to registry
             registry_url = self.target_repo_url.rstrip("/")
@@ -208,25 +182,17 @@ class NpmRegistryPublishingService:
             )
 
             if response.status_code in [200, 201]:
-                logger.info(
-                    f"Successfully published {package.name}@{package.version} to secure repository"
-                )
+                logger.info(f"Successfully published {package.name}@{package.version} to secure repository")
                 return True
             else:
-                logger.error(
-                    f"Failed to publish package: {response.status_code} - {response.text}"
-                )
+                logger.error(f"Failed to publish package: {response.status_code} - {response.text}")
                 return False
 
         except Exception as e:
-            logger.error(
-                f"Failed to publish package via direct HTTP: {str(e)}"
-            )
+            logger.error(f"Failed to publish package via direct HTTP: {str(e)}")
             return False
 
-    def _create_publish_payload(
-        self, package: Package, tarball_b64: str, tarball_data: bytes
-    ) -> dict:
+    def _create_publish_payload(self, package: Package, tarball_b64: str, tarball_data: bytes) -> dict:
         """Create the npm publish payload."""
         # Sanitize package name for filesystem (replace @ and / with -)
         safe_name = package.name.replace("@", "").replace("/", "-")

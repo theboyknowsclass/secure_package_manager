@@ -8,7 +8,7 @@ cd backend
 
 # Run flake8 for syntax and style checking
 echo "Running flake8..."
-python -m flake8 . --max-line-length=79 --extend-ignore=E203,W503
+python -m flake8 . --max-line-length=130 --extend-ignore=E203,W503
 
 if [ $? -ne 0 ]; then
     echo "Flake8 found issues!"

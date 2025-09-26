@@ -19,9 +19,7 @@ class PackageOperations:
         """
         self.session = session
 
-    def get_by_name_version(
-        self, name: str, version: str
-    ) -> Optional[Package]:
+    def get_by_name_version(self, name: str, version: str) -> Optional[Package]:
         """Get package by name and version.
 
         Args:
@@ -31,9 +29,7 @@ class PackageOperations:
         Returns:
             The package if found, None otherwise
         """
-        stmt = select(Package).where(
-            and_(Package.name == name, Package.version == version)
-        )
+        stmt = select(Package).where(and_(Package.name == name, Package.version == version))
         return self.session.execute(stmt).scalar_one_or_none()
 
     def get_by_status(self, status: str) -> List[Package]:
@@ -82,9 +78,7 @@ class PackageOperations:
         """
         from datetime import datetime, timedelta
 
-        stuck_threshold = datetime.utcnow() - timedelta(
-            minutes=timeout_minutes
-        )
+        stuck_threshold = datetime.utcnow() - timedelta(minutes=timeout_minutes)
 
         stmt = (
             select(Package)
@@ -105,9 +99,7 @@ class PackageOperations:
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def create_with_status(
-        self, package_data: dict, status: str = "Checking Licence"
-    ) -> Package:
+    def create_with_status(self, package_data: dict, status: str = "Checking Licence") -> Package:
         """Create a package with initial status.
 
         Args:
@@ -159,9 +151,7 @@ class PackageOperations:
         self.session.flush()
         return True
 
-    def batch_create_with_status(
-        self, packages_data: List[dict], status: str = "Checking Licence"
-    ) -> List[Package]:
+    def batch_create_with_status(self, packages_data: List[dict], status: str = "Checking Licence") -> List[Package]:
         """Create multiple packages with initial status.
 
         Args:
@@ -219,9 +209,7 @@ class PackageOperations:
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_stuck_packages_in_publishing(
-        self, stuck_threshold: int
-    ) -> List[Package]:
+    def get_stuck_packages_in_publishing(self, stuck_threshold: int) -> List[Package]:
         """Get packages stuck in publishing state.
 
         Args:
@@ -243,9 +231,7 @@ class PackageOperations:
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_packages_by_publish_status(
-        self, publish_status: str
-    ) -> List[Package]:
+    def get_packages_by_publish_status(self, publish_status: str) -> List[Package]:
         """Get packages by publish status.
 
         Args:
@@ -271,11 +257,7 @@ class PackageOperations:
         Returns:
             Number of packages with the specified publish status
         """
-        stmt = (
-            select(Package)
-            .join(PackageStatus)
-            .where(PackageStatus.publish_status == publish_status)
-        )
+        stmt = select(Package).join(PackageStatus).where(PackageStatus.publish_status == publish_status)
         return len(list(self.session.execute(stmt).scalars()))
 
     def count_packages_by_status(self, status: str) -> int:
@@ -287,16 +269,10 @@ class PackageOperations:
         Returns:
             Number of packages with the specified status
         """
-        stmt = (
-            select(Package)
-            .join(PackageStatus)
-            .where(PackageStatus.status == status)
-        )
+        stmt = select(Package).join(PackageStatus).where(PackageStatus.status == status)
         return len(list(self.session.execute(stmt).scalars()))
 
-    def get_stuck_packages_in_security_scanned(
-        self, stuck_threshold: int
-    ) -> List[Package]:
+    def get_stuck_packages_in_security_scanned(self, stuck_threshold: int) -> List[Package]:
         """Get packages stuck in Security Scanned state.
 
         Args:
@@ -318,9 +294,7 @@ class PackageOperations:
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_stuck_packages_in_security_scanning(
-        self, stuck_threshold: int
-    ) -> List[Package]:
+    def get_stuck_packages_in_security_scanning(self, stuck_threshold: int) -> List[Package]:
         """Get packages stuck in Security Scanning state.
 
         Args:
@@ -342,9 +316,7 @@ class PackageOperations:
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_stuck_packages_in_downloading(
-        self, stuck_threshold: int
-    ) -> List[Package]:
+    def get_stuck_packages_in_downloading(self, stuck_threshold: int) -> List[Package]:
         """Get packages stuck in Downloading state.
 
         Args:
@@ -366,9 +338,7 @@ class PackageOperations:
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_packages_needing_license_check(
-        self, limit: int | None = None
-    ) -> List[Package]:
+    def get_packages_needing_license_check(self, limit: int | None = None) -> List[Package]:
         """Get packages that need license checking.
 
         Args:
@@ -387,9 +357,7 @@ class PackageOperations:
             stmt = stmt.limit(limit)
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_stuck_packages_in_license_checking(
-        self, stuck_threshold: int
-    ) -> List[Package]:
+    def get_stuck_packages_in_license_checking(self, stuck_threshold: int) -> List[Package]:
         """Get packages stuck in license checking state.
 
         Args:
@@ -444,9 +412,7 @@ class PackageOperations:
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_with_security_scan_info(
-        self, package_id: int
-    ) -> Optional[Package]:
+    def get_with_security_scan_info(self, package_id: int) -> Optional[Package]:
         """Get package with security scan information.
 
         Args:
@@ -457,11 +423,7 @@ class PackageOperations:
         """
         from ..models import SecurityScan
 
-        stmt = (
-            select(Package)
-            .outerjoin(SecurityScan)
-            .where(Package.id == package_id)
-        )
+        stmt = select(Package).outerjoin(SecurityScan).where(Package.id == package_id)
         return self.session.execute(stmt).scalar_one_or_none()
 
     def count_by_license(self, license_identifier: str) -> int:
@@ -473,14 +435,10 @@ class PackageOperations:
         Returns:
             Number of packages with the specified license
         """
-        stmt = select(Package).where(
-            Package.license_identifier == license_identifier
-        )
+        stmt = select(Package).where(Package.license_identifier == license_identifier)
         return len(list(self.session.execute(stmt).scalars()))
 
-    def get_packages_with_context_and_scans(
-        self, request_id: int
-    ) -> List[tuple]:
+    def get_packages_with_context_and_scans(self, request_id: int) -> List[tuple]:
         """Get packages with their request context and security scan info.
 
         Args:
@@ -494,12 +452,8 @@ class PackageOperations:
         from ..models import RequestPackage, SecurityScan
 
         # First, get all request_packages for this request
-        request_package_stmt = select(RequestPackage).where(
-            RequestPackage.request_id == request_id
-        )
-        request_packages = (
-            self.session.execute(request_package_stmt).scalars().all()
-        )
+        request_package_stmt = select(RequestPackage).where(RequestPackage.request_id == request_id)
+        request_packages = self.session.execute(request_package_stmt).scalars().all()
 
         if not request_packages:
             return []
@@ -509,10 +463,7 @@ class PackageOperations:
 
         # Get all packages in one query
         packages_stmt = select(Package).where(Package.id.in_(package_ids))
-        packages = {
-            pkg.id: pkg
-            for pkg in self.session.execute(packages_stmt).scalars().all()
-        }
+        packages = {pkg.id: pkg for pkg in self.session.execute(packages_stmt).scalars().all()}
 
         # Get latest security scans for all packages in one query
         latest_scans_stmt = select(SecurityScan).where(
@@ -523,10 +474,7 @@ class PackageOperations:
                 .group_by(SecurityScan.package_id)
             ),
         )
-        latest_scans = {
-            scan.package_id: scan
-            for scan in self.session.execute(latest_scans_stmt).scalars().all()
-        }
+        latest_scans = {scan.package_id: scan for scan in self.session.execute(latest_scans_stmt).scalars().all()}
 
         # Build results maintaining order
         results = []

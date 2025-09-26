@@ -7,7 +7,7 @@ from I/O work for optimal performance.
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from database.operations.package_operations import PackageOperations
 from database.operations.package_status_operations import (
@@ -46,9 +46,7 @@ class PublishingService:
         """
         try:
             # Phase 1: Get package data (short DB session)
-            packages_to_process = self._get_packages_for_publishing(
-                max_packages
-            )
+            packages_to_process = self._get_packages_for_publishing(max_packages)
             if not packages_to_process:
                 return {
                     "success": True,
@@ -86,9 +84,7 @@ class PublishingService:
             package_ops = PackageOperations(session)
             return package_ops.get_packages_needing_publishing(max_packages)
 
-    def _perform_publish_batch(
-        self, packages: List[Any]
-    ) -> List[Tuple[Any, Dict[str, Any]]]:
+    def _perform_publish_batch(self, packages: List[Any]) -> List[Tuple[Any, Dict[str, Any]]]:
         """Perform publishing without database sessions.
 
         Args:
@@ -125,14 +121,10 @@ class PublishingService:
                 return {"status": "failed", "error": "Publishing failed"}
 
         except Exception as e:
-            self.logger.error(
-                f"Error publishing package {package.name}@{package.version}: {str(e)}"
-            )
+            self.logger.error(f"Error publishing package {package.name}@{package.version}: {str(e)}")
             return {"status": "failed", "error": str(e)}
 
-    def _update_publish_results(
-        self, publish_results: List[Tuple[Any, Dict[str, Any]]]
-    ) -> Dict[str, Any]:
+    def _update_publish_results(self, publish_results: List[Tuple[Any, Dict[str, Any]]]) -> Dict[str, Any]:
         """Update database with publish results (short DB session).
 
         Args:
@@ -167,18 +159,14 @@ class PublishingService:
                         failed_count += 1
 
                 except Exception as e:
-                    self.logger.error(
-                        f"Error updating package {package.name}@{package.version}: {str(e)}"
-                    )
+                    self.logger.error(f"Error updating package {package.name}@{package.version}: {str(e)}")
                     failed_count += 1
 
             session.commit()
 
         # Log batch summary
         if successful_count > 0 or failed_count > 0:
-            self.logger.info(
-                f"Publishing batch complete: {successful_count} successful, {failed_count} failed"
-            )
+            self.logger.info(f"Publishing batch complete: {successful_count} successful, {failed_count} failed")
 
         return {
             "success": True,
@@ -198,18 +186,10 @@ class PublishingService:
                 package_ops = PackageOperations(session)
 
                 # Get package counts by status
-                approved_count = package_ops.count_packages_by_status(
-                    "Approved"
-                )
-                publishing_count = package_ops.count_packages_by_status(
-                    "Publishing"
-                )
-                published_count = package_ops.count_packages_by_status(
-                    "Published"
-                )
-                publish_failed_count = package_ops.count_packages_by_status(
-                    "Publish Failed"
-                )
+                approved_count = package_ops.count_packages_by_status("Approved")
+                publishing_count = package_ops.count_packages_by_status("Publishing")
+                published_count = package_ops.count_packages_by_status("Published")
+                publish_failed_count = package_ops.count_packages_by_status("Publish Failed")
 
                 return {
                     "approved_packages": approved_count,
@@ -251,9 +231,7 @@ class PublishingService:
                             status_ops.update_status(package.id, "Approved")
                             retried_count += 1
                     except Exception as e:
-                        self.logger.error(
-                            f"Error retrying package {package.name}@{package.version}: {str(e)}"
-                        )
+                        self.logger.error(f"Error retrying package {package.name}@{package.version}: {str(e)}")
 
                 session.commit()
 
@@ -286,7 +264,5 @@ class PublishingService:
             publishing_service = NpmRegistryPublishingService()
             return publishing_service.publish_to_secure_repo(package)
         except Exception as e:
-            self.logger.error(
-                f"Error publishing package to repository: {str(e)}"
-            )
+            self.logger.error(f"Error publishing package to repository: {str(e)}")
             return False

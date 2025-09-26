@@ -4,8 +4,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from database.models import User
-
-from database.models import User
 from database.operations.user_operations import UserOperations
 from database.service import DatabaseService
 from flask import Blueprint, jsonify, request
@@ -34,9 +32,7 @@ def login() -> ResponseReturnValue:
     """Login endpoint - integrates with mock-idp service in dev, ADFS in
     production"""
     try:
-        logger.info(
-            f"Login request received. Content-Type: {request.content_type}"
-        )
+        logger.info(f"Login request received. Content-Type: {request.content_type}")
         logger.info(f"Raw data: {request.get_data()!r}")
 
         data = request.get_json()
@@ -93,9 +89,7 @@ def login() -> ResponseReturnValue:
 def userinfo() -> ResponseReturnValue:
     """Get current user information."""
     try:
-        logger.info(
-            f"UserInfo request from user: {get_authenticated_user().username}"
-        )
+        logger.info(f"UserInfo request from user: {get_authenticated_user().username}")
         return jsonify({"user": get_authenticated_user().to_dict()}), 200
     except Exception as e:
         logger.error(f"UserInfo error: {str(e)}")

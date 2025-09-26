@@ -24,7 +24,7 @@ def setup_test_environment() -> None:
         test_db_path = Path(__file__).parent.parent / "instance" / "test.db"
         os.environ["DATABASE_URL"] = f"sqlite:///{test_db_path.absolute()}"
         logger.info(f"Set DATABASE_URL to: {os.environ['DATABASE_URL']}")
-    
+
     # Set other required environment variables for testing
     os.environ.setdefault("FLASK_ENV", "testing")
     os.environ.setdefault("FLASK_DEBUG", "1")
@@ -40,7 +40,7 @@ def run_specific_test(test_file: str) -> bool:
     """Run a specific test file."""
     logger.info(f"🚀 Running {test_file}...")
     logger.info("=" * 50)
-    
+
     # Set up test environment
     setup_test_environment()
 
@@ -53,9 +53,7 @@ def run_specific_test(test_file: str) -> bool:
         return False
 
     # Run the specific test
-    result = subprocess.run(
-        [sys.executable, str(test_path)], capture_output=False, text=True
-    )
+    result = subprocess.run([sys.executable, str(test_path)], capture_output=False, text=True)
 
     if result.returncode == 0:
         logger.info(f"\n🎉 {test_file} passed!")
@@ -69,7 +67,7 @@ def run_service_tests_only() -> bool:
     """Run only the service tests."""
     logger.info("🚀 Starting Service Tests Only...")
     logger.info("=" * 50)
-    
+
     # Set up test environment
     setup_test_environment()
 
@@ -95,9 +93,7 @@ def run_service_tests_only() -> bool:
         logger.info("🎉 All service tests passed!")
         return True
     else:
-        logger.error(
-            f"❌ {len(result.failures)} test(s) failed, {len(result.errors)} error(s)"
-        )
+        logger.error(f"❌ {len(result.failures)} test(s) failed, {len(result.errors)} error(s)")
         return False
 
 

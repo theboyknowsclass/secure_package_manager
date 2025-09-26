@@ -32,9 +32,7 @@ class ApprovalService:
             raise ValueError("DATABASE_URL environment variable is required")
         self.db_service = DatabaseService(self.database_url)
 
-    def process_security_scanned_packages(
-        self, max_packages: int = 50
-    ) -> Dict[str, Any]:
+    def process_security_scanned_packages(self, max_packages: int = 50) -> Dict[str, Any]:
         """Process packages that are Security Scanned and ready for approval.
 
         This method separates database operations from I/O work:
@@ -59,17 +57,13 @@ class ApprovalService:
                 }
 
             # Phase 2: Process approval logic (no DB session)
-            approval_results = self._perform_approval_batch(
-                packages_to_process
-            )
+            approval_results = self._perform_approval_batch(packages_to_process)
 
             # Phase 3: Update database (short DB session)
             return self._update_approval_results(approval_results)
 
         except Exception as e:
-            self.logger.error(
-                f"Error processing security scanned packages: {str(e)}"
-            )
+            self.logger.error(f"Error processing security scanned packages: {str(e)}")
             return {
                 "success": False,
                 "error": str(e),
@@ -88,15 +82,9 @@ class ApprovalService:
                 package_ops = PackageOperations(session)
 
                 # Get package counts by status
-                security_scanned_count = package_ops.count_packages_by_status(
-                    "Security Scanned"
-                )
-                pending_approval_count = package_ops.count_packages_by_status(
-                    "Pending Approval"
-                )
-                approved_count = package_ops.count_packages_by_status(
-                    "Approved"
-                )
+                security_scanned_count = package_ops.count_packages_by_status("Security Scanned")
+                pending_approval_count = package_ops.count_packages_by_status("Pending Approval")
+                approved_count = package_ops.count_packages_by_status("Approved")
 
                 return {
                     "security_scanned_packages": security_scanned_count,
@@ -108,9 +96,7 @@ class ApprovalService:
             self.logger.error(f"Error getting approval statistics: {str(e)}")
             return {"error": str(e)}
 
-    def _transition_to_pending_approval(
-        self, package: Any, status_ops: PackageStatusOperations
-    ) -> bool:
+    def _transition_to_pending_approval(self, package: Any, status_ops: PackageStatusOperations) -> bool:
         """Transition a package from Security Scanned to Pending Approval.
 
         Args:
@@ -121,20 +107,13 @@ class ApprovalService:
             True if transition was successful, False otherwise
         """
         try:
-            if (
-                package.package_status
-                and package.package_status.status == "Security Scanned"
-            ):
+            if package.package_status and package.package_status.status == "Security Scanned":
                 status_ops.go_to_next_stage(package.id)
-                self.logger.debug(
-                    f"Transitioned package {package.name}@{package.version} to Pending Approval"
-                )
+                self.logger.debug(f"Transitioned package {package.name}@{package.version} to Pending Approval")
                 return True
             return False
         except Exception as e:
-            self.logger.error(
-                f"Error transitioning package {package.name}@{package.version}: {str(e)}"
-            )
+            self.logger.error(f"Error transitioning package {package.name}@{package.version}: {str(e)}")
             return False
 
     def _get_packages_for_approval(self, max_packages: int) -> List[Any]:
@@ -143,9 +122,7 @@ class ApprovalService:
             package_ops = PackageOperations(session)
             return package_ops.get_by_status("Security Scanned")[:max_packages]
 
-    def _perform_approval_batch(
-        self, packages: List[Any]
-    ) -> List[Tuple[Any, Dict[str, Any]]]:
+    def _perform_approval_batch(self, packages: List[Any]) -> List[Tuple[Any, Dict[str, Any]]]:
         """Process approval logic without database sessions."""
         results = []
         for package in packages:
@@ -161,9 +138,7 @@ class ApprovalService:
             )
         return results
 
-    def _update_approval_results(
-        self, approval_results: List[Tuple[Any, Dict[str, Any]]]
-    ) -> Dict[str, Any]:
+    def _update_approval_results(self, approval_results: List[Tuple[Any, Dict[str, Any]]]) -> Dict[str, Any]:
         """Update database with approval results (short DB session)."""
         processed_count = 0
 
@@ -178,21 +153,16 @@ class ApprovalService:
                     if (
                         not current_package
                         or not current_package.package_status
-                        or current_package.package_status.status
-                        != "Security Scanned"
+                        or current_package.package_status.status != "Security Scanned"
                     ):
                         continue
 
                     if result["status"] == "success":
-                        status_ops.update_status(
-                            package.id, "Pending Approval"
-                        )
+                        status_ops.update_status(package.id, "Pending Approval")
                         processed_count += 1
 
                 except Exception as e:
-                    self.logger.error(
-                        f"Error updating package {package.name}@{package.version}: {str(e)}"
-                    )
+                    self.logger.error(f"Error updating package {package.name}@{package.version}: {str(e)}")
 
             session.commit()
 

@@ -37,9 +37,7 @@ class PackageLockParsingService:
         self.database_url = os.getenv("DATABASE_URL", "")
         self.db_service = DatabaseService(self.database_url)
 
-    def process_requests(
-        self, max_requests_per_cycle: int = 5
-    ) -> Dict[str, Any]:
+    def process_requests(self, max_requests_per_cycle: int = 5) -> Dict[str, Any]:
         """Process requests that need parsing.
 
         This method separates database operations from I/O work:
@@ -55,9 +53,7 @@ class PackageLockParsingService:
         """
         try:
             # Phase 1: Get request data (short DB session)
-            requests_to_process = self._get_requests_for_parsing(
-                max_requests_per_cycle
-            )
+            requests_to_process = self._get_requests_for_parsing(max_requests_per_cycle)
             if not requests_to_process:
                 return {
                     "success": True,
@@ -73,9 +69,7 @@ class PackageLockParsingService:
             return self._update_parsing_results(parsing_results)
 
         except Exception as e:
-            logger.error(
-                f"Error processing parsing requests: {str(e)}", exc_info=True
-            )
+            logger.error(f"Error processing parsing requests: {str(e)}", exc_info=True)
             return {
                 "success": False,
                 "error": str(e),
@@ -90,16 +84,12 @@ class PackageLockParsingService:
             requests = request_ops.get_needing_parsing()
             logger.info(f"Found {len(requests)} requests needing parsing")
             if requests:
-                logger.info(
-                    f"Request IDs needing parsing: {[r.id for r in requests]}"
-                )
+                logger.info(f"Request IDs needing parsing: {[r.id for r in requests]}")
 
             # Limit the number of requests processed per cycle
             return requests[:max_requests]
 
-    def _perform_parsing_batch(
-        self, requests: List[Any]
-    ) -> List[Tuple[Any, Dict[str, Any]]]:
+    def _perform_parsing_batch(self, requests: List[Any]) -> List[Tuple[Any, Dict[str, Any]]]:
         """Perform package lock parsing work (no DB session)."""
         parsing_results = []
 
@@ -110,15 +100,11 @@ class PackageLockParsingService:
                 parsing_results.append((request, result))
             except Exception as e:
                 logger.error(f"Error parsing request {request.id}: {str(e)}")
-                parsing_results.append(
-                    (request, {"status": "failed", "error": str(e)})
-                )
+                parsing_results.append((request, {"status": "failed", "error": str(e)}))
 
         return parsing_results
 
-    def _update_parsing_results(
-        self, parsing_results: List[Tuple[Any, Dict[str, Any]]]
-    ) -> Dict[str, Any]:
+    def _update_parsing_results(self, parsing_results: List[Tuple[Any, Dict[str, Any]]]) -> Dict[str, Any]:
         """Update database with parsing results (short DB session)."""
         successful_count = 0
         failed_count = 0
@@ -135,10 +121,7 @@ class PackageLockParsingService:
                 try:
                     # Verify request still needs processing (race condition protection)
                     current_request = request_ops.get_by_id(request.id)
-                    if (
-                        not current_request
-                        or current_request.raw_request_blob is None
-                    ):
+                    if not current_request or current_request.raw_request_blob is None:
                         continue
 
                     if result["status"] == "success":
@@ -164,14 +147,10 @@ class PackageLockParsingService:
                     else:
                         # Handle failure
                         failed_count += 1
-                        logger.error(
-                            f"Failed to parse request {request.id}: {result.get('error', 'Unknown error')}"
-                        )
+                        logger.error(f"Failed to parse request {request.id}: {result.get('error', 'Unknown error')}")
 
                 except Exception as e:
-                    logger.error(
-                        f"Error updating request {request.id}: {str(e)}"
-                    )
+                    logger.error(f"Error updating request {request.id}: {str(e)}")
                     failed_count += 1
 
             session.commit()
@@ -236,9 +215,7 @@ class PackageLockParsingService:
             }
 
         except Exception as e:
-            logger.error(
-                f"Error parsing package lock for request {request_id}: {str(e)}"
-            )
+            logger.error(f"Error parsing package lock for request {request_id}: {str(e)}")
             return {
                 "status": "failed",
                 "error": str(e),
@@ -264,18 +241,12 @@ class PackageLockParsingService:
             package_version = package_data["version"]
 
             # Check if package already exists in database
-            existing_package = package_ops.get_by_name_version(
-                package_name, package_version
-            )
+            existing_package = package_ops.get_by_name_version(package_name, package_version)
 
             if existing_package:
                 # Link existing package to this request if not already linked
-                if not request_package_ops.link_exists(
-                    request_id, existing_package.id
-                ):
-                    request_package_ops.create_link(
-                        request_id, existing_package.id, "existing"
-                    )
+                if not request_package_ops.link_exists(request_id, existing_package.id):
+                    request_package_ops.create_link(request_id, existing_package.id, "existing")
                 existing_packages.append(existing_package)
             else:
                 packages_to_process.append(package_data)
@@ -293,17 +264,13 @@ class PackageLockParsingService:
             }
 
             # Create package with initial status
-            package = package_ops.create_with_status(
-                package_record_data, status="Checking Licence"
-            )
+            package = package_ops.create_with_status(package_record_data, status="Checking Licence")
 
             # Create request-package link
             request_package_ops.create_link(request_id, package.id, "new")
             created_packages.append(package)
 
-            logger.info(
-                f"Created new package: {package.name}@{package.version}"
-            )
+            logger.info(f"Created new package: {package.name}@{package.version}")
 
         # Log the parsing results
         logger.info(
@@ -312,15 +279,10 @@ class PackageLockParsingService:
             f"{len(existing_packages)} existing packages"
         )
 
-    def _validate_package_lock_file(
-        self, package_data: Dict[str, Any]
-    ) -> None:
+    def _validate_package_lock_file(self, package_data: Dict[str, Any]) -> None:
         """Validate that the package data is a valid package-lock.json file."""
         if "lockfileVersion" not in package_data:
-            raise ValueError(
-                "This file does not appear to be a package-lock.json file. "
-                "Missing 'lockfileVersion' field."
-            )
+            raise ValueError("This file does not appear to be a package-lock.json file. " "Missing 'lockfileVersion' field.")
 
         lockfile_version = package_data.get("lockfileVersion")
         if lockfile_version is None or lockfile_version < 3:
@@ -331,19 +293,13 @@ class PackageLockParsingService:
                 f"Please upgrade your npm version (npm 8+) and regenerate the lockfile."
             )
 
-    def _extract_packages_from_json(
-        self, package_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _extract_packages_from_json(self, package_data: Dict[str, Any]) -> Dict[str, Any]:
         """Extract package information from package-lock.json data."""
         packages = package_data.get("packages", {})
-        logger.info(
-            f"Processing package-lock.json with {len(packages)} package entries"
-        )
+        logger.info(f"Processing package-lock.json with {len(packages)} package entries")
         return dict(packages)
 
-    def _deduplicate_packages(
-        self, packages: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _deduplicate_packages(self, packages: Dict[str, Any]) -> Dict[str, Any]:
         """Deduplicate packages by name+version within the same lock file."""
         unique_packages = {}
 
@@ -351,16 +307,11 @@ class PackageLockParsingService:
             if package_path == "":  # Skip root package
                 continue
 
-            package_name = self._extract_package_name(
-                package_path, package_info
-            )
+            package_name = self._extract_package_name(package_path, package_info)
             package_version = package_info.get("version")
 
             if not package_name or not package_version:
-                logger.debug(
-                    f"Skipping package at path '{package_path}': "
-                    f"name='{package_name}', version='{package_version}'"
-                )
+                logger.debug(f"Skipping package at path '{package_path}': " f"name='{package_name}', version='{package_version}'")
                 continue
 
             # Use name+version as the key to deduplicate
@@ -374,15 +325,10 @@ class PackageLockParsingService:
                     "info": package_info,
                 }
 
-        logger.info(
-            f"Deduplicated {len(packages)} package entries to "
-            f"{len(unique_packages)} unique packages"
-        )
+        logger.info(f"Deduplicated {len(packages)} package entries to " f"{len(unique_packages)} unique packages")
         return unique_packages
 
-    def _extract_package_name(
-        self, package_path: str, package_info: Dict[str, Any]
-    ) -> Optional[str]:
+    def _extract_package_name(self, package_path: str, package_info: Dict[str, Any]) -> Optional[str]:
         """Extract package name from package info or infer from path."""
         package_name = package_info.get("name")
 
@@ -400,9 +346,7 @@ class PackageLockParsingService:
             last_node_modules = package_path.rfind("node_modules/")
             if last_node_modules != -1:
                 # Get the part after the last "node_modules/"
-                remaining_path = package_path[
-                    last_node_modules + len("node_modules/") :
-                ]
+                remaining_path = package_path[last_node_modules + len("node_modules/") :]
                 path_parts = remaining_path.split("/")
 
                 if len(path_parts) >= 1:

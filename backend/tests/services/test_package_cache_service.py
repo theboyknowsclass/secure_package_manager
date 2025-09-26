@@ -6,7 +6,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock, mock_open, patch
+from typing import Any
+from unittest.mock import Mock, patch
 
 # Add the backend directory to the Python path
 sys.path.insert(
@@ -26,9 +27,7 @@ class TestPackageCacheService(unittest.TestCase):
         self.test_cache_dir = tempfile.mkdtemp()
 
         # Mock environment variables
-        with patch.dict(
-            os.environ, {"PACKAGE_CACHE_DIR": self.test_cache_dir}
-        ):
+        with patch.dict(os.environ, {"PACKAGE_CACHE_DIR": self.test_cache_dir}):
             self.cache_service = PackageCacheService()
 
     def tearDown(self) -> None:
@@ -132,7 +131,7 @@ class TestPackageCacheService(unittest.TestCase):
         self.assertEqual(str(result), str(expected_path))
 
     @patch("tarfile.open")
-    def test_store_package_from_tarball_success(self, mock_tarfile_open) -> None:
+    def test_store_package_from_tarball_success(self, mock_tarfile_open: Any) -> None:
         """Test storing package from tarball successfully."""
         package = Mock()
         package.name = "test-package"
@@ -155,15 +154,13 @@ class TestPackageCacheService(unittest.TestCase):
         with open(package_json_path, "w") as f:
             f.write('{"name": "test-package", "version": "1.0.0"}')
 
-        result = self.cache_service.store_package_from_tarball(
-            package, tarball_content
-        )
+        result = self.cache_service.store_package_from_tarball(package, tarball_content)
 
         self.assertTrue(result)
         mock_tar.extractall.assert_called_once()
 
     @patch("tarfile.open")
-    def test_store_package_from_tarball_extraction_error(self, mock_tarfile_open) -> None:
+    def test_store_package_from_tarball_extraction_error(self, mock_tarfile_open: Any) -> None:
         """Test storing package from tarball with extraction error."""
         package = Mock()
         package.name = "test-package"
@@ -175,9 +172,7 @@ class TestPackageCacheService(unittest.TestCase):
         # Mock tarfile extraction error
         mock_tarfile_open.side_effect = Exception("Extraction failed")
 
-        result = self.cache_service.store_package_from_tarball(
-            package, tarball_content
-        )
+        result = self.cache_service.store_package_from_tarball(package, tarball_content)
 
         self.assertFalse(result)
 
@@ -207,9 +202,7 @@ class TestPackageCacheService(unittest.TestCase):
 
         result = self.cache_service.remove_package(package)
 
-        self.assertTrue(
-            result
-        )  # Should return True even if package doesn't exist
+        self.assertTrue(result)  # Should return True even if package doesn't exist
 
     def test_get_cache_size_empty(self) -> None:
         """Test getting cache size when cache is empty."""

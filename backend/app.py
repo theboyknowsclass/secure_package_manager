@@ -26,9 +26,7 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.config["SECRET_KEY"] = FLASK_SECRET_KEY
     app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = (
-        SQLALCHEMY_TRACK_MODIFICATIONS
-    )
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = SQLALCHEMY_TRACK_MODIFICATIONS
     app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 
     # Initialize extensions with explicit CORS configuration
@@ -41,11 +39,7 @@ def create_app() -> Flask:
     )
 
     # Configure logging - only show errors and warnings in production
-    log_level = (
-        logging.ERROR
-        if os.getenv("FLASK_ENV") == "production"
-        else logging.INFO
-    )
+    log_level = logging.ERROR if os.getenv("FLASK_ENV") == "production" else logging.INFO
     logging.basicConfig(
         level=log_level,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -82,19 +76,14 @@ app = create_app()
 @app.route("/health", methods=["GET"])
 def health_check() -> Response:
     """Health check endpoint."""
-    return jsonify(
-        {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
-    )
+    return jsonify({"status": "healthy", "timestamp": datetime.utcnow().isoformat()})
 
 
 @app.route("/heartbeat", methods=["GET"])
 def heartbeat() -> Response:
     """Heartbeat endpoint for monitoring."""
     # Only log heartbeat in production if specifically requested
-    if (
-        os.getenv("FLASK_ENV") == "production"
-        and os.getenv("LOG_HEARTBEATS", "false").lower() == "true"
-    ):
+    if os.getenv("FLASK_ENV") == "production" and os.getenv("LOG_HEARTBEATS", "false").lower() == "true":
         logging.info("API heartbeat check")
 
     return jsonify(
@@ -116,9 +105,7 @@ def wait_for_db(max_retries: int = 30, delay: int = 2) -> bool:
         try:
             database_url = os.getenv("DATABASE_URL")
             if not database_url:
-                raise ValueError(
-                    "DATABASE_URL environment variable is required"
-                )
+                raise ValueError("DATABASE_URL environment variable is required")
 
             db_service = DatabaseService(database_url)
             if db_service.test_connection():
@@ -127,15 +114,11 @@ def wait_for_db(max_retries: int = 30, delay: int = 2) -> bool:
                     logging.info("Database connection successful")
                 return True
         except Exception as e:
-            logging.warning(
-                f"Database connection attempt {attempt + 1} failed: {str(e)}"
-            )
+            logging.warning(f"Database connection attempt {attempt + 1} failed: {str(e)}")
             if attempt < max_retries - 1:
                 time.sleep(delay)
             else:
-                logging.error(
-                    "Failed to connect to database after all retries"
-                )
+                logging.error("Failed to connect to database after all retries")
                 raise e
     return False
 
@@ -154,8 +137,6 @@ if __name__ == "__main__":
         Base.metadata.create_all(engine)
         # Only log table creation in development
         if os.getenv("FLASK_ENV") != "production":
-            logging.getLogger(__name__).info(
-                "Database tables created/verified"
-            )
+            logging.getLogger(__name__).info("Database tables created/verified")
 
     app.run(host="0.0.0.0", port=5000, debug=True)

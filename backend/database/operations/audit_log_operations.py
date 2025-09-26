@@ -74,9 +74,7 @@ class AuditLogOperations:
         stmt = select(AuditLog).where(AuditLog.user_id == user_id)
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_by_resource(
-        self, resource_type: str, resource_id: int
-    ) -> List[AuditLog]:
+    def get_by_resource(self, resource_type: str, resource_id: int) -> List[AuditLog]:
         """Get audit logs by resource.
 
         Args:

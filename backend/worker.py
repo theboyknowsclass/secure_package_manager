@@ -13,9 +13,7 @@ from pathlib import Path
 from typing import cast
 
 # Configure logging - minimal output for production
-log_level = (
-    logging.ERROR if os.getenv("FLASK_ENV") == "production" else logging.INFO
-)
+log_level = logging.ERROR if os.getenv("FLASK_ENV") == "production" else logging.INFO
 logging.basicConfig(
     level=log_level,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -80,12 +78,8 @@ def main() -> None:
     # Get worker type from environment
     worker_type = os.getenv("WORKER_TYPE", "parse_worker")
     sleep_interval = int(os.getenv("WORKER_SLEEP_INTERVAL", "10"))
-    max_packages_per_cycle = int(
-        os.getenv("WORKER_MAX_PACKAGES_PER_CYCLE", "5")
-    )
-    max_license_groups_per_cycle = int(
-        os.getenv("WORKER_MAX_LICENSE_GROUPS_PER_CYCLE", "20")
-    )
+    max_packages_per_cycle = int(os.getenv("WORKER_MAX_PACKAGES_PER_CYCLE", "5"))
+    max_license_groups_per_cycle = int(os.getenv("WORKER_MAX_LICENSE_GROUPS_PER_CYCLE", "20"))
 
     # Only log startup details in development
     if os.getenv("FLASK_ENV") != "production":
@@ -94,9 +88,7 @@ def main() -> None:
         logger.info(f"  - Type: {worker_type}")
         logger.info(f"  - Sleep interval: {sleep_interval} seconds")
         logger.info(f"  - Max packages per cycle: {max_packages_per_cycle}")
-        logger.info(
-            f"  - Max license groups per cycle: {max_license_groups_per_cycle}"
-        )
+        logger.info(f"  - Max license groups per cycle: {max_license_groups_per_cycle}")
     else:
         # In production, only log essential startup info
         logger.info(f"Starting {worker_type} worker")
@@ -108,9 +100,7 @@ def main() -> None:
             available_types = get_available_worker_types()
 
             logger.error(f"Unknown worker type: {worker_type}")
-            logger.error(
-                f"Supported worker types: {', '.join(available_types)}"
-            )
+            logger.error(f"Supported worker types: {', '.join(available_types)}")
             sys.exit(1)
 
         # Create the worker instance

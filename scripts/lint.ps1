@@ -8,7 +8,7 @@ Set-Location -Path "backend"
 
 # Run flake8 for syntax and style checking
 Write-Host "Running flake8..." -ForegroundColor Yellow
-python -m flake8 . --max-line-length=79 --extend-ignore=E203,W503
+python -m flake8 . --max-line-length=130 --extend-ignore=E203,W503
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Flake8 found issues!" -ForegroundColor Red

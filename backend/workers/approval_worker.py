@@ -5,8 +5,7 @@ This is a lightweight worker that delegates all business logic to ApprovalServic
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from services.approval_service import ApprovalService
 from workers.base_worker import BaseWorker
@@ -28,9 +27,7 @@ class ApprovalWorker(BaseWorker):
     def __init__(self, sleep_interval: int = 30):
         super().__init__("ApprovalWorker", sleep_interval)
         self.approval_service: ApprovalService
-        self.max_packages_per_cycle = (
-            50  # Can handle many packages since it's just status updates
-        )
+        self.max_packages_per_cycle = 50  # Can handle many packages since it's just status updates
 
     def initialize(self) -> None:
         """Initialize services."""
@@ -42,23 +39,15 @@ class ApprovalWorker(BaseWorker):
         """Process one cycle of approval work."""
         try:
             # Process packages using the service (service manages its own database sessions)
-            result = self.approval_service.process_security_scanned_packages(
-                self.max_packages_per_cycle
-            )
+            result = self.approval_service.process_security_scanned_packages(self.max_packages_per_cycle)
 
             if result["success"]:
                 if result["processed_count"] > 0:
-                    logger.info(
-                        f"Successfully transitioned {result['processed_count']} packages to Pending Approval"
-                    )
+                    logger.info(f"Successfully transitioned {result['processed_count']} packages to Pending Approval")
                 else:
-                    logger.info(
-                        "ApprovalWorker heartbeat: No packages found for approval transition"
-                    )
+                    logger.info("ApprovalWorker heartbeat: No packages found for approval transition")
             else:
-                logger.error(
-                    f"Error processing security scanned packages: {result['error']}"
-                )
+                logger.error(f"Error processing security scanned packages: {result['error']}")
 
         except Exception as e:
             logger.error(f"Approval cycle error: {str(e)}", exc_info=True)

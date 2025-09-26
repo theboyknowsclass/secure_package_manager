@@ -7,12 +7,10 @@ tests faster and more focused.
 """
 
 import json
-import os
 import sys
 import unittest
 from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
 # Add the backend directory to the Python path
 sys.path.insert(
@@ -49,12 +47,8 @@ class TestPackageLockParsingService(unittest.TestCase):
         mock_ops = Mock()
 
         # Mock package operations
-        mock_ops.package.get_by_name_version.return_value = (
-            None  # No existing packages
-        )
-        mock_ops.package.create_with_status.return_value = Mock(
-            id=1, name="test", version="1.0.0"
-        )
+        mock_ops.package.get_by_name_version.return_value = None  # No existing packages
+        mock_ops.package.create_with_status.return_value = Mock(id=1, name="test", version="1.0.0")
 
         # Mock request_package operations
         mock_ops.request_package.link_exists.return_value = False
@@ -81,9 +75,7 @@ class TestPackageLockParsingService(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             self.service._validate_package_lock_file(package_data)
 
-        self.assertIn(
-            "Unsupported lockfile version: 1", str(context.exception)
-        )
+        self.assertIn("Unsupported lockfile version: 1", str(context.exception))
 
     def test_extract_packages_from_json(self) -> None:
         """Test package extraction from JSON data."""
@@ -110,9 +102,7 @@ class TestPackageLockParsingService(unittest.TestCase):
         self.assertEqual(len(unique_packages), 2)
 
         # Check that lodash appears only once despite being in multiple paths
-        lodash_keys = [
-            key for key in unique_packages.keys() if "lodash" in key
-        ]
+        lodash_keys = [key for key in unique_packages.keys() if "lodash" in key]
         self.assertEqual(len(lodash_keys), 1)
 
     def test_extract_package_name_from_path(self) -> None:
@@ -122,29 +112,21 @@ class TestPackageLockParsingService(unittest.TestCase):
         self.assertEqual(name, "lodash")
 
         # Test scoped package
-        name = self.service._extract_package_name(
-            "node_modules/@angular/core", {}
-        )
+        name = self.service._extract_package_name("node_modules/@angular/core", {})
         self.assertEqual(name, "@angular/core")
 
         # Test package with name in info
-        name = self.service._extract_package_name(
-            "node_modules/some-path", {"name": "actual-name"}
-        )
+        name = self.service._extract_package_name("node_modules/some-path", {"name": "actual-name"})
         self.assertEqual(name, "actual-name")
 
     def test_extract_package_name_nested_packages(self) -> None:
         """Test package name extraction from nested package paths."""
         # Test nested regular package (the bug we fixed)
-        name = self.service._extract_package_name(
-            "node_modules/test-exclude/node_modules/minimatch", {}
-        )
+        name = self.service._extract_package_name("node_modules/test-exclude/node_modules/minimatch", {})
         self.assertEqual(name, "minimatch")
 
         # Test nested scoped package
-        name = self.service._extract_package_name(
-            "node_modules/test-exclude/node_modules/@types/node", {}
-        )
+        name = self.service._extract_package_name("node_modules/test-exclude/node_modules/@types/node", {})
         self.assertEqual(name, "@types/node")
 
         # Test deeply nested regular package
@@ -178,9 +160,7 @@ class TestPackageLockParsingService(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             self.service._validate_package_lock_file(invalid_data)
 
-        self.assertIn(
-            "Missing 'lockfileVersion' field", str(context.exception)
-        )
+        self.assertIn("Missing 'lockfileVersion' field", str(context.exception))
 
     def test_parse_package_lock_nested_packages(self) -> None:
         """Test parsing with nested packages to ensure correct name extraction."""
@@ -195,12 +175,8 @@ class TestPackageLockParsingService(unittest.TestCase):
 
         # Check that nested packages are correctly identified
         package_names = [data["name"] for data in unique_packages.values()]
-        package_versions = [
-            data["version"] for data in unique_packages.values()
-        ]
-        package_urls = [
-            data["info"].get("resolved") for data in unique_packages.values()
-        ]
+        package_versions = [data["version"] for data in unique_packages.values()]
+        package_urls = [data["info"].get("resolved") for data in unique_packages.values()]
 
         # Verify specific nested packages are correctly parsed
         self.assertIn("test-exclude", package_names)
@@ -235,9 +211,7 @@ class TestPackageLockParsingService(unittest.TestCase):
             "https://repo/repository/npm/@types/node/-/node-18.15.0.tgz",
             package_urls,
         )
-        self.assertIn(
-            "https://repo/repository/npm/glob/-/glob-10.4.5.tgz", package_urls
-        )
+        self.assertIn("https://repo/repository/npm/glob/-/glob-10.4.5.tgz", package_urls)
         self.assertIn(
             "https://repo/repository/npm/@types/glob/-/glob-8.1.0.tgz",
             package_urls,

@@ -54,9 +54,7 @@ class TestDownloadService(unittest.TestCase):
 
         url = self.download_service._construct_download_url(package)
 
-        expected_url = (
-            "https://registry.npmjs.org/@babel/core/-/core-7.22.0.tgz"
-        )
+        expected_url = "https://registry.npmjs.org/@babel/core/-/core-7.22.0.tgz"
         self.assertEqual(url, expected_url)
 
     def test_construct_download_url_scoped_package_complex(self) -> None:
@@ -88,15 +86,11 @@ class TestDownloadService(unittest.TestCase):
             package = Mock()
             package.name = "lodash"
             package.version = "4.17.21"
-            package.npm_url = (
-                None  # Explicitly set to None to test custom logic
-            )
+            package.npm_url = None  # Explicitly set to None to test custom logic
 
             url = download_service._construct_download_url(package)
 
-            expected_url = (
-                "https://custom-registry.com/lodash/-/lodash-4.17.21.tgz"
-            )
+            expected_url = "https://custom-registry.com/lodash/-/lodash-4.17.21.tgz"
             self.assertEqual(url, expected_url)
 
     def test_construct_download_url_scoped_package_custom_registry(
@@ -117,9 +111,7 @@ class TestDownloadService(unittest.TestCase):
             package = Mock()
             package.name = "@vue/compiler-core"
             package.version = "3.3.0"
-            package.npm_url = (
-                None  # Explicitly set to None to test custom logic
-            )
+            package.npm_url = None  # Explicitly set to None to test custom logic
 
             url = download_service._construct_download_url(package)
 
@@ -160,21 +152,17 @@ class TestDownloadService(unittest.TestCase):
         url = self.download_service._construct_download_url(package)
 
         # Should return the existing npm_url directly
-        self.assertEqual(
-            url, "https://registry.npmjs.org/react/-/react-18.2.0.tgz"
-        )
+        self.assertEqual(url, "https://registry.npmjs.org/react/-/react-18.2.0.tgz")
 
-    def test_construct_download_url_ignores_npm_url_different_registry(self) -> (
-        None
-    ):
+    def test_construct_download_url_ignores_npm_url_different_registry(
+        self,
+    ) -> None:
         """Test URL construction ignores npm_url when it doesn't match source repository."""
         # Create a mock package with npm_url from different registry
         package = Mock()
         package.name = "react"
         package.version = "18.2.0"
-        package.npm_url = (
-            "https://different-registry.com/react/-/react-18.2.0.tgz"
-        )
+        package.npm_url = "https://different-registry.com/react/-/react-18.2.0.tgz"
 
         url = self.download_service._construct_download_url(package)
 
@@ -196,36 +184,30 @@ class TestDownloadService(unittest.TestCase):
         expected_url = "https://registry.npmjs.org/react/-/react-18.2.0.tgz"
         self.assertEqual(url, expected_url)
 
-    def test_construct_download_url_uses_existing_npm_url_scoped_package(self) -> (
-        None
-    ):
+    def test_construct_download_url_uses_existing_npm_url_scoped_package(
+        self,
+    ) -> None:
         """Test URL construction uses existing npm_url for scoped packages."""
         # Create a mock scoped package with npm_url that matches source repository
         package = Mock()
         package.name = "@babel/core"
         package.version = "7.22.0"
-        package.npm_url = (
-            "https://registry.npmjs.org/@babel/core/-/core-7.22.0.tgz"
-        )
+        package.npm_url = "https://registry.npmjs.org/@babel/core/-/core-7.22.0.tgz"
 
         url = self.download_service._construct_download_url(package)
 
         # Should return the existing npm_url directly
-        self.assertEqual(
-            url, "https://registry.npmjs.org/@babel/core/-/core-7.22.0.tgz"
-        )
+        self.assertEqual(url, "https://registry.npmjs.org/@babel/core/-/core-7.22.0.tgz")
 
-    def test_construct_download_url_different_npm_and_source_registry(self) -> (
-        None
-    ):
+    def test_construct_download_url_different_npm_and_source_registry(
+        self,
+    ) -> None:
         """Test URL construction when npm_url and source_repository_url are different."""
         # Create a mock package with npm_url from different registry
         package = Mock()
         package.name = "lodash"
         package.version = "4.17.21"
-        package.npm_url = (
-            "https://npm.pkg.github.com/lodash/-/lodash-4.17.21.tgz"
-        )
+        package.npm_url = "https://npm.pkg.github.com/lodash/-/lodash-4.17.21.tgz"
 
         url = self.download_service._construct_download_url(package)
 
@@ -233,9 +215,9 @@ class TestDownloadService(unittest.TestCase):
         expected_url = "https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz"
         self.assertEqual(url, expected_url)
 
-    def test_construct_download_url_different_npm_and_source_registry_scoped(self) -> (
-        None
-    ):
+    def test_construct_download_url_different_npm_and_source_registry_scoped(
+        self,
+    ) -> None:
         """Test URL construction for scoped packages when npm_url and source_repository_url are different."""
         # Create a mock scoped package with npm_url from different registry
         package = Mock()

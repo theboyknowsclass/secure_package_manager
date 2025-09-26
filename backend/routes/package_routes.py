@@ -14,7 +14,6 @@ from database.models import (
     PackageStatus,
     Request,
     RequestPackage,
-    SecurityScan,
 )
 from database.operations.audit_log_operations import AuditLogOperations
 from database.operations.package_operations import PackageOperations
@@ -52,9 +51,7 @@ def handle_error(e: Exception, context: str = "") -> ResponseReturnValue:
     environment = os.getenv("ENVIRONMENT")
     flask_debug = os.getenv("FLASK_DEBUG")
 
-    logger.info(
-        f"Environment check - FLASK_ENV: {flask_env}, ENVIRONMENT: {environment}, FLASK_DEBUG: {flask_debug}"
-    )
+    logger.info(f"Environment check - FLASK_ENV: {flask_env}, ENVIRONMENT: {environment}, FLASK_DEBUG: {flask_debug}")
 
     # For now, always return detailed errors to test
     return (
@@ -93,7 +90,7 @@ def upload_package_lock() -> ResponseReturnValue:
         # Create request record with raw blob
         if not isinstance(package_data, dict):
             return jsonify({"error": "Invalid package data format"}), 400
-        
+
         request_data = _create_request_with_blob(package_data)
 
         return _create_success_response(request_data, package_data)
@@ -135,10 +132,7 @@ def _parse_package_lock_file(
             jsonify(
                 {
                     "error": "Invalid file format",
-                    "details": (
-                        "This file does not appear to be a package-lock.json"
-                        " file. Missing required fields."
-                    ),
+                    "details": ("This file does not appear to be a package-lock.json" " file. Missing required fields."),
                 }
             ),
             400,
@@ -211,9 +205,7 @@ def _create_success_response(
     )
 
 
-@package_bp.route(
-    "/requests/<int:request_id>", methods=["GET"]
-)
+@package_bp.route("/requests/<int:request_id>", methods=["GET"])
 @auth_service.require_auth
 def get_package_request(request_id: int) -> ResponseReturnValue:
     """Get package request details."""
@@ -226,17 +218,12 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                 return jsonify({"error": "Request not found"}), 404
 
             # Check if user has access to this request
-            if (
-                not get_authenticated_user().is_admin()
-                and request_record.requestor_id != get_authenticated_user().id
-            ):
+            if not get_authenticated_user().is_admin() and request_record.requestor_id != get_authenticated_user().id:
                 return jsonify({"error": "Access denied"}), 403
 
             # Get packages for this request with their creation context and scan results
             package_ops = PackageOperations(session)
-            packages_with_context = (
-                package_ops.get_packages_with_context_and_scans(request_id)
-            )
+            packages_with_context = package_ops.get_packages_with_context_and_scans(request_id)
 
             # Get request status from status manager using the same session
             from services.package_request_status_manager import (
@@ -244,9 +231,7 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
             )
 
             status_manager = PackageRequestStatusManager(session)
-            status_summary = status_manager.get_request_status_summary(
-                request_id
-            )
+            status_summary = status_manager.get_request_status_summary(request_id)
 
             # Build packages list
             packages_list = []
@@ -267,32 +252,14 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                                 "id": pkg.id,
                                 "name": pkg.name,
                                 "version": pkg.version,
-                                "status": (
-                                    pkg.package_status.status
-                                    if pkg.package_status
-                                    else "Checking Licence"
-                                ),
-                                "security_score": (
-                                    pkg.package_status.security_score
-                                    if pkg.package_status
-                                    else None
-                                ),
-                                "license_score": (
-                                    pkg.package_status.license_score
-                                    if pkg.package_status
-                                    else None
-                                ),
+                                "status": (pkg.package_status.status if pkg.package_status else "Checking Licence"),
+                                "security_score": (pkg.package_status.security_score if pkg.package_status else None),
+                                "license_score": (pkg.package_status.license_score if pkg.package_status else None),
                                 "security_scan_status": (
-                                    pkg.package_status.security_scan_status
-                                    if pkg.package_status
-                                    else "pending"
+                                    pkg.package_status.security_scan_status if pkg.package_status else "pending"
                                 ),
                                 "license_identifier": pkg.license_identifier,
-                                "license_status": (
-                                    pkg.package_status.license_status
-                                    if pkg.package_status
-                                    else None
-                                ),
+                                "license_status": (pkg.package_status.license_status if pkg.package_status else None),
                                 "type": rp.package_type if rp else "unknown",
                                 "scan_result": (
                                     {
@@ -304,16 +271,8 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                                         "info_count": scan.info_count,
                                         "scan_type": scan.scan_type,
                                         "trivy_version": scan.trivy_version,
-                                        "created_at": (
-                                            scan.created_at.isoformat()
-                                            if scan.created_at
-                                            else None
-                                        ),
-                                        "completed_at": (
-                                            scan.completed_at.isoformat()
-                                            if scan.completed_at
-                                            else None
-                                        ),
+                                        "created_at": (scan.created_at.isoformat() if scan.created_at else None),
+                                        "completed_at": (scan.completed_at.isoformat() if scan.completed_at else None),
                                     }
                                     if scan
                                     else None
@@ -334,10 +293,8 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                             "version": request_record.version,
                             "status": status_summary["current_status"],
                             "total_packages": status_summary["total_packages"],
-                            "completion_percentage": status_summary[
-                                "completion_percentage"
-                            ],
-                            "created_at": request_record.created_at.isoformat() if request_record.created_at else None,
+                            "completion_percentage": status_summary["completion_percentage"],
+                            "created_at": (request_record.created_at.isoformat() if request_record.created_at else None),
                             "requestor": {
                                 "id": request_record.requestor.id,
                                 "username": request_record.requestor.username,
@@ -383,9 +340,7 @@ def list_package_requests() -> ResponseReturnValue:
                 status_manager = PackageRequestStatusManager()
                 if req.id is None:
                     continue  # Skip requests without ID
-                status_summary = status_manager.get_request_status_summary(
-                    req.id
-                )
+                status_summary = status_manager.get_request_status_summary(req.id)
 
                 result_requests.append(
                     {
@@ -394,10 +349,8 @@ def list_package_requests() -> ResponseReturnValue:
                         "version": req.version,
                         "status": status_summary["current_status"],
                         "total_packages": status_summary["total_packages"],
-                        "completion_percentage": status_summary[
-                            "completion_percentage"
-                        ],
-                        "created_at": req.created_at.isoformat() if req.created_at else None,
+                        "completion_percentage": status_summary["completion_percentage"],
+                        "created_at": (req.created_at.isoformat() if req.created_at else None),
                         "requestor": {
                             "id": req.requestor.id,
                             "username": req.requestor.username,
@@ -413,9 +366,7 @@ def list_package_requests() -> ResponseReturnValue:
         return handle_error(e, "List requests")
 
 
-@package_bp.route(
-    "/<int:package_id>/security-scan/status", methods=["GET"]
-)
+@package_bp.route("/<int:package_id>/security-scan/status", methods=["GET"])
 @auth_service.require_auth
 def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
     """Get security scan status for a package."""
@@ -432,14 +383,12 @@ def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
             # Check if user has access through any request
             db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
         with db_service.get_session() as session:
-                request_package_ops = RequestPackageOperations(session)
-                user = get_authenticated_user()
-                user_id = user.id
-                if user_id is None:
-                    return jsonify({"error": "User ID not found"}), 401
-                has_access = request_package_ops.check_user_access(
-                    package_id, user_id
-                )
+            request_package_ops = RequestPackageOperations(session)
+            user = get_authenticated_user()
+            user_id = user.id
+            if user_id is None:
+                return jsonify({"error": "User ID not found"}), 401
+            has_access = request_package_ops.check_user_access(package_id, user_id)
 
         if not has_access:
             return jsonify({"error": "Access denied"}), 403
@@ -468,9 +417,7 @@ def get_package_security_scan_status(package_id: int) -> ResponseReturnValue:
         return handle_error(e, "Get security scan status")
 
 
-@package_bp.route(
-    "/<int:package_id>/security-scan/report", methods=["GET"]
-)
+@package_bp.route("/<int:package_id>/security-scan/report", methods=["GET"])
 @auth_service.require_auth
 def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
     """Get detailed security scan report for a package."""
@@ -487,14 +434,12 @@ def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
             # Check if user has access through any request
             db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
         with db_service.get_session() as session:
-                request_package_ops = RequestPackageOperations(session)
-                user = get_authenticated_user()
-                user_id = user.id
-                if user_id is None:
-                    return jsonify({"error": "User ID not found"}), 401
-                has_access = request_package_ops.check_user_access(
-                    package_id, user_id
-                )
+            request_package_ops = RequestPackageOperations(session)
+            user = get_authenticated_user()
+            user_id = user.id
+            if user_id is None:
+                return jsonify({"error": "User ID not found"}), 401
+            has_access = request_package_ops.check_user_access(package_id, user_id)
 
         if not has_access:
             return jsonify({"error": "Access denied"}), 403
@@ -503,9 +448,7 @@ def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
 
         if not scan_report:
             return (
-                jsonify(
-                    {"error": "No security scan report found for this package"}
-                ),
+                jsonify({"error": "No security scan report found for this package"}),
                 404,
             )
 
@@ -525,9 +468,7 @@ def get_package_security_scan_report(package_id: int) -> ResponseReturnValue:
         return handle_error(e, "Get security scan report")
 
 
-@package_bp.route(
-    "/<int:package_id>/security-scan/trigger", methods=["POST"]
-)
+@package_bp.route("/<int:package_id>/security-scan/trigger", methods=["POST"])
 @auth_service.require_auth
 def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
     """Trigger a new security scan for a package."""
@@ -544,14 +485,12 @@ def trigger_package_security_scan(package_id: int) -> ResponseReturnValue:
             # Check if user has access through any request
             db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
         with db_service.get_session() as session:
-                request_package_ops = RequestPackageOperations(session)
-                user = get_authenticated_user()
-                user_id = user.id
-                if user_id is None:
-                    return jsonify({"error": "User ID not found"}), 401
-                has_access = request_package_ops.check_user_access(
-                    package_id, user_id
-                )
+            request_package_ops = RequestPackageOperations(session)
+            user = get_authenticated_user()
+            user_id = user.id
+            if user_id is None:
+                return jsonify({"error": "User ID not found"}), 401
+            has_access = request_package_ops.check_user_access(package_id, user_id)
 
         if not has_access:
             return jsonify({"error": "Access denied"}), 403
@@ -611,15 +550,10 @@ def get_processing_status() -> ResponseReturnValue:
                 {
                     "package_name": package.name,
                     "package_version": package.version,
-                    "status": (
-                        package.package_status.status
-                        if package.package_status
-                        else None
-                    ),
+                    "status": (package.package_status.status if package.package_status else None),
                     "updated_at": (
                         package.package_status.updated_at.isoformat()
-                        if package.package_status
-                        and package.package_status.updated_at
+                        if package.package_status and package.package_status.updated_at
                         else None
                     ),
                 }
@@ -661,14 +595,7 @@ def retry_failed_packages() -> ResponseReturnValue:
 
             if request_id:
                 # Filter by request if specified
-                failed_packages = [
-                    p
-                    for p in failed_packages
-                    if any(
-                        rp.request_id == request_id
-                        for rp in p.request_packages
-                    )
-                ]
+                failed_packages = [p for p in failed_packages if any(rp.request_id == request_id for rp in p.request_packages)]
 
         if not failed_packages:
             return (
@@ -712,10 +639,7 @@ def get_audit_data() -> ResponseReturnValue:
     """Get audit data for approved packages."""
     try:
         # Only admins and approvers can view audit data
-        if not (
-            get_authenticated_user().is_admin()
-            or get_authenticated_user().is_approver()
-        ):
+        if not (get_authenticated_user().is_admin() or get_authenticated_user().is_approver()):
             return jsonify({"error": "Access denied"}), 403
 
         db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
@@ -733,9 +657,7 @@ def get_audit_data() -> ResponseReturnValue:
                 .join(User, Request.requestor_id == User.id)
                 .options(
                     joinedload(Package.package_status),
-                    joinedload(Package.request_packages).joinedload(
-                        RequestPackage.request
-                    ),
+                    joinedload(Package.request_packages).joinedload(RequestPackage.request),
                 )
                 .filter(PackageStatus.status == "Approved")
                 .all()
@@ -745,15 +667,8 @@ def get_audit_data() -> ResponseReturnValue:
             for package in approved_packages:
                 # Get the approver information
                 approver = None
-                if (
-                    package.package_status
-                    and package.package_status.approver_id
-                ):
-                    approver = (
-                        session.query(User)
-                        .filter(User.id == package.package_status.approver_id)
-                        .first()
-                    )
+                if package.package_status and package.package_status.approver_id:
+                    approver = session.query(User).filter(User.id == package.package_status.approver_id).first()
 
                 # Get the original request information
                 original_request = None
@@ -771,17 +686,12 @@ def get_audit_data() -> ResponseReturnValue:
                             "name": package.name,
                             "version": package.version,
                             "license_identifier": package.license_identifier,
-                            "created_at": (
-                                package.created_at.isoformat()
-                                if package.created_at
-                                else None
-                            ),
+                            "created_at": (package.created_at.isoformat() if package.created_at else None),
                         },
                         "approval": {
                             "approved_at": (
                                 package.package_status.updated_at.isoformat()
-                                if package.package_status
-                                and package.package_status.updated_at
+                                if package.package_status and package.package_status.updated_at
                                 else None
                             ),
                             "approver": (
@@ -800,9 +710,7 @@ def get_audit_data() -> ResponseReturnValue:
                                 "application_name": original_request.application_name,
                                 "application_version": original_request.version,
                                 "requested_at": (
-                                    original_request.created_at.isoformat()
-                                    if original_request.created_at
-                                    else None
+                                    original_request.created_at.isoformat() if original_request.created_at else None
                                 ),
                                 "requestor": (
                                     {

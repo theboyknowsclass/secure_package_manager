@@ -5,7 +5,7 @@ repository. This worker delegates all business logic to PublishingService.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from services.publishing_service import PublishingService
 from workers.base_worker import BaseWorker
@@ -24,16 +24,12 @@ class PublishWorker(BaseWorker):
     WORKER_TYPE = "package_publisher"
 
     # Extend base environment variables with publish-specific ones
-    required_env_vars = BaseWorker.required_env_vars + [
-        "TARGET_REPOSITORY_URL"
-    ]
+    required_env_vars = BaseWorker.required_env_vars + ["TARGET_REPOSITORY_URL"]
 
     def __init__(self, sleep_interval: int = 30):
         super().__init__("PackagePublisher", sleep_interval)
         self.publishing_service: PublishingService
-        self.max_packages_per_cycle = (
-            3  # Process max 3 packages per cycle (publishing is slow)
-        )
+        self.max_packages_per_cycle = 3  # Process max 3 packages per cycle (publishing is slow)
 
     def initialize(self) -> None:
         """Initialize services."""
@@ -45,20 +41,15 @@ class PublishWorker(BaseWorker):
         """Process one cycle of package publishing."""
         try:
             # Process packages using the service (service manages its own database sessions)
-            result = self.publishing_service.process_package_batch(
-                self.max_packages_per_cycle
-            )
+            result = self.publishing_service.process_package_batch(self.max_packages_per_cycle)
 
             if result["success"]:
                 if result["processed_count"] > 0:
                     logger.info(
-                        f"Publishing complete: {result['successful_packages']} successful, "
-                        f"{result['failed_packages']} failed"
+                        f"Publishing complete: {result['successful_packages']} successful, " f"{result['failed_packages']} failed"
                     )
                 else:
-                    logger.info(
-                        "PublishWorker heartbeat: No packages found for publishing"
-                    )
+                    logger.info("PublishWorker heartbeat: No packages found for publishing")
             else:
                 logger.error(f"Error in publishing batch: {result['error']}")
 
@@ -86,15 +77,11 @@ class PublishWorker(BaseWorker):
             result = self.publishing_service.retry_failed_packages()
 
             if "retried" in result and result["retried"] > 0:
-                logger.info(
-                    f"Retried {result['retried']} failed publishing packages"
-                )
+                logger.info(f"Retried {result['retried']} failed publishing packages")
 
             return result
         except Exception as e:
-            logger.error(
-                f"Error retrying failed publishing packages: {str(e)}"
-            )
+            logger.error(f"Error retrying failed publishing packages: {str(e)}")
             return {"error": str(e)}
 
     def get_required_env_vars(self) -> List[str]:

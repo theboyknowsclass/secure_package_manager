@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, List
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, relationship
@@ -26,9 +26,7 @@ class Request(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    request_packages: Mapped[List["RequestPackage"]] = relationship(
-        "RequestPackage", back_populates="request", lazy=True
-    )
+    request_packages: Mapped[List["RequestPackage"]] = relationship("RequestPackage", back_populates="request", lazy=True)
     requestor: Mapped["User"] = relationship("User", back_populates="requests", lazy=True)
 
     def to_dict(self) -> dict[str, Any]:
@@ -37,7 +35,5 @@ class Request(Base):
             "application_name": self.application_name,
             "version": self.version,
             "requestor_id": self.requestor_id,
-            "created_at": (
-                self.created_at.isoformat() if self.created_at else None
-            ),
+            "created_at": (self.created_at.isoformat() if self.created_at else None),
         }

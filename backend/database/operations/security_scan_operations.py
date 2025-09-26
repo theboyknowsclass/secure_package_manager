@@ -1,6 +1,6 @@
 """Database operations for SecurityScan entities."""
 
-from typing import List, Optional, Type
+from typing import List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -41,14 +41,10 @@ class SecurityScanOperations:
         Returns:
             List of security scans for the specified package
         """
-        stmt = select(SecurityScan).where(
-            SecurityScan.package_id == package_id
-        )
+        stmt = select(SecurityScan).where(SecurityScan.package_id == package_id)
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_latest_by_package_id(
-        self, package_id: int
-    ) -> Optional[SecurityScan]:
+    def get_latest_by_package_id(self, package_id: int) -> Optional[SecurityScan]:
         """Get the latest security scan for a package.
 
         Args:
@@ -57,11 +53,7 @@ class SecurityScanOperations:
         Returns:
             The latest security scan if found, None otherwise
         """
-        stmt = (
-            select(SecurityScan)
-            .where(SecurityScan.package_id == package_id)
-            .order_by(SecurityScan.created_at.desc())
-        )
+        stmt = select(SecurityScan).where(SecurityScan.package_id == package_id).order_by(SecurityScan.created_at.desc())
         return self.session.execute(stmt).scalar_one_or_none()
 
     def get_packages_needing_scan(self) -> List[int]:

@@ -22,9 +22,7 @@ class PackageStatus(Base):
     status: Mapped[str] = mapped_column(String(50), default="Checking Licence", nullable=False)
     file_size: Mapped[Optional[int]] = mapped_column(BigInteger)
     checksum: Mapped[Optional[str]] = mapped_column(String(255))
-    cache_path: Mapped[Optional[str]] = mapped_column(
-        String(500)
-    )  # Actual cache directory path where package is stored
+    cache_path: Mapped[Optional[str]] = mapped_column(String(500))  # Actual cache directory path where package is stored
     license_score: Mapped[Optional[int]] = mapped_column(Integer)
     security_score: Mapped[Optional[int]] = mapped_column(Integer)
     security_scan_status: Mapped[str] = mapped_column(
@@ -46,9 +44,7 @@ class PackageStatus(Base):
         String(20), default="pending", nullable=False
     )  # Publishing status: pending, publishing, published, failed
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -63,16 +59,10 @@ class PackageStatus(Base):
             "license_status": self.license_status,
             "approver_id": self.approver_id,
             "rejector_id": self.rejector_id,
-            "published_at": (
-                self.published_at.isoformat() if self.published_at else None
-            ),
+            "published_at": (self.published_at.isoformat() if self.published_at else None),
             "publish_status": self.publish_status,
-            "created_at": (
-                self.created_at.isoformat() if self.created_at else None
-            ),
-            "updated_at": (
-                self.updated_at.isoformat() if self.updated_at else None
-            ),
+            "created_at": (self.created_at.isoformat() if self.created_at else None),
+            "updated_at": (self.updated_at.isoformat() if self.updated_at else None),
         }
 
     def is_processing(self) -> bool:

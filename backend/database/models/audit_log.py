@@ -27,7 +27,5 @@ class AuditLog(Base):
             "resource_type": self.resource_type,
             "resource_id": self.resource_id,
             "details": self.details,
-            "created_at": (
-                self.created_at.isoformat() if self.created_at else None
-            ),
+            "created_at": (self.created_at.isoformat() if self.created_at else None),
         }

@@ -1,14 +1,14 @@
+import os
 from functools import wraps
 from typing import Any, Callable, Dict, Optional
 
 import jwt
-import os
 from config.constants import JWT_SECRET, OAUTH_AUDIENCE, OAUTH_ISSUER
 from database.models.user import User
 from database.operations.user_operations import UserOperations
 from database.service import DatabaseService
-from flask import jsonify, request as flask_request
-from flask.wrappers import Request as FlaskRequest
+from flask import jsonify
+from flask import request as flask_request
 
 
 class AuthService:
@@ -53,9 +53,7 @@ class AuthService:
             logger.error(f"Invalid token: {str(e)}")
             return None
         except Exception as e:
-            logger.error(
-                f"Unexpected error during token verification: {str(e)}"
-            )
+            logger.error(f"Unexpected error during token verification: {str(e)}")
             return None
 
         logger.error("Token verification failed - no valid user found")
@@ -87,9 +85,7 @@ class AuthService:
         elif "user_id" in payload:
             return self._handle_legacy_token(payload)
         else:
-            logger.error(
-                "Token payload contains neither 'sub' nor 'user_id' field"
-            )
+            logger.error("Token payload contains neither 'sub' nor 'user_id' field")
             return None
 
     def _handle_oauth2_token(self, payload: Dict[str, Any]) -> Optional[User]:
@@ -108,13 +104,9 @@ class AuthService:
             user_ops = UserOperations(session)
             user = user_ops.get_by_username(username)
             if not user:
-                user = self._create_user_from_oauth2_payload(
-                    payload, username, user_ops
-                )
+                user = self._create_user_from_oauth2_payload(payload, username, user_ops)
             else:
-                user = self._update_user_from_oauth2_payload(
-                    user, payload, user_ops
-                )
+                user = self._update_user_from_oauth2_payload(user, payload, user_ops)
 
         return user
 
@@ -134,25 +126,19 @@ class AuthService:
             user_ops = UserOperations(session)
             user = user_ops.get_by_id(user_id)
             if user:
-                logger.info(
-                    f"Found user by ID: {user.username} with role: {user.role}"
-                )
+                logger.info(f"Found user by ID: {user.username} with role: {user.role}")
                 return user
             else:
                 logger.error(f"No user found with ID: {user_id}")
                 return None
 
-    def _create_user_from_oauth2_payload(
-        self, payload: Dict[str, Any], username: str, user_ops: UserOperations
-    ) -> User:
+    def _create_user_from_oauth2_payload(self, payload: Dict[str, Any], username: str, user_ops: UserOperations) -> User:
         """Create new user from OAuth2 token payload."""
         import logging
 
         logger = logging.getLogger(__name__)
 
-        logger.info(
-            f"User {username} not found in database, creating new user"
-        )
+        logger.info(f"User {username} not found in database, creating new user")
         user = User(
             username=username,
             email=payload.get("email", f"{username}@example.com"),
@@ -161,31 +147,23 @@ class AuthService:
         )
         user = user_ops.create(user)
         if user:
-            logger.info(
-                f"Created new user: {user.username} with role: {user.role}"
-            )
+            logger.info(f"Created new user: {user.username} with role: {user.role}")
         return user
 
-    def _update_user_from_oauth2_payload(
-        self, user: User, payload: Dict[str, Any], user_ops: UserOperations
-    ) -> User:
+    def _update_user_from_oauth2_payload(self, user: User, payload: Dict[str, Any], user_ops: UserOperations) -> User:
         """Update existing user with OAuth2 token data."""
         import logging
 
         logger = logging.getLogger(__name__)
 
-        logger.info(
-            f"Found existing user: {user.username} with role: {user.role}"
-        )
+        logger.info(f"Found existing user: {user.username} with role: {user.role}")
         # Update existing user with fresh OAuth2 token data
         user.email = payload.get("email", user.email)
         user.full_name = payload.get("full_name", user.full_name)
         user.role = payload.get("role", user.role)
 
         user = user_ops.update(user)
-        logger.info(
-            f"Updated existing user: {user.username} with role: {user.role}"
-        )
+        logger.info(f"Updated existing user: {user.username} with role: {user.role}")
         return user
 
     def require_auth(self, f: Callable[..., Any]) -> Callable[..., Any]:
@@ -205,9 +183,7 @@ class AuthService:
                 try:
                     token = auth_header.split(" ")[1]
                 except IndexError:
-                    logger.error(
-                        "Invalid token format - missing space separator"
-                    )
+                    logger.error("Invalid token format - missing space separator")
                     return jsonify({"error": "Invalid token format"}), 401
             else:
                 logger.warning("No Authorization header found")
@@ -219,9 +195,7 @@ class AuthService:
             # Verify token
             user = self.verify_token(token)
             if not user:
-                logger.error(
-                    "Token verification failed - invalid or expired token"
-                )
+                logger.error("Token verification failed - invalid or expired token")
                 return jsonify({"error": "Invalid or expired token"}), 401
 
             # Add user to request context
@@ -273,9 +247,7 @@ class AuthService:
             # Check if user is approver or admin
             if not (flask_request.user.role in ["approver", "admin"]):  # type: ignore[attr-defined]
                 return (
-                    jsonify(
-                        {"error": "Approver or Admin privileges required"}
-                    ),
+                    jsonify({"error": "Approver or Admin privileges required"}),
                     403,
                 )
 
@@ -300,9 +272,7 @@ class AuthService:
                 # Check if user has permission
                 if not flask_request.user.has_permission(permission):  # type: ignore[attr-defined]
                     return (
-                        jsonify(
-                            {"error": f"Permission required: {permission}"}
-                        ),
+                        jsonify({"error": f"Permission required: {permission}"}),
                         403,
                     )
 

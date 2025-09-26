@@ -1,6 +1,6 @@
 """Database operations for RequestPackage entities."""
 
-from typing import List, Optional, Type
+from typing import List
 
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
@@ -20,9 +20,7 @@ class RequestPackageOperations:
         Returns:
             List of request-package links for the specified request
         """
-        stmt = select(RequestPackage).where(
-            RequestPackage.request_id == request_id
-        )
+        stmt = select(RequestPackage).where(RequestPackage.request_id == request_id)
         return list(self.session.execute(stmt).scalars().all())
 
     def get_by_package_id(self, package_id: int) -> List[RequestPackage]:
@@ -34,9 +32,7 @@ class RequestPackageOperations:
         Returns:
             List of request-package links for the specified package
         """
-        stmt = select(RequestPackage).where(
-            RequestPackage.package_id == package_id
-        )
+        stmt = select(RequestPackage).where(RequestPackage.package_id == package_id)
         return list(self.session.execute(stmt).scalars().all())
 
     def link_exists(self, request_id: int, package_id: int) -> bool:
@@ -65,9 +61,7 @@ class RequestPackageOperations:
         """
         self.session = session
 
-    def create_link(
-        self, request_id: int, package_id: int, package_type: str = "new"
-    ) -> RequestPackage:
+    def create_link(self, request_id: int, package_id: int, package_type: str = "new") -> RequestPackage:
         """Create a request-package link.
 
         Args:

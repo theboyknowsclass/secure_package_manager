@@ -31,9 +31,7 @@ class DownloadService:
 
         # Download configuration
         self.download_timeout = int(os.getenv("DOWNLOAD_TIMEOUT", "60"))
-        self.source_repository_url = os.getenv(
-            "SOURCE_REPOSITORY_URL", "https://registry.npmjs.org"
-        )
+        self.source_repository_url = os.getenv("SOURCE_REPOSITORY_URL", "https://registry.npmjs.org")
         self.database_url = os.getenv("DATABASE_URL", "")
         self.db_service = DatabaseService(self.database_url)
 
@@ -65,9 +63,7 @@ class DownloadService:
                 }
 
             # Phase 2: Perform downloads (no DB session)
-            download_results = self._perform_download_batch(
-                packages_to_process
-            )
+            download_results = self._perform_download_batch(packages_to_process)
 
             # Phase 3: Update database (short DB session)
             return self._update_download_results(download_results)
@@ -97,9 +93,7 @@ class DownloadService:
             package_ops = PackageOperations(session)
             return package_ops.get_by_status("Licence Checked")[:max_packages]
 
-    def _perform_download_batch(
-        self, packages: List[Any]
-    ) -> List[Tuple[Any, Dict[str, Any]]]:
+    def _perform_download_batch(self, packages: List[Any]) -> List[Tuple[Any, Dict[str, Any]]]:
         """Perform downloads without database sessions.
 
         Args:
@@ -150,14 +144,10 @@ class DownloadService:
                 return {"status": "failed", "error": "Download failed"}
 
         except Exception as e:
-            self.logger.error(
-                f"Error downloading package {package.name}@{package.version}: {str(e)}"
-            )
+            self.logger.error(f"Error downloading package {package.name}@{package.version}: {str(e)}")
             return {"status": "failed", "error": str(e)}
 
-    def _update_download_results(
-        self, download_results: List[Tuple[Any, Dict[str, Any]]]
-    ) -> Dict[str, Any]:
+    def _update_download_results(self, download_results: List[Tuple[Any, Dict[str, Any]]]) -> Dict[str, Any]:
         """Update database with download results (short DB session).
 
         Args:
@@ -181,8 +171,7 @@ class DownloadService:
                     if (
                         not current_package
                         or not current_package.package_status
-                        or current_package.package_status.status
-                        != "Licence Checked"
+                        or current_package.package_status.status != "Licence Checked"
                     ):
                         continue  # Skip if status changed
 
@@ -197,19 +186,13 @@ class DownloadService:
                         failed_count += 1
 
                 except Exception as e:
-                    self.logger.error(
-                        f"Error updating package {package.name}@{package.version}: {str(e)}"
-                    )
+                    self.logger.error(f"Error updating package {package.name}@{package.version}: {str(e)}")
                     failed_count += 1
 
             session.commit()
 
         # Log batch summary
-        if (
-            successful_count > 0
-            or failed_count > 0
-            or already_cached_count > 0
-        ):
+        if successful_count > 0 or failed_count > 0 or already_cached_count > 0:
             self.logger.info(
                 f"Download batch complete: {successful_count} downloaded, "
                 f"{already_cached_count} already cached, {failed_count} failed"
@@ -240,9 +223,7 @@ class DownloadService:
             cache_service = PackageCacheService()
             return cache_service.is_package_cached(package)
         except Exception as e:
-            self.logger.error(
-                f"Error checking if package is downloaded: {str(e)}"
-            )
+            self.logger.error(f"Error checking if package is downloaded: {str(e)}")
             return False
 
     def _perform_download(self, package: Any) -> bool:
@@ -266,9 +247,7 @@ class DownloadService:
 
             # Store tarball in local cache
             cache_service = PackageCacheService()
-            result = cache_service.store_package_from_tarball(
-                package, tarball_content
-            )
+            result = cache_service.store_package_from_tarball(package, tarball_content)
             return result is not None
 
         except Exception as e:
@@ -288,35 +267,23 @@ class DownloadService:
             # Construct download URL using SOURCE_REPOSITORY_URL
             download_url = self._construct_download_url(package)
 
-            self.logger.info(
-                f"Downloading package {package.name}@{package.version} from {download_url}"
-            )
+            self.logger.info(f"Downloading package {package.name}@{package.version} from {download_url}")
 
             # Download tarball
-            response = requests.get(
-                download_url, timeout=self.download_timeout
-            )
+            response = requests.get(download_url, timeout=self.download_timeout)
 
             if response.status_code != 200:
-                self.logger.error(
-                    f"Failed to download package tarball: HTTP {response.status_code}"
-                )
+                self.logger.error(f"Failed to download package tarball: HTTP {response.status_code}")
                 return None
 
-            self.logger.info(
-                f"Successfully downloaded tarball for {package.name}@{package.version}"
-            )
+            self.logger.info(f"Successfully downloaded tarball for {package.name}@{package.version}")
             return bytes(response.content)
 
         except requests.exceptions.RequestException as e:
-            self.logger.error(
-                f"Network error downloading package {package.name}@{package.version}: {str(e)}"
-            )
+            self.logger.error(f"Network error downloading package {package.name}@{package.version}: {str(e)}")
             return None
         except (OSError, IOError, ValueError) as e:
-            self.logger.error(
-                f"Unexpected error downloading package {package.name}@{package.version}: {str(e)}"
-            )
+            self.logger.error(f"Unexpected error downloading package {package.name}@{package.version}: {str(e)}")
             return None
 
     def _construct_download_url(self, package: Package) -> str:
@@ -329,9 +296,7 @@ class DownloadService:
             Constructed download URL
         """
         # If package has an npm_url that starts with the same base as source_repository_url, use it directly
-        if package.npm_url and package.npm_url.startswith(
-            self.source_repository_url
-        ):
+        if package.npm_url and package.npm_url.startswith(self.source_repository_url):
             return package.npm_url
 
         # Otherwise, use custom logic to construct the URL

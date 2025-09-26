@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, List
 
 from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, relationship
@@ -23,20 +23,14 @@ class User(Base):
     username = Column(String(255), unique=True, nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     full_name = Column(String(255), nullable=False)
-    role = Column(
-        String(20), default="user", nullable=False
-    )  # "user", "approver", "admin"
+    role = Column(String(20), default="user", nullable=False)  # "user", "approver", "admin"
     created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     requests: Mapped[List["Request"]] = relationship("Request", back_populates="requestor", lazy=True)
     audit_logs: Mapped[List["AuditLog"]] = relationship("AuditLog", backref="user", lazy=True)
-    supported_licenses: Mapped[List["SupportedLicense"]] = relationship(
-        "SupportedLicense", backref="creator", lazy=True
-    )
+    supported_licenses: Mapped[List["SupportedLicense"]] = relationship("SupportedLicense", backref="creator", lazy=True)
 
     # Role helper methods
     def is_user(self) -> bool:
@@ -77,10 +71,6 @@ class User(Base):
             "email": self.email,
             "full_name": self.full_name,
             "role": self.role,
-            "created_at": (
-                self.created_at.isoformat() if self.created_at else None
-            ),
-            "updated_at": (
-                self.updated_at.isoformat() if self.updated_at else None
-            ),
+            "created_at": (self.created_at.isoformat() if self.created_at else None),
+            "updated_at": (self.updated_at.isoformat() if self.updated_at else None),
         }

@@ -45,20 +45,20 @@ class DatabaseService:
                 engine_kwargs["connect_args"] = {"check_same_thread": False}
             else:
                 # PostgreSQL pool settings
-                engine_kwargs.update({
-                    "pool_pre_ping": True,  # Verify connections before use
-                    "pool_recycle": 3600,  # Recycle connections every hour
-                    "pool_size": 5,  # Number of connections to maintain in pool
-                    "max_overflow": 10,  # Additional connections beyond pool_size
-                    "pool_timeout": 30,  # Seconds to wait for connection from pool
-                })
+                engine_kwargs.update(
+                    {
+                        "pool_pre_ping": True,  # Verify connections before use
+                        "pool_recycle": 3600,  # Recycle connections every hour
+                        "pool_size": 5,  # Number of connections to maintain in pool
+                        "max_overflow": 10,  # Additional connections beyond pool_size
+                        "pool_timeout": 30,  # Seconds to wait for connection from pool
+                    }
+                )
 
             self._engine = create_engine(self.database_url, **engine_kwargs)
             self._SessionLocal = sessionmaker(bind=self._engine)
 
-            logger.debug(
-                f"Database service initialized with URL: {self._mask_database_url()}"
-            )
+            logger.debug(f"Database service initialized with URL: {self._mask_database_url()}")
 
         except Exception as e:
             logger.error(f"Failed to initialize database service: {str(e)}")

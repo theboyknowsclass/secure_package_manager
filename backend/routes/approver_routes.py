@@ -5,13 +5,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from database.models import User
 
-from database.models import (
-    AuditLog,
-    Package,
-    PackageStatus,
-    Request,
-    RequestPackage,
-)
+from database.models import AuditLog
 from database.operations.audit_log_operations import AuditLogOperations
 from database.operations.package_operations import PackageOperations
 from database.operations.request_package_operations import (
@@ -45,9 +39,7 @@ publishing_service = NpmRegistryPublishingService()
 
 
 # Package Approval Routes - Batch Operations Only
-@approver_bp.route(
-    "/packages/publish/<int:package_id>", methods=["POST"]
-)
+@approver_bp.route("/packages/publish/<int:package_id>", methods=["POST"])
 @auth_service.require_admin
 def publish_package(package_id: int) -> ResponseReturnValue:
     """Publish an approved package to the secure repository."""
@@ -64,9 +56,7 @@ def publish_package(package_id: int) -> ResponseReturnValue:
 
         if package.package_status.status != "Approved":
             return (
-                jsonify(
-                    {"error": "Package must be approved before publishing"}
-                ),
+                jsonify({"error": "Package must be approved before publishing"}),
                 400,
             )
 
@@ -80,10 +70,7 @@ def publish_package(package_id: int) -> ResponseReturnValue:
                 action="publish_package",
                 resource_type="package",
                 resource_id=package.id,
-                details=(
-                    f"Package {package.name}@{package.version} published to "
-                    f"secure repo"
-                ),
+                details=(f"Package {package.name}@{package.version} published to " f"secure repo"),
             )
             db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
             with db_service.get_session() as session:
@@ -100,9 +87,7 @@ def publish_package(package_id: int) -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
-@approver_bp.route(
-    "/packages/batch-approve", methods=["POST"]
-)
+@approver_bp.route("/packages/batch-approve", methods=["POST"])
 @auth_service.require_admin
 def batch_approve_packages() -> ResponseReturnValue:
     """Approve multiple packages at once."""
@@ -121,9 +106,7 @@ def batch_approve_packages() -> ResponseReturnValue:
         failed_packages = []
 
         for package_id in package_ids:
-            result = _process_package_approval(
-                package_id, get_authenticated_user(), reason
-            )
+            result = _process_package_approval(package_id, get_authenticated_user(), reason)
             if result["success"]:
                 approved_count += 1
             else:
@@ -150,25 +133,16 @@ def batch_approve_packages() -> ResponseReturnValue:
 
         # Packages are approved immediately and will be published by the
         # background worker
-        logger.info(
-            (
-                f"Batch approval completed: {approved_count} packages approved"
-                f", will be published by background worker"
-            )
-        )
+        logger.info((f"Batch approval completed: {approved_count} packages approved" f", will be published by background worker"))
 
         response_data = {
-            "message": (
-                f"Batch approval completed - {approved_count} packages "
-                f"approved"
-            ),
+            "message": (f"Batch approval completed - {approved_count} packages " f"approved"),
             "approved_count": approved_count,
             "total_requested": len(package_ids),
             "package_ids": list(package_ids),
             "approved_by": get_authenticated_user().username,
             "note": (
-                "Packages are approved and ready for publishing. Publishing "
-                "can be done separately for better performance."
+                "Packages are approved and ready for publishing. Publishing " "can be done separately for better performance."
             ),
         }
 
@@ -185,9 +159,7 @@ def batch_approve_packages() -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
-@approver_bp.route(
-    "/packages/batch-reject", methods=["POST"]
-)
+@approver_bp.route("/packages/batch-reject", methods=["POST"])
 @auth_service.require_admin
 def batch_reject_packages() -> ResponseReturnValue:
     """Reject multiple packages at once."""
@@ -209,9 +181,7 @@ def batch_reject_packages() -> ResponseReturnValue:
         failed_packages = []
 
         for package_id in package_ids:
-            result = _process_package_rejection(
-                package_id, get_authenticated_user(), reason
-            )
+            result = _process_package_rejection(package_id, get_authenticated_user(), reason)
             if result["success"]:
                 rejected_count += 1
             else:
@@ -255,9 +225,7 @@ def batch_reject_packages() -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
-@approver_bp.route(
-    "/packages/validated", methods=["GET"]
-)
+@approver_bp.route("/packages/validated", methods=["GET"])
 @auth_service.require_admin
 def get_validated_packages() -> ResponseReturnValue:
     """Get all packages ready for admin review (pending approval)"""
@@ -279,12 +247,8 @@ def get_validated_packages() -> ResponseReturnValue:
                 db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
                 with db_service.get_session() as session:
                     request_package_ops = RequestPackageOperations(session)
-                    request_packages = request_package_ops.get_by_package_id(
-                        pkg.id
-                    )
-                    request_package = (
-                        request_packages[0] if request_packages else None
-                    )
+                    request_packages = request_package_ops.get_by_package_id(pkg.id)
+                    request_package = request_packages[0] if request_packages else None
                     request_data = None
 
                     if request_package:
@@ -295,9 +259,7 @@ def get_validated_packages() -> ResponseReturnValue:
                         request_ops = RequestOperations(session)
                         if request_package.request_id is None:
                             continue  # Skip request packages without request ID
-                        request_record = request_ops.get_by_id(
-                            request_package.request_id
-                        )
+                        request_record = request_ops.get_by_id(request_package.request_id)
                     if request_record:
                         request_data = {
                             "id": request_record.id,
@@ -306,9 +268,7 @@ def get_validated_packages() -> ResponseReturnValue:
                         }
 
                 # Get package type from RequestPackage
-                package_type = (
-                    request_package.package_type if request_package else "new"
-                )
+                package_type = request_package.package_type if request_package else "new"
 
                 package_list.append(
                     {
@@ -330,9 +290,7 @@ def get_validated_packages() -> ResponseReturnValue:
                     }
                 )
             except Exception as pkg_error:
-                logger.warning(
-                    f"Error processing package {pkg.id}: {str(pkg_error)}"
-                )
+                logger.warning(f"Error processing package {pkg.id}: {str(pkg_error)}")
                 # Skip this package but continue with others
                 continue
 
@@ -388,10 +346,7 @@ def _process_package_approval(package_id: int, user: Any, reason: str) -> dict:
                 action="approve_package",
                 resource_type="package",
                 resource_id=package.id,
-                details=(
-                    f"Package {package.name}@{package.version} approved: "
-                    f"{reason}"
-                ),
+                details=(f"Package {package.name}@{package.version} approved: " f"{reason}"),
             )
             audit_ops = AuditLogOperations(session)
             audit_ops.create(audit_log)
@@ -453,10 +408,7 @@ def _process_package_rejection(package_id: int, user: Any, reason: str) -> dict:
                 action="batch_reject_package",
                 resource_type="package",
                 resource_id=package.id,
-                details=(
-                    f"Package {package.name}@{package.version} rejected: "
-                    f"{reason}"
-                ),
+                details=(f"Package {package.name}@{package.version} rejected: " f"{reason}"),
             )
             audit_ops = AuditLogOperations(session)
             audit_ops.create(audit_log)

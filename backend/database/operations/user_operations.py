@@ -1,6 +1,6 @@
 """Database operations for User entities."""
 
-from typing import List, Optional, Type
+from typing import List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session

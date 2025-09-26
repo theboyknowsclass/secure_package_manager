@@ -40,22 +40,18 @@ config_service = ConfigurationService()
 def get_supported_licenses() -> ResponseReturnValue:
     """Get all supported licenses."""
     try:
-        status = request.args.get(
-            "status"
-        )  # 'always_allowed', 'allowed', 'avoid', 'blocked'
-        
+        status = request.args.get("status")  # 'always_allowed', 'allowed', 'avoid', 'blocked'
+
         db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
         with db_service.get_session() as session:
             license_ops = SupportedLicenseOperations(session)
-            
+
             if status:
                 licenses = license_ops.get_by_status(status)
             else:
                 licenses = license_ops.get_all()
-                
-        return jsonify(
-            {"licenses": [license.to_dict() for license in licenses]}
-        )
+
+        return jsonify({"licenses": [license.to_dict() for license in licenses]})
     except Exception as e:
         logger.error(f"Get supported licenses error: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
@@ -127,9 +123,7 @@ def create_supported_license() -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
-@admin_bp.route(
-    "/licenses/<int:license_id>", methods=["PUT"]
-)
+@admin_bp.route("/licenses/<int:license_id>", methods=["PUT"])
 @auth_service.require_auth
 def update_supported_license(license_id: int) -> ResponseReturnValue:
     """Update a supported license."""
@@ -181,9 +175,7 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
         return jsonify({"error": "Internal server error"}), 500
 
 
-@admin_bp.route(
-    "/licenses/<int:license_id>", methods=["DELETE"]
-)
+@admin_bp.route("/licenses/<int:license_id>", methods=["DELETE"])
 @auth_service.require_auth
 def delete_supported_license(license_id: int) -> ResponseReturnValue:
     """Delete a supported license."""
@@ -206,19 +198,10 @@ def delete_supported_license(license_id: int) -> ResponseReturnValue:
             db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
             with db_service.get_session() as session:
                 license_ops = SupportedLicenseOperations(session)
-                package_count = license_ops.count_packages_by_license(
-                    license.identifier
-                )
+                package_count = license_ops.count_packages_by_license(license.identifier)
         if package_count > 0:
             return (
-                jsonify(
-                    {
-                        "error": (
-                            f"Cannot delete license. It is used by "
-                            f"{package_count} package(s). Disable it instead."
-                        )
-                    }
-                ),
+                jsonify({"error": (f"Cannot delete license. It is used by " f"{package_count} package(s). Disable it instead.")}),
                 400,
             )
 
@@ -287,9 +270,7 @@ def get_config() -> ResponseReturnValue:
             "security": {
                 "jwt_secret_configured": bool(os.getenv("JWT_SECRET")),
                 "flask_secret_configured": bool(os.getenv("FLASK_SECRET_KEY")),
-                "oauth_audience": os.getenv(
-                    "OAUTH_AUDIENCE", "Not configured"
-                ),
+                "oauth_audience": os.getenv("OAUTH_AUDIENCE", "Not configured"),
                 "oauth_issuer": os.getenv("OAUTH_ISSUER", "Not configured"),
             },
             "trivy": {
@@ -299,9 +280,7 @@ def get_config() -> ResponseReturnValue:
             "environment": {
                 "flask_env": os.getenv("FLASK_ENV", "development"),
                 "flask_debug": os.getenv("FLASK_DEBUG", "0"),
-                "max_content_length": os.getenv(
-                    "MAX_CONTENT_LENGTH", "16777216"
-                ),
+                "max_content_length": os.getenv("MAX_CONTENT_LENGTH", "16777216"),
             },
         }
 
@@ -312,10 +291,7 @@ def get_config() -> ResponseReturnValue:
                     "is_complete": is_complete,
                     "missing_keys": missing_keys,
                     "requires_admin_setup": not is_complete,
-                    "note": (
-                        "Repository configuration is now managed via "
-                        "environment variables"
-                    ),
+                    "note": ("Repository configuration is now managed via " "environment variables"),
                 },
             }
         )

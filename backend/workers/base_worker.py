@@ -53,10 +53,7 @@ class BaseWorker(ABC):
                 missing_vars.append(f"  - {var}")
 
         if missing_vars:
-            error_msg = (
-                f"Missing required environment variables for {self.worker_name}:\n"
-                + "\n".join(missing_vars)
-            )
+            error_msg = f"Missing required environment variables for {self.worker_name}:\n" + "\n".join(missing_vars)
             error_msg += "\n\nPlease set these environment variables before starting this worker."
             error_msg += "\nSee env.example for reference values."
             raise ValueError(error_msg)
@@ -68,9 +65,7 @@ class BaseWorker(ABC):
 
     def _signal_handler(self, signum: int, frame: Any) -> None:
         """Handle shutdown signals."""
-        logger.info(
-            f"{self.worker_name} received signal {signum}, shutting down gracefully..."
-        )
+        logger.info(f"{self.worker_name} received signal {signum}, shutting down gracefully...")
         self.running = False
 
     def start(self) -> None:
@@ -100,9 +95,7 @@ class BaseWorker(ABC):
                     and os.getenv("LOG_HEARTBEATS", "false").lower() == "true"
                     and cycle_count % 10 == 0
                 ):
-                    logger.info(
-                        f"{self.worker_name} heartbeat - {cycle_count} cycles completed"
-                    )
+                    logger.info(f"{self.worker_name} heartbeat - {cycle_count} cycles completed")
 
             except Exception as e:
                 logger.error(

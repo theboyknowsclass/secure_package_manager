@@ -5,7 +5,7 @@ all business logic to LicenseService.
 """
 
 import logging
-from typing import List, Optional
+from typing import List
 
 from services.license_service import LicenseService
 from workers.base_worker import BaseWorker
@@ -26,9 +26,7 @@ class LicenseWorker(BaseWorker):
     def __init__(self, sleep_interval: int = 15):
         super().__init__("LicenseChecker", sleep_interval)
         self.license_service: LicenseService
-        self.max_license_groups_per_cycle = (
-            20  # Process max 20 unique license groups per cycle
-        )
+        self.max_license_groups_per_cycle = 20  # Process max 20 unique license groups per cycle
 
     def initialize(self) -> None:
         """Initialize services."""
@@ -40,9 +38,7 @@ class LicenseWorker(BaseWorker):
         """Process one cycle of license checking."""
         try:
             # Process packages using the service (service manages its own database sessions)
-            result = self.license_service.process_license_groups(
-                self.max_license_groups_per_cycle
-            )
+            result = self.license_service.process_license_groups(self.max_license_groups_per_cycle)
 
             if result["success"]:
                 if result["processed_count"] > 0:
@@ -51,9 +47,7 @@ class LicenseWorker(BaseWorker):
                         f"{result['failed_packages']} failed across {result['license_groups_processed']} license groups"
                     )
                 else:
-                    logger.info(
-                        "LicenseWorker heartbeat: No packages found needing license checking"
-                    )
+                    logger.info("LicenseWorker heartbeat: No packages found needing license checking")
             else:
                 logger.error(f"Error in license processing: {result['error']}")
 

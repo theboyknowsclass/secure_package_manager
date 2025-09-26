@@ -37,9 +37,7 @@ class OperationsFactory:
     }
 
     @classmethod
-    def create_operations(
-        cls, entity_type: str, session: Session
-    ) -> Any:
+    def create_operations(cls, entity_type: str, session: Session) -> Any:
         """Create operations instance for specific entity type."""
         if entity_type not in cls._operations_classes:
             raise ValueError(f"Unknown entity type: {entity_type}")

@@ -52,9 +52,7 @@ def get_required_env_int(key: str, description: str | None = None) -> int:
         return int(value)
     except ValueError:
         desc = f" ({description})" if description else ""
-        _missing_env_vars.append(
-            f"  - {key}{desc} (invalid integer value: '{value}')"
-        )
+        _missing_env_vars.append(f"  - {key}{desc} (invalid integer value: '{value}')")
         return 0  # Return 0 as placeholder
 
 
@@ -64,13 +62,8 @@ def validate_all_required_env() -> None:
     Raises ValueError with all missing variables if any are missing.
     """
     if _missing_env_vars:
-        error_msg = "Missing required environment variables:\n" + "\n".join(
-            _missing_env_vars
-        )
-        error_msg += (
-            "\n\nPlease set these environment variables before starting "
-            "the application."
-        )
+        error_msg = "Missing required environment variables:\n" + "\n".join(_missing_env_vars)
+        error_msg += "\n\nPlease set these environment variables before starting " "the application."
         error_msg += "\nSee env.example for reference values."
         raise ValueError(error_msg)
 
@@ -94,25 +87,14 @@ def validate_env_vars(*names: str, context: Optional[str] = None) -> None:
     # Reuse messages accumulated during import; just filter by name prefix.
     if names:
         wanted = set(names)
-        local_errors = [
-            e
-            for e in _missing_env_vars
-            for n in wanted
-            if e.startswith(f"  - {n}")
-        ]
+        local_errors = [e for e in _missing_env_vars for n in wanted if e.startswith(f"  - {n}")]
     else:
         local_errors = list(_missing_env_vars)
 
     if local_errors:
-        header = (
-            f"Missing required environment variables"
-            f"{f' for {context}' if context else ''}:\n"
-        )
+        header = f"Missing required environment variables" f"{f' for {context}' if context else ''}:\n"
         error_msg = header + "\n".join(local_errors)
-        error_msg += (
-            "\n\nPlease set these environment variables before starting "
-            "this component."
-        )
+        error_msg += "\n\nPlease set these environment variables before starting " "this component."
         error_msg += "\nSee env.example for reference values."
         raise ValueError(error_msg)
 
@@ -132,9 +114,7 @@ FRONTEND_APP_NAME = f"{APP_NAME}-frontend"
 # JWT & Flask Secrets
 JWT_SECRET = get_required_env("JWT_SECRET", "JWT signing secret")
 FLASK_SECRET_KEY = get_required_env("FLASK_SECRET_KEY", "Flask secret key")
-IDP_SECRET_KEY = get_required_env(
-    "IDP_SECRET_KEY", "Identity Provider secret key"
-)
+IDP_SECRET_KEY = get_required_env("IDP_SECRET_KEY", "Identity Provider secret key")
 
 # OAuth & IDP Configuration
 OAUTH_AUDIENCE = get_required_env("OAUTH_AUDIENCE", "OAuth audience")
@@ -155,9 +135,7 @@ DATABASE_URL = get_required_env("DATABASE_URL", "Database connection URL")
 
 # Database Credentials
 POSTGRES_USER = get_required_env("POSTGRES_USER", "PostgreSQL username")
-POSTGRES_PASSWORD = get_required_env(
-    "POSTGRES_PASSWORD", "PostgreSQL password"
-)
+POSTGRES_PASSWORD = get_required_env("POSTGRES_PASSWORD", "PostgreSQL password")
 POSTGRES_DB = get_required_env("POSTGRES_DB", "PostgreSQL database name")
 
 # =============================================================================
@@ -167,12 +145,8 @@ POSTGRES_DB = get_required_env("POSTGRES_DB", "PostgreSQL database name")
 # Trivy Service
 TRIVY_PORT = get_required_env_int("TRIVY_PORT", "Trivy security scanner port")
 TRIVY_URL = get_required_env("TRIVY_URL", "Trivy service URL")
-TRIVY_TIMEOUT = get_required_env_int(
-    "TRIVY_TIMEOUT", "Trivy timeout in seconds"
-)
-TRIVY_MAX_RETRIES = get_required_env_int(
-    "TRIVY_MAX_RETRIES", "Trivy maximum retry attempts"
-)
+TRIVY_TIMEOUT = get_required_env_int("TRIVY_TIMEOUT", "Trivy timeout in seconds")
+TRIVY_MAX_RETRIES = get_required_env_int("TRIVY_MAX_RETRIES", "Trivy maximum retry attempts")
 
 # Repository Configuration
 SOURCE_REPOSITORY_URL = get_required_env(
@@ -190,9 +164,7 @@ TARGET_REPOSITORY_URL = get_required_env(
 
 # Flask Ports & Network
 API_PORT = get_required_env_int("API_PORT", "Backend API port")
-FRONTEND_PORT = get_required_env_int(
-    "FRONTEND_PORT", "Frontend application port"
-)
+FRONTEND_PORT = get_required_env_int("FRONTEND_PORT", "Frontend application port")
 
 # Hosts
 LOCALHOST = get_required_env("LOCALHOST", "Localhost hostname")
@@ -204,13 +176,9 @@ API_URL = f"http://{LOCALHOST}:{API_PORT}"
 IDP_URL = f"http://{LOCALHOST}:{IDP_PORT}"
 
 # Flask App Configuration
-FLASK_ENV = get_required_env(
-    "FLASK_ENV", "Flask environment (development/production)"
-)
+FLASK_ENV = get_required_env("FLASK_ENV", "Flask environment (development/production)")
 FLASK_DEBUG = get_required_env("FLASK_DEBUG", "Flask debug mode (0/1)")
-MAX_CONTENT_LENGTH = get_required_env_int(
-    "MAX_CONTENT_LENGTH", "Maximum content length in bytes"
-)
+MAX_CONTENT_LENGTH = get_required_env_int("MAX_CONTENT_LENGTH", "Maximum content length in bytes")
 SQLALCHEMY_TRACK_MODIFICATIONS = False  # Disable for performance
 
 
@@ -224,15 +192,9 @@ INTERNAL_TRIVY_URL = f"http://trivy:{TRIVY_PORT}"
 # =============================================================================
 
 # Default admin credentials (should only be used in development)
-DEFAULT_ADMIN_USERNAME = get_required_env(
-    "DEFAULT_ADMIN_USERNAME", "Default admin username"
-)
-DEFAULT_ADMIN_PASSWORD = get_required_env(
-    "DEFAULT_ADMIN_PASSWORD", "Default admin password"
-)
-DEFAULT_ADMIN_EMAIL = get_required_env(
-    "DEFAULT_ADMIN_EMAIL", "Default admin email"
-)
+DEFAULT_ADMIN_USERNAME = get_required_env("DEFAULT_ADMIN_USERNAME", "Default admin username")
+DEFAULT_ADMIN_PASSWORD = get_required_env("DEFAULT_ADMIN_PASSWORD", "Default admin password")
+DEFAULT_ADMIN_EMAIL = get_required_env("DEFAULT_ADMIN_EMAIL", "Default admin email")
 
 # =============================================================================
 # ENVIRONMENT DETECTION

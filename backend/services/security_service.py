@@ -7,7 +7,7 @@ from I/O work for optimal performance.
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from database.operations.package_operations import PackageOperations
 from database.operations.package_status_operations import (
@@ -60,17 +60,13 @@ class SecurityService:
                 }
 
             # Phase 2: Perform security scans (no DB session)
-            scan_results = self._perform_security_scan_batch(
-                packages_to_process
-            )
+            scan_results = self._perform_security_scan_batch(packages_to_process)
 
             # Phase 3: Update database (short DB session)
             return self._update_scan_results(scan_results)
 
         except Exception as e:
-            self.logger.error(
-                f"Error processing security scan batch: {str(e)}"
-            )
+            self.logger.error(f"Error processing security scan batch: {str(e)}")
             return {
                 "success": False,
                 "error": str(e),
@@ -93,9 +89,7 @@ class SecurityService:
             package_ops = PackageOperations(session)
             return package_ops.get_by_status("Downloaded")[:max_packages]
 
-    def _perform_security_scan_batch(
-        self, packages: List[Any]
-    ) -> List[Tuple[Any, Dict[str, Any]]]:
+    def _perform_security_scan_batch(self, packages: List[Any]) -> List[Tuple[Any, Dict[str, Any]]]:
         """Perform security scans without database sessions.
 
         Args:
@@ -136,9 +130,7 @@ class SecurityService:
                 }
 
         except Exception as e:
-            self.logger.error(
-                f"Error scanning package {package.name}@{package.version}: {str(e)}"
-            )
+            self.logger.error(f"Error scanning package {package.name}@{package.version}: {str(e)}")
             return {"status": "failed", "error": str(e)}
 
     def _perform_security_scan(self, package: Any) -> Dict[str, Any]:
@@ -160,9 +152,7 @@ class SecurityService:
             self.logger.error(f"Error performing security scan: {str(e)}")
             return {"status": "failed", "error": str(e)}
 
-    def _update_scan_results(
-        self, scan_results: List[Tuple[Any, Dict[str, Any]]]
-    ) -> Dict[str, Any]:
+    def _update_scan_results(self, scan_results: List[Tuple[Any, Dict[str, Any]]]) -> Dict[str, Any]:
         """Update database with scan results (short DB session).
 
         Args:
@@ -186,22 +176,16 @@ class SecurityService:
                     if (
                         not current_package
                         or not current_package.package_status
-                        or current_package.package_status.status
-                        != "Downloaded"
+                        or current_package.package_status.status != "Downloaded"
                     ):
                         continue  # Skip if status changed
 
                     if result["status"] == "success":
                         # Update package status to Security Scanned
-                        status_ops.update_status(
-                            package.id, "Security Scanned"
-                        )
+                        status_ops.update_status(package.id, "Security Scanned")
 
                         # Update package with security score if available
-                        if (
-                            "scan_data" in result
-                            and "security_score" in result["scan_data"]
-                        ):
+                        if "scan_data" in result and "security_score" in result["scan_data"]:
                             status_ops.update_security_score(
                                 package.id,
                                 result["scan_data"]["security_score"],
@@ -220,29 +204,21 @@ class SecurityService:
                             successful_count += 1
                         else:
                             # If scan results couldn't be stored, treat as failed
-                            status_ops.update_status(
-                                package.id, "Security Scan Failed"
-                            )
+                            status_ops.update_status(package.id, "Security Scan Failed")
                             failed_count += 1
                     else:  # failed
-                        status_ops.update_status(
-                            package.id, "Security Scan Failed"
-                        )
+                        status_ops.update_status(package.id, "Security Scan Failed")
                         failed_count += 1
 
                 except Exception as e:
-                    self.logger.error(
-                        f"Error updating package {package.name}@{package.version}: {str(e)}"
-                    )
+                    self.logger.error(f"Error updating package {package.name}@{package.version}: {str(e)}")
                     failed_count += 1
 
             session.commit()
 
         # Log batch summary
         if successful_count > 0 or failed_count > 0:
-            self.logger.info(
-                f"Security scan batch complete: {successful_count} successful, {failed_count} failed"
-            )
+            self.logger.info(f"Security scan batch complete: {successful_count} successful, {failed_count} failed")
 
         return {
             "success": True,
@@ -290,7 +266,5 @@ class SecurityService:
             return True
 
         except Exception as e:
-            self.logger.error(
-                f"Error storing scan results for package {package_id}: {str(e)}"
-            )
+            self.logger.error(f"Error storing scan results for package {package_id}: {str(e)}")
             return False

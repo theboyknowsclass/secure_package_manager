@@ -18,16 +18,12 @@ class PackageCacheService:
     """Service for managing local package cache operations."""
 
     def __init__(self) -> None:
-        self.package_cache_dir = Path(os.getenv(
-            "PACKAGE_CACHE_DIR", "/app/package_cache"
-        ))
+        self.package_cache_dir = Path(os.getenv("PACKAGE_CACHE_DIR", "/app/package_cache"))
 
         # Ensure package cache directory exists
         self.package_cache_dir.mkdir(parents=True, exist_ok=True)
 
-    def store_package_from_tarball(
-        self, package: Any, tarball_content: bytes
-    ) -> Optional[str]:
+    def store_package_from_tarball(self, package: Any, tarball_content: bytes) -> Optional[str]:
         """Store a package in the cache from tarball content.
 
         Args:
@@ -43,9 +39,7 @@ class PackageCacheService:
             package_dir.mkdir(parents=True, exist_ok=True)
 
             # Extract tarball to package cache directory
-            tarball_buffer = tarfile.open(
-                fileobj=io.BytesIO(tarball_content), mode="r:gz"
-            )
+            tarball_buffer = tarfile.open(fileobj=io.BytesIO(tarball_content), mode="r:gz")
             tarball_buffer.extractall(str(package_dir))
             tarball_buffer.close()
 
@@ -53,14 +47,10 @@ class PackageCacheService:
             return str(package_dir)
 
         except tarfile.TarError as e:
-            logger.error(
-                f"Error extracting tarball for {package.name}@{package.version}: {str(e)}"
-            )
+            logger.error(f"Error extracting tarball for {package.name}@{package.version}: {str(e)}")
             return None
         except Exception as e:
-            logger.error(
-                f"Unexpected error storing package {package.name}@{package.version}: {str(e)}"
-            )
+            logger.error(f"Unexpected error storing package {package.name}@{package.version}: {str(e)}")
             return None
 
     def is_package_cached(self, package: Any) -> bool:
@@ -107,15 +97,11 @@ class PackageCacheService:
                 import shutil
 
                 shutil.rmtree(str(package_dir))
-                logger.info(
-                    f"Removed package {package.name}@{package.version} from cache"
-                )
+                logger.info(f"Removed package {package.name}@{package.version} from cache")
                 return True
             return True  # Already removed
         except Exception as e:
-            logger.error(
-                f"Error removing package {package.name}@{package.version}: {str(e)}"
-            )
+            logger.error(f"Error removing package {package.name}@{package.version}: {str(e)}")
             return False
 
     def get_cache_size(self) -> int:

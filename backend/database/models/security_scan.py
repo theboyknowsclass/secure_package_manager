@@ -12,12 +12,8 @@ class SecurityScan(Base):
     __tablename__ = "security_scans"
 
     id = Column(Integer, primary_key=True)
-    package_id = Column(
-        Integer, ForeignKey("packages.id", ondelete="CASCADE"), nullable=False
-    )
-    scan_type = Column(
-        String(50), default="trivy", nullable=False
-    )  # trivy, snyk, npm_audit
+    package_id = Column(Integer, ForeignKey("packages.id", ondelete="CASCADE"), nullable=False)
+    scan_type = Column(String(50), default="trivy", nullable=False)  # trivy, snyk, npm_audit
     scan_result = Column(JSON)  # Store the full Trivy scan result
     vulnerability_count = Column(Integer, default=0)
     critical_count = Column(Integer, default=0)
@@ -28,9 +24,7 @@ class SecurityScan(Base):
     scan_duration_ms = Column(Integer)  # Scan duration in milliseconds
     trivy_version = Column(String(50))  # Version of Trivy used for the scan
     created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = Column(DateTime)
 
     def get_total_vulnerabilities(self) -> int:
@@ -57,13 +51,7 @@ class SecurityScan(Base):
             "info_count": self.info_count,
             "scan_duration_ms": self.scan_duration_ms,
             "trivy_version": self.trivy_version,
-            "created_at": (
-                self.created_at.isoformat() if self.created_at else None
-            ),
-            "updated_at": (
-                self.updated_at.isoformat() if self.updated_at else None
-            ),
-            "completed_at": (
-                self.completed_at.isoformat() if self.completed_at else None
-            ),
+            "created_at": (self.created_at.isoformat() if self.created_at else None),
+            "updated_at": (self.updated_at.isoformat() if self.updated_at else None),
+            "completed_at": (self.completed_at.isoformat() if self.completed_at else None),
         }

@@ -3,10 +3,9 @@
 Tests the license service implementation with proper data validation.
 """
 
-from typing import Any, Dict, List, Union
-from unittest.mock import MagicMock, Mock, patch
+from typing import Dict, Union
+from unittest.mock import Mock, patch
 
-import pytest
 from services.license_service import LicenseService
 
 
@@ -20,23 +19,17 @@ class TestLicenseService:
     def test_validate_package_license_returns_correct_structure(self) -> None:
         """Test that validate_package_license returns the expected data structure."""
         # Mock the license cache and database lookup
-        with patch.object(
-            self.service, "_lookup_license_in_db"
-        ) as mock_lookup:
+        with patch.object(self.service, "_lookup_license_in_db") as mock_lookup:
             mock_lookup.return_value = {
                 "status": "allowed",
                 "name": "MIT License",
                 "identifier": "MIT",
             }
 
-            with patch.object(
-                self.service, "_calculate_license_score"
-            ) as mock_score:
+            with patch.object(self.service, "_calculate_license_score") as mock_score:
                 mock_score.return_value = 75
 
-                result = self.service.validate_package_license(
-                    {"license": "MIT"}
-                )
+                result = self.service.validate_package_license({"license": "MIT"})
 
                 # Validate structure
                 assert isinstance(result, dict)
@@ -65,9 +58,7 @@ class TestLicenseService:
 
     def test_validate_package_license_handles_missing_license(self) -> None:
         """Test that validate_package_license handles missing license correctly."""
-        with patch.object(
-            self.service, "_create_no_license_result"
-        ) as mock_no_license:
+        with patch.object(self.service, "_create_no_license_result") as mock_no_license:
             mock_no_license.return_value = {
                 "valid": True,
                 "score": 50,
@@ -77,9 +68,7 @@ class TestLicenseService:
                 "errors": [],
             }
 
-            result = self.service.validate_package_license(
-                {"name": "test-package"}
-            )
+            result = self.service.validate_package_license({"name": "test-package"})
 
             assert result["valid"] is True
             assert result["score"] == 50
@@ -88,14 +77,10 @@ class TestLicenseService:
 
     def test_validate_package_license_handles_unknown_license(self) -> None:
         """Test that validate_package_license handles unknown license correctly."""
-        with patch.object(
-            self.service, "_lookup_license_in_db"
-        ) as mock_lookup:
+        with patch.object(self.service, "_lookup_license_in_db") as mock_lookup:
             mock_lookup.return_value = None
 
-            with patch.object(
-                self.service, "_create_unknown_license_result"
-            ) as mock_unknown:
+            with patch.object(self.service, "_create_unknown_license_result") as mock_unknown:
                 mock_unknown.return_value = {
                     "valid": False,
                     "score": 0,
@@ -105,9 +90,7 @@ class TestLicenseService:
                     "errors": ["Unknown license: Unknown-License"],
                 }
 
-                result = self.service.validate_package_license(
-                    {"license": "Unknown-License"}
-                )
+                result = self.service.validate_package_license({"license": "Unknown-License"})
 
                 assert result["valid"] is False
                 assert result["score"] == 0
@@ -135,9 +118,7 @@ class TestLicenseService:
         packages = [mock_package1, mock_package2]
 
         # Mock license validation
-        with patch.object(
-            self.service, "validate_package_license"
-        ) as mock_validate:
+        with patch.object(self.service, "validate_package_license") as mock_validate:
             mock_validate.return_value = {
                 "valid": True,
                 "score": 75,
@@ -181,9 +162,7 @@ class TestLicenseService:
         packages = [mock_package]
 
         # Mock license validation failure
-        with patch.object(
-            self.service, "validate_package_license"
-        ) as mock_validate:
+        with patch.object(self.service, "validate_package_license") as mock_validate:
             mock_validate.return_value = {
                 "valid": False,
                 "score": 0,
@@ -193,9 +172,7 @@ class TestLicenseService:
                 "errors": ["Unknown license: Unknown-License"],
             }
 
-            results = self.service._process_license_group_work(
-                "Unknown-License", packages
-            )
+            results = self.service._process_license_group_work("Unknown-License", packages)
 
             assert len(results) == 1
             package, result = results[0]
@@ -211,13 +188,14 @@ class TestLicenseService:
         del invalid_package.id  # Remove required attribute
 
         # Test with invalid result object
-        invalid_result: Dict[str, Union[str, int]] = {"invalid": "data", "score": 0}  # Missing "status" field but has score
+        invalid_result: Dict[str, Union[str, int]] = {
+            "invalid": "data",
+            "score": 0,
+        }  # Missing "status" field but has score
 
         license_results = [(invalid_package, invalid_result)]
 
-        with patch(
-            "services.license_service.SessionHelper.get_session"
-        ) as mock_session:
+        with patch("services.license_service.SessionHelper.get_session") as mock_session:
             mock_db = Mock()
             mock_session.return_value.__enter__.return_value = mock_db
 
@@ -232,9 +210,7 @@ class TestLicenseService:
                     "services.license_service.PackageStatusOperations",
                     return_value=mock_status_ops,
                 ):
-                    result = self.service._update_license_results(
-                        license_results
-                    )
+                    result = self.service._update_license_results(license_results)
 
                     # Should handle invalid data gracefully
                     assert result["success"] is True
@@ -257,9 +233,7 @@ class TestLicenseService:
 
         license_results = [(mock_package, invalid_score_result)]
 
-        with patch(
-            "services.license_service.SessionHelper.get_session"
-        ) as mock_session:
+        with patch("services.license_service.SessionHelper.get_session") as mock_session:
             mock_db = Mock()
             mock_session.return_value.__enter__.return_value = mock_db
 
@@ -279,9 +253,7 @@ class TestLicenseService:
                     "services.license_service.PackageStatusOperations",
                     return_value=mock_status_ops,
                 ):
-                    result = self.service._update_license_results(
-                        license_results
-                    )
+                    result = self.service._update_license_results(license_results)
 
                     # Should handle invalid score gracefully
                     assert result["success"] is True
@@ -297,14 +269,10 @@ class TestLicenseService:
         mock_package.version = "1.0.0"
         mock_package.license_identifier = "MIT"
 
-        with patch.object(
-            self.service, "_get_packages_for_license_check"
-        ) as mock_get_packages:
+        with patch.object(self.service, "_get_packages_for_license_check") as mock_get_packages:
             mock_get_packages.return_value = [mock_package]
 
-            with patch.object(
-                self.service, "_perform_license_validation_batch"
-            ) as mock_validate_batch:
+            with patch.object(self.service, "_perform_license_validation_batch") as mock_validate_batch:
                 mock_validate_batch.return_value = [
                     (
                         mock_package,
@@ -316,9 +284,7 @@ class TestLicenseService:
                     )
                 ]
 
-                with patch.object(
-                    self.service, "_update_license_results"
-                ) as mock_update:
+                with patch.object(self.service, "_update_license_results") as mock_update:
                     mock_update.return_value = {
                         "success": True,
                         "processed_count": 1,
@@ -327,9 +293,7 @@ class TestLicenseService:
                         "license_groups_processed": 1,
                     }
 
-                    result = self.service.process_license_groups(
-                        max_license_groups=1
-                    )
+                    result = self.service.process_license_groups(max_license_groups=1)
 
                     # Validate result structure
                     assert isinstance(result, dict)
@@ -348,9 +312,7 @@ class TestLicenseService:
 
     def test_process_license_groups_no_packages(self) -> None:
         """Test process_license_groups when no packages need processing."""
-        with patch.object(
-            self.service, "_get_packages_for_license_check"
-        ) as mock_get_packages:
+        with patch.object(self.service, "_get_packages_for_license_check") as mock_get_packages:
             mock_get_packages.return_value = []
 
             result = self.service.process_license_groups(max_license_groups=1)
@@ -363,9 +325,7 @@ class TestLicenseService:
 
     def test_process_license_groups_exception_handling(self) -> None:
         """Test that process_license_groups handles exceptions gracefully."""
-        with patch.object(
-            self.service, "_get_packages_for_license_check"
-        ) as mock_get_packages:
+        with patch.object(self.service, "_get_packages_for_license_check") as mock_get_packages:
             mock_get_packages.side_effect = Exception("Database error")
 
             result = self.service.process_license_groups(max_license_groups=1)

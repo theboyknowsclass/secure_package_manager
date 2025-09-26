@@ -1,7 +1,7 @@
 """Database operations for PackageStatus entities."""
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Union
 
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
@@ -29,14 +29,10 @@ class PackageStatusOperations:
         Returns:
             The package status if found, None otherwise
         """
-        stmt = select(PackageStatus).where(
-            PackageStatus.package_id == package_id
-        )
+        stmt = select(PackageStatus).where(PackageStatus.package_id == package_id)
         return self.session.execute(stmt).scalar_one_or_none()
 
-    def update_status(
-        self, package_id: int, new_status: str, **kwargs: Any
-    ) -> bool:
+    def update_status(self, package_id: int, new_status: str, **kwargs: Any) -> bool:
         """Update package status.
 
         Args:
@@ -51,7 +47,6 @@ class PackageStatusOperations:
         if not status:
             return False
 
-        old_status = status.status
         status.status = new_status
         status.updated_at = datetime.utcnow()
 
@@ -62,9 +57,7 @@ class PackageStatusOperations:
 
         return True
 
-    def batch_update_status(
-        self, package_ids: List[int], new_status: str, **kwargs: Any
-    ) -> int:
+    def batch_update_status(self, package_ids: List[int], new_status: str, **kwargs: Any) -> int:
         """Update status for multiple packages.
 
         Args:
@@ -77,32 +70,34 @@ class PackageStatusOperations:
         """
         # Create update dict with proper types for SQLAlchemy update
         update_dict: Dict[str, Union[str, int, datetime]] = {
-            'status': new_status,
-            'updated_at': datetime.utcnow(),
+            "status": new_status,
+            "updated_at": datetime.utcnow(),
         }
-        
+
         # Add valid kwargs (filter to avoid SQLAlchemy type issues)
         valid_fields = {
-            'license_score', 'security_score', 'license_status', 
-            'security_scan_status', 'publish_status', 'approver_id', 'rejector_id'
+            "license_score",
+            "security_score",
+            "license_status",
+            "security_scan_status",
+            "publish_status",
+            "approver_id",
+            "rejector_id",
         }
         for key, value in kwargs.items():
             if key in valid_fields:
                 update_dict[key] = value
-        
+
         # Use bulk update with proper SQLAlchemy syntax
-        stmt = (
-            select(PackageStatus)
-            .where(PackageStatus.package_id.in_(package_ids))
-        )
+        stmt = select(PackageStatus).where(PackageStatus.package_id.in_(package_ids))
         packages = self.session.execute(stmt).scalars().all()
-        
+
         updated_count = 0
         for package in packages:
             for key, value in update_dict.items():
                 setattr(package, key, value)
             updated_count += 1
-        
+
         self.session.commit()
 
         return updated_count
@@ -119,9 +114,7 @@ class PackageStatusOperations:
         stmt = select(PackageStatus).where(PackageStatus.status == status)
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_stuck_statuses(
-        self, timeout_minutes: int, statuses: List[str]
-    ) -> List[PackageStatus]:
+    def get_stuck_statuses(self, timeout_minutes: int, statuses: List[str]) -> List[PackageStatus]:
         """Get stuck package statuses.
 
         Args:
@@ -133,9 +126,7 @@ class PackageStatusOperations:
         """
         from datetime import timedelta
 
-        stuck_threshold = datetime.utcnow() - timedelta(
-            minutes=timeout_minutes
-        )
+        stuck_threshold = datetime.utcnow() - timedelta(minutes=timeout_minutes)
 
         stmt = select(PackageStatus).where(
             and_(
@@ -164,9 +155,7 @@ class PackageStatusOperations:
         """
         return self.session.get(PackageStatus, package_status_id)
 
-    def update_package_publish_status(
-        self, package_id: int, publish_status: str
-    ) -> bool:
+    def update_package_publish_status(self, package_id: int, publish_status: str) -> bool:
         """Update package publish status.
 
         Args:
@@ -202,9 +191,7 @@ class PackageStatusOperations:
         status.updated_at = datetime.utcnow()
         return True
 
-    def mark_package_publish_failed(
-        self, package_id: int, error_message: str
-    ) -> bool:
+    def mark_package_publish_failed(self, package_id: int, error_message: str) -> bool:
         """Mark package as publish failed.
 
         Args:
@@ -238,9 +225,7 @@ class PackageStatusOperations:
         status.updated_at = datetime.utcnow()
         return True
 
-    def update_security_scan_status(
-        self, package_id: int, scan_status: str
-    ) -> bool:
+    def update_security_scan_status(self, package_id: int, scan_status: str) -> bool:
         """Update package security scan status.
 
         Args:
@@ -258,9 +243,7 @@ class PackageStatusOperations:
         status.updated_at = datetime.utcnow()
         return True
 
-    def update_security_score(
-        self, package_id: int, security_score: float
-    ) -> bool:
+    def update_security_score(self, package_id: int, security_score: float) -> bool:
         """Update package security score.
 
         Args:
@@ -278,9 +261,7 @@ class PackageStatusOperations:
         status.updated_at = datetime.utcnow()
         return True
 
-    def update_license_info(
-        self, package_id: int, license_score: int, license_status: str
-    ) -> bool:
+    def update_license_info(self, package_id: int, license_score: int, license_status: str) -> bool:
         """Update package license information.
 
         Args:
@@ -296,9 +277,7 @@ class PackageStatusOperations:
             return False
 
         status.license_score = license_score
-        status.license_status = (
-            license_status  # Use exact value to match database constraints
-        )
+        status.license_status = license_status  # Use exact value to match database constraints
         status.updated_at = datetime.utcnow()
         return True
 
@@ -443,11 +422,7 @@ class PackageStatusOperations:
         if current_status in failed_states:
             return False
 
-        current_index = (
-            workflow_stages.index(current_status)
-            if current_status in workflow_stages
-            else -1
-        )
+        current_index = workflow_stages.index(current_status) if current_status in workflow_stages else -1
 
         if current_index == -1:
             # Current status not in workflow - cannot advance

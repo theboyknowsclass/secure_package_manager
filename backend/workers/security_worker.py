@@ -5,7 +5,7 @@ This worker delegates all business logic to SecurityService.
 """
 
 import logging
-from typing import List, Optional
+from typing import List
 
 from services.security_service import SecurityService
 from workers.base_worker import BaseWorker
@@ -45,9 +45,7 @@ class SecurityWorker(BaseWorker):
         """Process one cycle of security scanning."""
         try:
             # Process packages using the service (service manages its own database sessions)
-            result = self.security_service.process_package_batch(
-                self.max_packages_per_cycle
-            )
+            result = self.security_service.process_package_batch(self.max_packages_per_cycle)
 
             if result["success"]:
                 if result["processed_count"] > 0:
@@ -56,13 +54,9 @@ class SecurityWorker(BaseWorker):
                         f"{result['failed_scans']} failed"
                     )
                 else:
-                    logger.info(
-                        "SecurityWorker heartbeat: No packages found for security scanning"
-                    )
+                    logger.info("SecurityWorker heartbeat: No packages found for security scanning")
             else:
-                logger.error(
-                    f"Error in security scanning batch: {result['error']}"
-                )
+                logger.error(f"Error in security scanning batch: {result['error']}")
 
         except Exception as e:
             logger.error(f"Security cycle error: {str(e)}", exc_info=True)
