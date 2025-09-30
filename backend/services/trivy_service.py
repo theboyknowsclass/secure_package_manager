@@ -112,34 +112,25 @@ class TrivyService:
             Path to downloaded package or None if not available
         """
         try:
-            # First, try to use the stored cache_path from package_status
-            if package.package_status and package.package_status.cache_path and Path(package.package_status.cache_path).exists():
-                # The cache_path points to the cache directory, we need the package subdirectory
-                package_path_obj: Path = Path(package.package_status.cache_path) / "package"
-                if package_path_obj.exists():
-                    logger.info(f"Using stored cache_path for scanning: {package_path_obj}")
-                    return str(package_path_obj)
-                else:
-                    logger.warning(
-                        f"Stored cache_path exists but package subdirectory not found: {package.package_status.cache_path}"
-                    )
-
-            # Fallback to the old method for backward compatibility
-            from .package_cache_service import PackageCacheService
-
-            cache_service = PackageCacheService()
-            package_path: Optional[str] = cache_service.get_package_path(package)
-
-            if package_path and Path(package_path).exists():
-                logger.info(f"Using fallback cache lookup for scanning: {package_path}")
-                return package_path
-            else:
+            # Use the stored cache_path from package_status - no fallback
+            if not package.package_status or not package.package_status.cache_path:
                 logger.error(
-                    f"Package {package.name}@{package.version} not found in cache. "
-                    f"Download worker should have completed download before security scanning. "
-                    f"Stored cache_path: {package.package_status.cache_path if package.package_status else 'None'}"
+                    f"Package {package.name}@{package.version} has no cache_path in database. "
+                    f"Download worker should have completed download before security scanning."
                 )
                 return None
+
+            # Use the cache directory directly for scanning
+            cache_dir = Path(package.package_status.cache_path)
+            
+            if not cache_dir.exists():
+                logger.error(
+                    f"Package {package.name}@{package.version} cache_path exists in database but directory not found: {package.package_status.cache_path}"
+                )
+                return None
+
+            logger.info(f"Using cache directory for scanning: {cache_dir}")
+            return str(cache_dir)
 
         except Exception as e:
             logger.error(f"Error getting package path for scanning: {str(e)}")

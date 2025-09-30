@@ -1,12 +1,13 @@
 """Download Service.
 
 Handles downloading packages from external npm registries and managing their local cache.
-This service separates database operations from I/O work for optimal performance.
+This service manages its own database sessions and operations, following the service-first architecture pattern.
 """
 
 import logging
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 import requests
 from database.models import Package
@@ -22,53 +23,83 @@ logger = logging.getLogger(__name__)
 class DownloadService:
     """Service for downloading packages from external npm registries and managing local cache.
 
-    This service separates database operations from I/O work to minimize database session time.
+    This service manages its own database sessions and operations,
+    following the service-first architecture pattern.
     """
 
     def __init__(self) -> None:
         """Initialize the download service."""
         self.logger = logger
+        # Operations instances (set up in _setup_operations)
+        self._session: Optional[Any] = None
+        self._package_ops: Optional[PackageOperations] = None
+        self._status_ops: Optional[PackageStatusOperations] = None
+        self.database_url = os.getenv("DATABASE_URL", "")
+        self.db_service = DatabaseService(self.database_url)
 
         # Download configuration
         self.download_timeout = int(os.getenv("DOWNLOAD_TIMEOUT", "60"))
         self.source_repository_url = os.getenv("SOURCE_REPOSITORY_URL", "https://registry.npmjs.org")
-        self.database_url = os.getenv("DATABASE_URL", "")
-        self.db_service = DatabaseService(self.database_url)
+
+    def _setup_operations(self, session: Any) -> None:
+        """Set up operations instances for the current session."""
+        self._session = session
+        self._package_ops = PackageOperations(session)
+        self._status_ops = PackageStatusOperations(session)
 
     def process_package_batch(self, max_packages: int = 5) -> Dict[str, Any]:
         """Process a batch of packages for downloading.
 
-        This method separates database operations from I/O work:
-        1. Get packages that need downloading (short DB session)
-        2. Perform downloads (no DB session)
-        3. Update database with results (short DB session)
-
         Args:
-            max_packages: Maximum number of packages to process
+            max_packages: Maximum number of packages to process (reduced for better performance)
 
         Returns:
             Dict with processing results
         """
         try:
-            # Phase 1: Get package data (short DB session)
-            packages_to_process = self._get_packages_for_download(max_packages)
-            if not packages_to_process:
+            with self.db_service.get_session() as session:
+                # Set up operations
+                self._setup_operations(session)
+
+                # MyPy assertion - operations are guaranteed to be set after _setup_operations
+                assert self._package_ops is not None
+                assert self._status_ops is not None
+
+                # Find packages that need downloading
+                ready_packages = self._package_ops.get_by_status("Licence Checked")
+
+                # Limit the number of packages processed (smaller batches)
+                limited_packages = ready_packages[:max_packages]
+
+                if not limited_packages:
+                    return {
+                        "success": True,
+                        "processed_count": 0,
+                        "successful_downloads": 0,
+                        "failed_downloads": 0,
+                        "total_packages": 0,
+                    }
+
+                successful_downloads = 0
+                failed_downloads = 0
+
+                for package in limited_packages:
+                    result = self.process_single_package(package)
+                    if result["success"]:
+                        successful_downloads += 1
+                    else:
+                        failed_downloads += 1
+
+                session.commit()
+
                 return {
                     "success": True,
-                    "processed_count": 0,
-                    "successful_downloads": 0,
-                    "failed_downloads": 0,
-                    "already_cached": 0,
-                    "total_packages": 0,
+                    "processed_count": len(limited_packages),
+                    "successful_downloads": successful_downloads,
+                    "failed_downloads": failed_downloads,
+                    "total_packages": len(limited_packages),
                 }
-
-            # Phase 2: Perform downloads (no DB session)
-            download_results = self._perform_download_batch(packages_to_process)
-
-            # Phase 3: Update database (short DB session)
-            return self._update_download_results(download_results)
-
-        except (ValueError, TypeError, AttributeError) as e:
+        except Exception as e:
             self.logger.error(f"Error processing download batch: {str(e)}")
             return {
                 "success": False,
@@ -76,136 +107,62 @@ class DownloadService:
                 "processed_count": 0,
                 "successful_downloads": 0,
                 "failed_downloads": 0,
-                "already_cached": 0,
                 "total_packages": 0,
             }
 
-    def _get_packages_for_download(self, max_packages: int) -> List[Any]:
-        """Get packages that need downloading (short DB session).
+    def process_single_package(self, package: Any) -> Dict[str, Any]:
+        """Process a single package for downloading.
 
         Args:
-            max_packages: Maximum number of packages to retrieve
-
-        Returns:
-            List of packages that need downloading
-        """
-        with self.db_service.get_session() as session:
-            package_ops = PackageOperations(session)
-            return package_ops.get_by_status("Licence Checked")[:max_packages]
-
-    def _perform_download_batch(self, packages: List[Any]) -> List[Tuple[Any, Dict[str, Any]]]:
-        """Perform downloads without database sessions.
-
-        Args:
-            packages: List of packages to download
-
-        Returns:
-            List of tuples (package, result_dict)
-        """
-        results = []
-        for package in packages:
-            result = self._perform_download_work(package)
-            results.append((package, result))
-        return results
-
-    def _perform_download_work(self, package: Any) -> Dict[str, Any]:
-        """Pure I/O work - no database operations.
-
-        Args:
-            package: Package to download
-
-        Returns:
-            Dict with download result
-        """
-        try:
-            # Check if already cached
-            if self._is_package_already_downloaded(package):
-                return {
-                    "status": "already_cached",
-                    "message": "Already downloaded",
-                }
-
-            # Perform download
-            download_success = self._perform_download(package)
-
-            if download_success:
-                # Verify download
-                if self._is_package_already_downloaded(package):
-                    return {
-                        "status": "success",
-                        "message": "Download completed",
-                    }
-                else:
-                    return {
-                        "status": "failed",
-                        "error": "Download completed but file not found in cache",
-                    }
-            else:
-                return {"status": "failed", "error": "Download failed"}
-
-        except Exception as e:
-            self.logger.error(f"Error downloading package {package.name}@{package.version}: {str(e)}")
-            return {"status": "failed", "error": str(e)}
-
-    def _update_download_results(self, download_results: List[Tuple[Any, Dict[str, Any]]]) -> Dict[str, Any]:
-        """Update database with download results (short DB session).
-
-        Args:
-            download_results: List of tuples (package, result_dict)
+            package: Package to process
 
         Returns:
             Dict with processing results
         """
-        successful_count = 0
-        failed_count = 0
-        already_cached_count = 0
+        try:
+            self.logger.info(f"Processing package {package.name}@{package.version} with status: {package.package_status.status if package.package_status else 'No status'}")
+            
+            # Check if package is already downloaded
+            if self._is_package_already_downloaded(package):
+                self.logger.info(f"Package {package.name}@{package.version} already downloaded, checking database info")
+                
+                # Check if we need to update database info (cache_path, file_size, checksum)
+                needs_db_update = not (package.package_status and package.package_status.cache_path)
+                
+                if needs_db_update:
+                    self.logger.info(f"Package {package.name}@{package.version} missing database info, updating...")
+                    # Update download info in database
+                    self._update_download_info_for_cached_package(package)
+                
+                # Skip "Downloading" status and go directly to "Downloaded"
+                self.logger.info(f"Package {package.name}@{package.version} already downloaded, marking as downloaded")
+                self._mark_package_downloaded_directly(package)
+                return {"success": True, "message": "Already downloaded"}
 
-        with self.db_service.get_session() as session:
-            package_ops = PackageOperations(session)
-            status_ops = PackageStatusOperations(session)
+            # Mark package as downloading
+            self.logger.info(f"Marking package {package.name}@{package.version} as downloading")
+            self._mark_package_downloading(package)
 
-            for package, result in download_results:
-                try:
-                    # Verify package still needs processing (race condition protection)
-                    current_package = package_ops.get_by_id(package.id)
-                    if (
-                        not current_package
-                        or not current_package.package_status
-                        or current_package.package_status.status != "Licence Checked"
-                    ):
-                        continue  # Skip if status changed
+            # Perform the actual download
+            self.logger.info(f"Starting download for package {package.name}@{package.version}")
+            download_success = self._perform_download(package)
 
-                    if result["status"] == "already_cached":
-                        status_ops.update_status(package.id, "Downloaded")
-                        already_cached_count += 1
-                    elif result["status"] == "success":
-                        status_ops.update_status(package.id, "Downloaded")
-                        successful_count += 1
-                    else:  # failed
-                        status_ops.update_status(package.id, "Download Failed")
-                        failed_count += 1
+            if download_success:
+                # Update status to "Downloaded" in the original session
+                self.logger.info(f"Download completed successfully for {package.name}@{package.version}, updating status")
+                self.logger.info(f"Current status before update: {package.package_status.status if package.package_status else 'No status'}")
+                self._mark_package_downloaded(package)
+                self.logger.info(f"Status after update attempt: {package.package_status.status if package.package_status else 'No status'}")
+                return {"success": True, "message": "Download completed"}
+            else:
+                self.logger.error(f"Download failed for package {package.name}@{package.version}")
+                self._mark_package_download_failed(package)
+                return {"success": False, "error": "Download failed"}
 
-                except Exception as e:
-                    self.logger.error(f"Error updating package {package.name}@{package.version}: {str(e)}")
-                    failed_count += 1
-
-            session.commit()
-
-        # Log batch summary
-        if successful_count > 0 or failed_count > 0 or already_cached_count > 0:
-            self.logger.info(
-                f"Download batch complete: {successful_count} downloaded, "
-                f"{already_cached_count} already cached, {failed_count} failed"
-            )
-
-        return {
-            "success": True,
-            "processed_count": len(download_results),
-            "successful_downloads": successful_count,
-            "failed_downloads": failed_count,
-            "already_cached": already_cached_count,
-            "total_packages": len(download_results),
-        }
+        except Exception as e:
+            self.logger.error(f"Error processing package {package.name}@{package.version}: {str(e)}")
+            self._mark_package_download_failed(package)
+            return {"success": False, "error": str(e)}
 
     def _is_package_already_downloaded(self, package: Any) -> bool:
         """Check if package is already downloaded.
@@ -217,11 +174,24 @@ class DownloadService:
             True if already downloaded, False otherwise
         """
         try:
-            # Import here to avoid circular imports
-            from services.package_cache_service import PackageCacheService
-
-            cache_service = PackageCacheService()
-            return cache_service.is_package_cached(package)
+            # First check if we have cache_path in database
+            has_cache_path = package.package_status and package.package_status.cache_path
+            
+            if not has_cache_path:
+                self.logger.info(f"Package {package.name}@{package.version} - No cache_path in database, needs download")
+                return False
+            
+            # Verify the cache directory exists
+            cache_path = package.package_status.cache_path
+            cache_dir = Path(cache_path)
+            
+            if not cache_dir.exists() or not cache_dir.is_dir():
+                self.logger.info(f"Package {package.name}@{package.version} - Cache path exists in DB but directory missing: {cache_dir}")
+                return False
+            
+            self.logger.info(f"Package {package.name}@{package.version} - Already downloaded at: {cache_dir}")
+            return True
+            
         except Exception as e:
             self.logger.error(f"Error checking if package is downloaded: {str(e)}")
             return False
@@ -247,14 +217,53 @@ class DownloadService:
 
             # Store tarball in local cache
             cache_service = PackageCacheService()
-            result = cache_service.store_package_from_tarball(package, tarball_content)
-            return result is not None
+            cache_path = cache_service.store_package_from_tarball(package, tarball_content)
+
+            if cache_path is None:
+                return False
+
+            # Update package with download information (cache_path, size, checksum)
+            with self.db_service.get_session() as session:
+                from database.operations.package_status_operations import (
+                    PackageStatusOperations,
+                )
+
+                status_ops = PackageStatusOperations(session)
+
+                # Calculate file size and checksum
+                file_size = None
+                checksum = None
+                try:
+                    # Calculate size of the extracted package directory
+                    package_dir = Path(cache_path) / "package"
+                    if package_dir.exists():
+                        file_size = sum(filepath.stat().st_size for filepath in package_dir.rglob("*") if filepath.is_file())
+
+                    # Calculate checksum of the original tarball content
+                    if tarball_content:
+                        import hashlib
+
+                        checksum = hashlib.sha256(tarball_content).hexdigest()
+                except Exception as e:
+                    self.logger.warning(f"Could not calculate file size/checksum for {package.name}@{package.version}: {str(e)}")
+
+                if status_ops.update_download_info(package.id, cache_path, file_size, checksum):
+                    session.commit()
+                    self.logger.info(
+                        f"Updated download info for {package.name}@{package.version}: "
+                        f"cache_path={cache_path}, size={file_size}, "
+                        f"checksum={checksum[:16] if checksum else 'None'}..."
+                    )
+                    return True
+                else:
+                    self.logger.error(f"Failed to update download info for {package.name}@{package.version}")
+                    return False
 
         except Exception as e:
             self.logger.error(f"Error performing download: {str(e)}")
             return False
 
-    def _download_package_tarball(self, package: Package) -> Optional[bytes]:
+    def _download_package_tarball(self, package: Any) -> Optional[bytes]:
         """Download package tarball from npm registry.
 
         Args:
@@ -282,7 +291,7 @@ class DownloadService:
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Network error downloading package {package.name}@{package.version}: {str(e)}")
             return None
-        except (OSError, IOError, ValueError) as e:
+        except Exception as e:
             self.logger.error(f"Unexpected error downloading package {package.name}@{package.version}: {str(e)}")
             return None
 
@@ -308,3 +317,111 @@ class DownloadService:
         else:
             # For regular packages: package -> package
             return f"{self.source_repository_url}/{package_name}/-/{package_name}-{package.version}.tgz"
+
+    def _mark_package_downloading(self, package: Any) -> None:
+        """Mark package as downloading.
+
+        Args:
+            package: Package to update
+        """
+        assert self._status_ops is not None
+        if package.package_status:
+            self.logger.info(f"Attempting to mark package {package.name}@{package.version} as downloading (current status: {package.package_status.status})")
+            success = self._status_ops.go_to_next_stage(package.id)
+            if success:
+                self.logger.info(f"Successfully marked package {package.name}@{package.version} as downloading")
+            else:
+                self.logger.error(f"Failed to mark package {package.name}@{package.version} as downloading")
+        else:
+            self.logger.error(f"Package {package.name}@{package.version} has no package_status")
+
+    def _mark_package_downloaded(self, package: Any) -> None:
+        """Mark package as downloaded.
+
+        Args:
+            package: Package to update
+        """
+        assert self._status_ops is not None
+        if package.package_status:
+            self.logger.info(f"Attempting to mark package {package.name}@{package.version} as downloaded (current status: {package.package_status.status})")
+            success = self._status_ops.go_to_next_stage(package.id)
+            if success:
+                self.logger.info(f"Successfully marked package {package.name}@{package.version} as downloaded")
+            else:
+                self.logger.error(f"Failed to mark package {package.name}@{package.version} as downloaded")
+        else:
+            self.logger.error(f"Package {package.name}@{package.version} has no package_status")
+
+    def _mark_package_downloaded_directly(self, package: Any) -> None:
+        """Mark package as downloaded directly, skipping the "Downloading" status.
+
+        Args:
+            package: Package to update
+        """
+        assert self._status_ops is not None
+        if package.package_status:
+            self.logger.info(f"Attempting to mark package {package.name}@{package.version} as downloaded directly (current status: {package.package_status.status})")
+            # Go directly to "Downloaded" status, skipping "Downloading"
+            success = self._status_ops.update_status(package.id, "Downloaded")
+            if success:
+                self.logger.info(f"Successfully marked package {package.name}@{package.version} as downloaded directly")
+            else:
+                self.logger.error(f"Failed to mark package {package.name}@{package.version} as downloaded directly")
+        else:
+            self.logger.error(f"Package {package.name}@{package.version} has no package_status")
+
+    def _update_download_info_for_cached_package(self, package: Any) -> None:
+        """Update download info for a package that's already cached but missing database info.
+
+        Args:
+            package: Package to update
+        """
+        try:
+            # Import here to avoid circular imports
+            from services.package_cache_service import PackageCacheService
+
+            cache_service = PackageCacheService()
+            
+            # Get the cache path for this package
+            cache_path = cache_service.get_package_path(package)
+            if not cache_path:
+                self.logger.error(f"Could not get cache path for package {package.name}@{package.version}")
+                return
+
+            # Calculate file size and checksum
+            file_size = None
+            checksum = None
+            try:
+                # Calculate size of the cached package directory
+                package_dir = Path(cache_path)
+                if package_dir.exists():
+                    file_size = sum(filepath.stat().st_size for filepath in package_dir.rglob("*") if filepath.is_file())
+
+                # For checksum, we'd need the original tarball, but we can skip it for now
+                # since the package is already successfully cached
+                checksum = None
+            except Exception as e:
+                self.logger.warning(f"Could not calculate file size for cached package {package.name}@{package.version}: {str(e)}")
+
+            # Update the database with download info
+            # Store the cache directory path (parent of the package subdirectory)
+            cache_dir_path = str(Path(cache_path).parent)
+            
+            assert self._status_ops is not None
+            if self._status_ops.update_download_info(package.id, cache_dir_path, file_size, checksum):
+                self.logger.info(f"Updated download info for cached package {package.name}@{package.version}: cache_path={cache_dir_path}, size={file_size}")
+            else:
+                self.logger.error(f"Failed to update download info for cached package {package.name}@{package.version}")
+                
+        except Exception as e:
+            self.logger.error(f"Error updating download info for cached package {package.name}@{package.version}: {str(e)}")
+
+    def _mark_package_download_failed(self, package: Any) -> None:
+        """Mark package as download failed.
+
+        Args:
+            package: Package to update
+        """
+        assert self._status_ops is not None
+        if package.package_status:
+            self._status_ops.update_status(package.id, "Download Failed")

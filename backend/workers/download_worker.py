@@ -43,7 +43,12 @@ class DownloadWorker(BaseWorker):
             # Process packages using the service (service manages its own database sessions)
             result = self.download_service.process_package_batch(self.max_packages_per_cycle)
 
-            if not result["success"]:
+            if result["success"]:
+                if result.get("processed_count", 0) > 0:
+                    logger.info(f"Successfully downloaded {result['processed_count']} packages")
+                else:
+                    logger.info("DownloadWorker heartbeat: No packages found for downloading")
+            else:
                 logger.error(f"Error in download batch: {result['error']}")
 
         except Exception as e:

@@ -45,8 +45,12 @@ class PackageStatusOperations:
         """
         status = self.get_by_package_id(package_id)
         if not status:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"update_status: No status found for package_id={package_id}")
             return False
 
+        old_status = status.status
         status.status = new_status
         status.updated_at = datetime.utcnow()
 
@@ -54,6 +58,10 @@ class PackageStatusOperations:
         for key, value in kwargs.items():
             if hasattr(status, key):
                 setattr(status, key, value)
+
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"update_status: package_id={package_id}, old_status='{old_status}', new_status='{new_status}'")
 
         return True
 
@@ -433,4 +441,13 @@ class PackageStatusOperations:
             return False
 
         next_status = workflow_stages[current_index + 1]
-        return self.update_status(package_id, next_status, **kwargs)
+        
+        # Add debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"go_to_next_stage: package_id={package_id}, current_status='{current_status}', next_status='{next_status}'")
+        
+        result = self.update_status(package_id, next_status, **kwargs)
+        logger.info(f"go_to_next_stage: update_status result={result}")
+        
+        return result
