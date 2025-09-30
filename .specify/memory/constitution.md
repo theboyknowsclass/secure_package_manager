@@ -1,14 +1,14 @@
 <!--
 Sync Impact Report:
-Version change: 1.0.0 → 1.0.0 (initial creation)
-Modified principles: N/A (new constitution)
-Added sections: Security-First Architecture, Production Readiness, Quality Assurance, Accessibility Standards
+Version change: 1.0.0 → 1.1.0 (major update)
+Modified principles: Added Latest Stable Versions, Code Quality and Linting Standards
+Added sections: Frontend Development Standards, Backend Development Standards, Enhanced Quality Assurance
 Removed sections: N/A
 Templates requiring updates:
   ✅ .specify/templates/plan-template.md - Constitution Check section updated
   ✅ .specify/templates/spec-template.md - Security requirements added
   ✅ .specify/templates/tasks-template.md - TDD and security testing tasks added
-Follow-up TODOs: None
+Follow-up TODOs: Update plan templates to include new linting and version requirements
 -->
 
 # Secure Package Manager Constitution
@@ -32,6 +32,12 @@ All components MUST be fully dockerized with multi-environment support (dev/prod
 
 ### VI. Accessibility and UX Standards
 User interfaces MUST use commonplace UI libraries with minimal custom code. All interfaces MUST meet WCAG AA accessibility standards. Focus on usability, responsive design, and inclusive user experience. No custom UI components without strong justification.
+
+### VII. Latest Stable Versions (NON-NEGOTIABLE)
+All dependencies MUST use the latest stable versions available. This includes Python, Node.js, React, Flask, and all other libraries. Regular updates are mandatory to ensure security, performance, and access to latest features. No outdated dependencies are acceptable in production.
+
+### VIII. Code Quality and Linting Standards (NON-NEGOTIABLE)
+All code MUST follow established linting and formatting standards. Python code MUST follow PEP8 standards with Black for formatting and flake8 for linting. JavaScript/TypeScript code MUST use ESLint and Prettier for consistent formatting. All code MUST be automatically formatted and linted before commits.
 
 ## Security Requirements
 
@@ -87,9 +93,13 @@ User interfaces MUST use commonplace UI libraries with minimal custom code. All 
 - Security tests for authentication and authorization
 - Performance tests for critical paths
 - End-to-end tests for user workflows
+- **Accessibility tests**: Automated WCAG AA compliance testing with axe-core
+- **Component testing**: Storybook for isolated component development and visual regression testing
 
-### Code Quality
-- Automated linting and formatting
+### Code Quality and Linting
+- **Python**: PEP8 compliance with Black formatting and flake8 linting
+- **JavaScript/TypeScript**: ESLint and Prettier for consistent formatting
+- **Automated formatting**: All code MUST be automatically formatted before commits
 - Code review requirements for all changes
 - Static analysis and security scanning
 - Documentation requirements for complex logic
@@ -101,6 +111,56 @@ User interfaces MUST use commonplace UI libraries with minimal custom code. All 
 - README files describe what the system does NOW
 - Inline code comments explain current functionality
 - Remove outdated documentation immediately when making changes
+
+## Frontend Development Standards
+
+### Component Development
+- **Storybook**: All UI components MUST have Storybook stories for isolated development and testing
+- **Co-location**: Tests and stories MUST be co-located with their components
+- **Accessibility**: All components MUST pass automated accessibility testing with axe-core
+- **Responsive Design**: All components MUST be responsive and mobile-friendly
+
+### State Management
+- **Zustand**: Use Zustand for global state management (simple, performant)
+- **Local State**: Use React hooks for component-local state
+- **No Redux**: Avoid Redux complexity unless absolutely necessary
+
+### API Integration
+- **MSW**: Use Mock Service Worker for API mocking in development and tests
+- **Co-located Mocks**: Mock files MUST be co-located with their corresponding services
+- **Type Safety**: All API calls MUST be fully typed with TypeScript
+
+### Build and Development
+- **Vite**: Use Vite for fast development and optimized builds
+- **Latest React**: Always use the latest stable version of React
+- **TypeScript**: All frontend code MUST be written in TypeScript
+
+## Backend Development Standards
+
+### Code Quality
+- **PEP8**: All Python code MUST follow PEP8 standards
+- **Black**: Use Black for automatic code formatting
+- **flake8**: Use flake8 for linting and style checking
+- **isort**: Use isort for import organization
+- **mypy**: Use mypy for static type checking
+
+### Testing Organization
+- **Mirror Structure**: Tests MUST mirror source structure under `tests/` folder
+- **Co-location**: Test files MUST be in corresponding `tests/` subdirectories
+- **pytest**: Use pytest for all Python testing
+- **Coverage**: Maintain high test coverage for all business logic
+
+### API Development
+- **Flask**: Use latest stable Flask version
+- **Type Hints**: All Python functions MUST have proper type hints
+- **Documentation**: All API endpoints MUST be documented with OpenAPI/Swagger
+- **Validation**: All inputs MUST be validated and sanitized
+
+### Database
+- **SQLAlchemy**: Use latest stable SQLAlchemy version
+- **Migrations**: Use init scripts approach (no migration files)
+- **Connection Pooling**: Implement proper database connection pooling
+- **Transactions**: Use proper transaction management
 
 ## Development Workflow
 
@@ -134,4 +194,4 @@ This constitution supersedes all other practices and MUST be followed by all tea
 
 All pull requests and code reviews MUST verify compliance with this constitution. Complexity MUST be justified with clear documentation. Use the project README and documentation for runtime development guidance.
 
-**Version**: 1.0.0 | **Ratified**: 2025-01-27 | **Last Amended**: 2025-01-27
+**Version**: 1.1.0 | **Ratified**: 2025-01-27 | **Last Amended**: 2024-12-19

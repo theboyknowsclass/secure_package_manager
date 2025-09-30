@@ -1,0 +1,274 @@
+openapi: 3.0.3
+info:
+  title: Package Lock Upload API
+  description: API for uploading and managing package-lock.json files
+  version: 1.0.0
+  contact:
+    name: Secure Package Manager
+    email: support@example.com
+
+servers:
+  - url: http://localhost:5000/api
+    description: Development server
+  - url: https://api.secure-package-manager.com/api
+    description: Production server
+
+security:
+  - bearerAuth: []
+
+paths:
+  /packages/upload:
+    post:
+      summary: Upload package-lock.json file
+      description: Upload a package-lock.json file for processing. Requires authentication.
+      operationId: uploadPackageLock
+      tags:
+        - Package Upload
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: package-lock.json file to upload
+                  maxLength: 104857600  # 100MB in bytes
+            encoding:
+              file:
+                contentType: application/json
+      responses:
+        '200':
+          description: Upload successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadSuccessResponse'
+        '400':
+          description: Bad request - invalid file or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
+          description: Unauthorized - authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedResponse'
+        '409':
+          description: Conflict - user already has an upload in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConflictResponse'
+        '413':
+          description: Payload too large - file exceeds 100MB limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileTooLargeResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalErrorResponse'
+
+  /packages/upload/status:
+    get:
+      summary: Get upload status
+      description: Get the status of the current user's upload
+      operationId: getUploadStatus
+      tags:
+        - Package Upload
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Upload status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadStatusResponse'
+        '401':
+          description: Unauthorized - authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedResponse'
+        '404':
+          description: No upload in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoUploadResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from ADFS authentication
+
+  schemas:
+    UploadSuccessResponse:
+      type: object
+      required:
+        - success
+        - request_id
+        - message
+        - application_name
+        - version
+        - packages_processed
+      properties:
+        success:
+          type: boolean
+          example: true
+        request_id:
+          type: integer
+          description: Unique identifier for the upload request
+          example: 12345
+        message:
+          type: string
+          description: Success message
+          example: "Package-lock.json uploaded successfully"
+        application_name:
+          type: string
+          description: Name extracted from package-lock.json
+          example: "my-application"
+        version:
+          type: string
+          description: Version extracted from package-lock.json
+          example: "1.0.0"
+        packages_processed:
+          type: integer
+          description: Number of packages found in the file
+          example: 150
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when the request was created
+          example: "2024-12-19T10:30:00Z"
+
+    ValidationErrorResponse:
+      type: object
+      required:
+        - error
+        - details
+      properties:
+        error:
+          type: string
+          description: Error type
+          example: "Validation Error"
+        details:
+          type: string
+          description: Specific technical error message
+          example: "Invalid lockfileVersion: expected 3+, got 2"
+        field:
+          type: string
+          description: Field that failed validation
+          example: "lockfileVersion"
+
+    UnauthorizedResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          example: "Unauthorized"
+        message:
+          type: string
+          example: "Authentication required"
+
+    ConflictResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          example: "Upload in Progress"
+        message:
+          type: string
+          example: "You already have an upload in progress. Please wait for it to complete."
+
+    FileTooLargeResponse:
+      type: object
+      required:
+        - error
+        - details
+      properties:
+        error:
+          type: string
+          example: "File Too Large"
+        details:
+          type: string
+          example: "File size exceeds 100MB limit"
+
+    InternalErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          example: "Internal Server Error"
+        message:
+          type: string
+          example: "An unexpected error occurred. Please try again."
+
+    UploadStatusResponse:
+      type: object
+      required:
+        - status
+        - request_id
+      properties:
+        status:
+          type: string
+          enum: [uploading, processing, completed, failed, queued]
+          description: Current status of the upload
+          example: "processing"
+        request_id:
+          type: integer
+          description: Unique identifier for the upload request
+          example: 12345
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Upload progress percentage
+          example: 75
+        message:
+          type: string
+          description: Status message
+          example: "Processing package dependencies..."
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when the request was created
+          example: "2024-12-19T10:30:00Z"
+
+    NoUploadResponse:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          example: "No upload in progress"
+
+tags:
+  - name: Package Upload
+    description: Operations for uploading and managing package-lock.json files

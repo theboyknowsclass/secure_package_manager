@@ -1,0 +1,31 @@
+# secure_package_manager Development Guidelines
+
+Auto-generated from all feature plans. Last updated: 2025-09-30
+
+## Active Technologies
+- Python 3.11+ (backend), TypeScript 4.9+ (frontend) + Flask 3.1.2, React 18.2.0, Material-UI 7.3.2, SQLAlchemy 2.0.40 (001-package-lock-upload)
+- Python 3.11+ (backend), TypeScript 5.0+ (frontend), React 18.3+ + Flask 3.1.2, React 18.3+, Vite 5.0+, Material-UI 7.3.2, SQLAlchemy 2.0.40, Zustand 5.0+ (001-package-lock-upload)
+- PostgreSQL with existing Request/User/Package models (001-package-lock-upload)
+- Python 3.11+ (backend), TypeScript 5.0+ (frontend), React 22.x LTS + Flask 3.1.2, React 22.x LTS, Vite 5.0+, Material-UI 7.3.2, SQLAlchemy 2.0.40, Zustand 5.0+ (001-package-lock-upload)
+- Python 3.11+ (backend), TypeScript 5.0+ (frontend), React 19.1.1, Node.js 20.x LTS + Flask 3.1.2, React 19.1.1, Vite 5.0+, Material-UI 7.3.2, SQLAlchemy 2.0.40, Zustand 5.0+ (001-package-lock-upload)
+
+## Project Structure
+```
+backend/
+frontend/
+tests/
+```
+
+## Commands
+cd src; pytest; ruff check .
+
+## Code Style
+Python 3.11+ (backend), TypeScript 4.9+ (frontend): Follow standard conventions
+
+## Recent Changes
+- 001-package-lock-upload: Added Python 3.11+ (backend), TypeScript 5.0+ (frontend), React 19.1.1, Node.js 20.x LTS + Flask 3.1.2, React 19.1.1, Vite 5.0+, Material-UI 7.3.2, SQLAlchemy 2.0.40, Zustand 5.0+
+- 001-package-lock-upload: Added Python 3.11+ (backend), TypeScript 5.0+ (frontend), React 19.1.1, Node.js 20.x LTS + Flask 3.1.2, React 19.1.1, Vite 5.0+, Material-UI 7.3.2, SQLAlchemy 2.0.40, Zustand 5.0+
+- 001-package-lock-upload: Added Python 3.11+ (backend), TypeScript 5.0+ (frontend), React 22.x LTS + Flask 3.1.2, React 22.x LTS, Vite 5.0+, Material-UI 7.3.2, SQLAlchemy 2.0.40, Zustand 5.0+
+
+<!-- MANUAL ADDITIONS START -->
+<!-- MANUAL ADDITIONS END -->
