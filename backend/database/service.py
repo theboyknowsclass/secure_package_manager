@@ -28,7 +28,7 @@ class DatabaseService:
         self.database_url = database_url
         self.echo = echo
         self._engine: Optional[Engine] = None
-        self._SessionLocal: Optional[sessionmaker] = None
+        self._session_local: Optional[sessionmaker] = None
         self._initialize_engine()
 
     def _initialize_engine(self) -> None:
@@ -56,7 +56,7 @@ class DatabaseService:
                 )
 
             self._engine = create_engine(self.database_url, **engine_kwargs)
-            self._SessionLocal = sessionmaker(bind=self._engine)
+            self._session_local = sessionmaker(bind=self._engine)
 
             logger.debug(f"Database service initialized with URL: {self._mask_database_url()}")
 
@@ -86,9 +86,9 @@ class DatabaseService:
                 result = session.query(Model).all()
                 session.commit()
         """
-        if self._SessionLocal is None:
+        if self._session_local is None:
             raise RuntimeError("Database service not initialized")
-        session = self._SessionLocal()
+        session = self._session_local()
         try:
             yield session
         except Exception as e:

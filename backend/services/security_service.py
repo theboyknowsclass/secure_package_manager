@@ -173,32 +173,20 @@ class SecurityService:
                 try:
                     # Verify package still needs processing (race condition protection)
                     current_package = package_ops.get_by_id(package.id)
-                    if (
-                        not current_package
-                        or not current_package.package_status
-                        or current_package.package_status.status != "Downloaded"
-                    ):
-                        continue  # Skip if status changed
+
+                    if not all([current_package, current_package.package_status, current_package.package_status.status == "Downloaded"]):
+                        continue
 
                     if result["status"] == "success":
                         # Update package status to Security Scanned
                         status_ops.update_status(package.id, "Security Scanned")
 
                         # Update package with security score if available
-                        if "scan_data" in result and "security_score" in result["scan_data"]:
-                            status_ops.update_security_score(
-                                package.id,
-                                result["scan_data"]["security_score"],
-                            )
+                        self.update_package_with_security_score(result, status_ops, package.id)
 
                         # Store scan results if available
                         scan_stored = True
-                        if "scan_data" in result:
-                            scan_stored = self._store_scan_results(
-                                security_scan_ops,
-                                package.id,
-                                result["scan_data"],
-                            )
+                        scan_stored = self.storing_scan_results(result, security_scan_ops, package.id)
 
                         if scan_stored:
                             successful_count += 1
@@ -259,7 +247,7 @@ class SecurityService:
                 info_count=scan_data.get("info_count", 0),
                 scan_duration_ms=scan_data.get("scan_duration_ms", 0),
                 trivy_version=scan_data.get("trivy_version", "unknown"),
-                completed_at=datetime.utcnow(),
+                completed_at=datetime.now(timezone.utc),
             )
 
             security_scan_ops.create(security_scan)
@@ -268,3 +256,20 @@ class SecurityService:
         except Exception as e:
             self.logger.error(f"Error storing scan results for package {package_id}: {str(e)}")
             return False
+    
+    def storing_scan_results(self, result, security_scan_ops, package_id):
+        if "scan_data" in result:
+            scan_stored = self._store_scan_results(
+                security_scan_ops,
+                package_id,
+                result["scan_data"],
+            )
+            return scan_stored
+    
+    def update_package_with_security_score(self, result, status_ops, package_id):
+        if "scan_data" in result and "security_score" in result["scan_data"]:
+            status_ops.update_security_score(
+                package_id,
+                result["scan_data"]["security_score"],
+            )
+        

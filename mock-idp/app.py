@@ -9,6 +9,7 @@ from constants import (
     JWT_SECRET,
     OAUTH_AUDIENCE,
     OAUTH_ISSUER,
+    DOMAIN_USERS
 )
 from flask import Flask, jsonify, redirect, request, session
 from flask_cors import CORS
@@ -39,14 +40,14 @@ MOCK_USERS = {
         "email": "approver@company.com",
         "full_name": "Package Approver",
         "password": "approver",
-        "ad_groups": ["PackageManager-Approvers", "Domain Users"],
+        "ad_groups": ["PackageManager-Approvers", DOMAIN_USERS],
     },
     "user": {
         "username": "user",
         "email": "user@company.com",
         "full_name": "Regular User",
         "password": "user",
-        "ad_groups": ["PackageManager-Users", "Domain Users"],
+        "ad_groups": ["PackageManager-Users", DOMAIN_USERS],
     },
 }
 
@@ -337,7 +338,7 @@ def validate_token():
             "username": "john.doe",
             "email": "john.doe@company.com",
             "full_name": "John Doe",
-            "ad_groups": ["PackageManager-Users", "Domain Users"],  # Mock AD groups
+            "ad_groups": ["PackageManager-Users", DOMAIN_USERS],  # Mock AD groups
         }
 
         # Map AD groups to roles

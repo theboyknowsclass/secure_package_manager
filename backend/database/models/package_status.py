@@ -18,33 +18,29 @@ from .base import Base
 class PackageStatus(Base):
     __tablename__ = "package_status"
 
+    CHECKING_LICENCE_STR = "Checking Licence"
+    PARSE_FAILED_STR = "Parse Failed"
+    LICENCE_CHECK_FAILED_STR = "Licence Check Failed"
+    DOWNLOAD_FAILED_STR = "Download Failed"
+    SECURITY_SCAN_FAILED_STR = "Security Scan Failed"
+
     package_id: Mapped[int] = mapped_column(Integer, ForeignKey("packages.id"), primary_key=True)
-    status: Mapped[str] = mapped_column(String(50), default="Checking Licence", nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default=CHECKING_LICENCE_STR, nullable=False)
     file_size: Mapped[Optional[int]] = mapped_column(BigInteger)
     checksum: Mapped[Optional[str]] = mapped_column(String(255))
     cache_path: Mapped[Optional[str]] = mapped_column(String(500))  # Actual cache directory path where package is stored
     license_score: Mapped[Optional[int]] = mapped_column(Integer)
     security_score: Mapped[Optional[int]] = mapped_column(Integer)
-    security_scan_status: Mapped[str] = mapped_column(
-        String(50), default="pending", nullable=False
-    )  # pending, running, completed, failed, skipped
-    license_status: Mapped[Optional[str]] = mapped_column(
-        String(20)
-    )  # Primary license status calculated from supported_licenses table
-    approver_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True
-    )  # User who approved the package
-    rejector_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True
-    )  # User who rejected the package
-    published_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, nullable=True
-    )  # Timestamp when package was successfully published
-    publish_status: Mapped[str] = mapped_column(
-        String(20), default="pending", nullable=False
-    )  # Publishing status: pending, publishing, published, failed
+    security_scan_status: Mapped[str] = mapped_column(String(50), default="pending", nullable=False)  # pending, running, completed, failed, skipped
+    license_status: Mapped[Optional[str]] = mapped_column(String(20))  # Primary license status calculated from supported_licenses table
+    approver_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)  # User who approved the package
+    rejector_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)  # User who rejected the package
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # Timestamp when package was successfully published
+    publish_status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)  # Publishing status: pending, publishing, published, failed
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -68,7 +64,7 @@ class PackageStatus(Base):
     def is_processing(self) -> bool:
         """Check if package is in a processing state."""
         processing_statuses = {
-            "Checking Licence",
+            self.CHECKING_LICENCE_STR,
             "Downloading",
             "Security Scanning",
         }
@@ -84,10 +80,10 @@ class PackageStatus(Base):
             "Approved",
             "Rejected",
             # Failed states
-            "Parse Failed",
-            "Licence Check Failed",
-            "Download Failed",
-            "Security Scan Failed",
+            self.PARSE_FAILED_STR,
+            self.LICENCE_CHECK_FAILED_STR,
+            self.DOWNLOAD_FAILED_STR,
+            self.SECURITY_SCAN_FAILED_STR,
         }
         return self.status in completed_statuses
 
@@ -96,16 +92,16 @@ class PackageStatus(Base):
         return self.status in {
             "Approved",
             "Rejected",
-            "Parse Failed",
-            "Licence Check Failed",
-            "Download Failed",
-            "Security Scan Failed",
+            self.PARSE_FAILED_STR,
+            self.LICENCE_CHECK_FAILED_STR,
+            self.DOWNLOAD_FAILED_STR,
+            self.SECURITY_SCAN_FAILED_STR,
         }
 
     def get_processing_stage(self) -> str:
         """Get the current processing stage for display purposes."""
         stage_mapping = {
-            "Checking Licence": "License Validation",
+            self.CHECKING_LICENCE_STR: "License Validation",
             "Licence Checked": "License Complete",
             "Downloading": "Downloading Package",
             "Downloaded": "Download Complete",
@@ -115,9 +111,9 @@ class PackageStatus(Base):
             "Approved": "Approved",
             "Rejected": "Rejected",
             # Failed states
-            "Parse Failed": "Parse Failed",
-            "Licence Check Failed": "License Check Failed",
-            "Download Failed": "Download Failed",
-            "Security Scan Failed": "Security Scan Failed",
+            self.PARSE_FAILED_STR: self.PARSE_FAILED_STR,
+            self.LICENCE_CHECK_FAILED_STR: self.LICENCE_CHECK_FAILED_STR,
+            self.DOWNLOAD_FAILED_STR: self.DOWNLOAD_FAILED_STR,
+            self.SECURITY_SCAN_FAILED_STR: self.SECURITY_SCAN_FAILED_STR,
         }
         return stage_mapping.get(self.status or "", "Unknown")

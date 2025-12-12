@@ -1,6 +1,7 @@
 [tool.black]
 line-length = 130
-target-version = ['py38', 'py39', 'py310', 'py311']
+target-version = ['py312']
+#target-version = ['py38', 'py39', 'py310', 'py311']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -31,7 +32,7 @@ ensure_newline_before_comments = true
 skip_glob = ["*/migrations/*"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 explicit_package_bases = true
 mypy_path = "backend"
 warn_return_any = true

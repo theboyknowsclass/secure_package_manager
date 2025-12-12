@@ -76,7 +76,7 @@ app = create_app()
 @app.route("/health", methods=["GET"])
 def health_check() -> Response:
     """Health check endpoint."""
-    return jsonify({"status": "healthy", "timestamp": datetime.utcnow().isoformat()})
+    return jsonify({"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()})
 
 
 @app.route("/heartbeat", methods=["GET"])
@@ -89,7 +89,7 @@ def heartbeat() -> Response:
     return jsonify(
         {
             "status": "alive",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "service": "secure-package-manager-api",
         }
     )

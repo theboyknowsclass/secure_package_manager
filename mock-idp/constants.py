@@ -73,6 +73,8 @@ ADFS_ENTITY_ID = get_optional_env("ADFS_ENTITY_ID", "http://localhost:3000")
 ADFS_SSO_URL = get_optional_env("ADFS_SSO_URL", "http://localhost:8081/sso")
 ADFS_CERT_PATH = get_optional_env("ADFS_CERT_PATH", "/app/certs/adfs.crt")
 
+DOMAIN_USERS = "Domain Users"
+
 # =============================================================================
 # FLASK CONFIGURATION
 # =============================================================================

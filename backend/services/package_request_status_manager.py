@@ -15,6 +15,12 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
+# define constants
+PENDING_APPROVAL_STR = "Pending Approval"
+CHECKING_LICENCE_STR = "Checking Licence"
+SECURITY_SCANNING_STR = "Security Scanning"
+LICENCE_CHECKED_STR = "Licence Checked"
+SECURITY_SCANNED_STR = "Security Scanned"
 
 class PackageRequestStatusManager:
     """Manages package request status updates based on package states."""
@@ -68,12 +74,12 @@ class PackageRequestStatusManager:
             return "no_packages"
 
         # Rule 1: If there are still early-stage packages, keep processing
-        if counts["Checking Licence"] > 0:
+        if counts[CHECKING_LICENCE_STR] > 0:
             return "processing"
 
         # Rule 3: If all packages are pending approval, request is ready for
         # approval
-        if counts["Pending Approval"] == total_packages:
+        if counts[PENDING_APPROVAL_STR] == total_packages:
             return "pending_approval"
 
         # Rule 4: If all packages are approved, request is complete
@@ -82,12 +88,12 @@ class PackageRequestStatusManager:
 
         # Rule 5: If some packages are still processing, determine the stage
         processing_count = (
-            counts["Checking Licence"]
+            counts[CHECKING_LICENCE_STR]
             + counts["Downloading"]
-            + counts["Security Scanning"]
-            + counts["Licence Checked"]
+            + counts[SECURITY_SCANNING_STR]
+            + counts[LICENCE_CHECKED_STR]
             + counts["Downloaded"]
-            + counts["Security Scanned"]
+            + counts[SECURITY_SCANNED_STR]
         )
         if processing_count > 0:
             return "processing"
@@ -128,28 +134,28 @@ class PackageRequestStatusManager:
                 func.sum(case((PackageStatus.status == "Parsed", 1), else_=0)).label("parsed"),
                 func.sum(
                     case(
-                        (PackageStatus.status == "Checking Licence", 1),
+                        (PackageStatus.status == CHECKING_LICENCE_STR, 1),
                         else_=0,
                     )
                 ).label("checking_licence"),
-                func.sum(case((PackageStatus.status == "Licence Checked", 1), else_=0)).label("licence_checked"),
+                func.sum(case((PackageStatus.status == LICENCE_CHECKED_STR, 1), else_=0)).label("licence_checked"),
                 func.sum(case((PackageStatus.status == "Downloading", 1), else_=0)).label("downloading"),
                 func.sum(case((PackageStatus.status == "Downloaded", 1), else_=0)).label("downloaded"),
                 func.sum(
                     case(
-                        (PackageStatus.status == "Security Scanning", 1),
+                        (PackageStatus.status == SECURITY_SCANNING_STR, 1),
                         else_=0,
                     )
                 ).label("security_scanning"),
                 func.sum(
                     case(
-                        (PackageStatus.status == "Security Scanned", 1),
+                        (PackageStatus.status == SECURITY_SCANNED_STR, 1),
                         else_=0,
                     )
                 ).label("security_scanned"),
                 func.sum(
                     case(
-                        (PackageStatus.status == "Pending Approval", 1),
+                        (PackageStatus.status == PENDING_APPROVAL_STR, 1),
                         else_=0,
                     )
                 ).label("pending_approval"),
@@ -169,13 +175,13 @@ class PackageRequestStatusManager:
                 "total": 0,
                 "Submitted": 0,
                 "Parsed": 0,
-                "Checking Licence": 0,
-                "Licence Checked": 0,
+                CHECKING_LICENCE_STR: 0,
+                LICENCE_CHECKED_STR: 0,
                 "Downloading": 0,
                 "Downloaded": 0,
-                "Security Scanning": 0,
-                "Security Scanned": 0,
-                "Pending Approval": 0,
+                SECURITY_SCANNING_STR: 0,
+                SECURITY_SCANNED_STR: 0,
+                PENDING_APPROVAL_STR: 0,
                 "Approved": 0,
                 "Rejected": 0,
             }
@@ -184,13 +190,13 @@ class PackageRequestStatusManager:
             "total": result.total or 0,
             "Submitted": result.submitted or 0,
             "Parsed": result.parsed or 0,
-            "Checking Licence": result.checking_licence or 0,
-            "Licence Checked": result.licence_checked or 0,
+            CHECKING_LICENCE_STR: result.checking_licence or 0,
+            LICENCE_CHECKED_STR: result.licence_checked or 0,
             "Downloading": result.downloading or 0,
             "Downloaded": result.downloaded or 0,
-            "Security Scanning": result.security_scanning or 0,
-            "Security Scanned": result.security_scanned or 0,
-            "Pending Approval": result.pending_approval or 0,
+            SECURITY_SCANNING_STR: result.security_scanning or 0,
+            SECURITY_SCANNED_STR: result.security_scanned or 0,
+            PENDING_APPROVAL_STR: result.pending_approval or 0,
             "Approved": result.approved or 0,
             "Rejected": result.rejected or 0,
         }
@@ -253,7 +259,7 @@ class PackageRequestStatusManager:
         if total_packages == 0:
             return 0.0
 
-        completed_packages = counts["Security Scanned"] + counts["Pending Approval"] + counts["Approved"] + counts["Rejected"]
+        completed_packages = counts[SECURITY_SCANNED_STR] + counts[PENDING_APPROVAL_STR] + counts["Approved"] + counts["Rejected"]
 
         return (completed_packages / total_packages) * 100.0
 
@@ -292,7 +298,7 @@ class PackageRequestStatusManager:
         Returns:
             List of packages pending approval
         """
-        return self.get_packages_by_status(request_id, "Pending Approval")
+        return self.get_packages_by_status(request_id, PENDING_APPROVAL_STR)
 
     def get_packages_by_security_scan_status(self, request_id: int, scan_status: str) -> List[Package]:
         """Get all packages for a request with a specific security scan status.

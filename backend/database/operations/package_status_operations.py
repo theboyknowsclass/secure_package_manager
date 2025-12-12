@@ -1,6 +1,6 @@
 """Database operations for PackageStatus entities."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
 
 from sqlalchemy import and_, select
@@ -52,7 +52,7 @@ class PackageStatusOperations:
 
         old_status = status.status
         status.status = new_status
-        status.updated_at = datetime.utcnow()
+        status.updated_at = datetime.now(timezone.utc)
 
         # Update any additional fields
         for key, value in kwargs.items():
@@ -79,7 +79,7 @@ class PackageStatusOperations:
         # Create update dict with proper types for SQLAlchemy update
         update_dict: Dict[str, Union[str, int, datetime]] = {
             "status": new_status,
-            "updated_at": datetime.utcnow(),
+            "updated_at": datetime.now(timezone.utc),
         }
 
         # Add valid kwargs (filter to avoid SQLAlchemy type issues)
@@ -134,7 +134,7 @@ class PackageStatusOperations:
         """
         from datetime import timedelta
 
-        stuck_threshold = datetime.utcnow() - timedelta(minutes=timeout_minutes)
+        stuck_threshold = datetime.now(timezone.utc) - timedelta(minutes=timeout_minutes)
 
         stmt = select(PackageStatus).where(
             and_(
@@ -178,7 +178,7 @@ class PackageStatusOperations:
             return False
 
         status.publish_status = publish_status
-        status.updated_at = datetime.utcnow()
+        status.updated_at = datetime.now(timezone.utc)
         return True
 
     def mark_package_published(self, package_id: int) -> bool:
@@ -195,11 +195,11 @@ class PackageStatusOperations:
             return False
 
         status.publish_status = "published"
-        status.published_at = datetime.utcnow()
-        status.updated_at = datetime.utcnow()
+        status.published_at = datetime.now(timezone.utc)
+        status.updated_at = datetime.now(timezone.utc)
         return True
 
-    def mark_package_publish_failed(self, package_id: int, error_message: str) -> bool:
+    def mark_package_publish_failed(self, package_id: int) -> bool:
         """Mark package as publish failed.
 
         Args:
@@ -214,7 +214,7 @@ class PackageStatusOperations:
             return False
 
         status.publish_status = "failed"
-        status.updated_at = datetime.utcnow()
+        status.updated_at = datetime.now(timezone.utc)
         return True
 
     def refresh_package_timestamp(self, package_id: int) -> bool:
@@ -230,7 +230,7 @@ class PackageStatusOperations:
         if not status:
             return False
 
-        status.updated_at = datetime.utcnow()
+        status.updated_at = datetime.now(timezone.utc)
         return True
 
     def update_security_scan_status(self, package_id: int, scan_status: str) -> bool:
@@ -248,7 +248,7 @@ class PackageStatusOperations:
             return False
 
         status.security_scan_status = scan_status
-        status.updated_at = datetime.utcnow()
+        status.updated_at = datetime.now(timezone.utc)
         return True
 
     def update_security_score(self, package_id: int, security_score: float) -> bool:
@@ -266,7 +266,7 @@ class PackageStatusOperations:
             return False
 
         status.security_score = int(security_score)
-        status.updated_at = datetime.utcnow()
+        status.updated_at = datetime.now(timezone.utc)
         return True
 
     def update_license_info(self, package_id: int, license_score: int, license_status: str) -> bool:
@@ -286,7 +286,7 @@ class PackageStatusOperations:
 
         status.license_score = license_score
         status.license_status = license_status  # Use exact value to match database constraints
-        status.updated_at = datetime.utcnow()
+        status.updated_at = datetime.now(timezone.utc)
         return True
 
     def update_download_info(
@@ -318,7 +318,7 @@ class PackageStatusOperations:
         if checksum is not None:
             status.checksum = checksum
 
-        status.updated_at = datetime.utcnow()
+        status.updated_at = datetime.now(timezone.utc)
         return True
 
     def update_security_scan_info(
@@ -346,7 +346,7 @@ class PackageStatusOperations:
         if security_scan_status is not None:
             status.security_scan_status = security_scan_status
 
-        status.updated_at = datetime.utcnow()
+        status.updated_at = datetime.now(timezone.utc)
         return True
 
     def update_approval_info(
@@ -382,7 +382,7 @@ class PackageStatusOperations:
         if publish_status is not None:
             status.publish_status = publish_status
 
-        status.updated_at = datetime.utcnow()
+        status.updated_at = datetime.now(timezone.utc)
         return True
 
     def go_to_next_stage(self, package_id: int, **kwargs: Any) -> bool:

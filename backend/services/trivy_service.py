@@ -492,7 +492,7 @@ class TrivyService:
                 security_scan.info_count = summary.get("info", 0)
                 security_scan.scan_duration_ms = scan_result.get("scan_duration_ms", 0)
                 security_scan.trivy_version = scan_result.get("trivy_version", "unknown")
-                security_scan.completed_at = datetime.utcnow()
+                security_scan.completed_at = datetime.now(timezone.utc)
 
                 # Update package status with scan results
                 status_ops = PackageStatusOperations(session)
@@ -600,7 +600,7 @@ class TrivyService:
                 if security_scan:
                     # Update security scan record
                     security_scan.scan_result = {"error": error_message}
-                    security_scan.completed_at = datetime.utcnow()
+                    security_scan.completed_at = datetime.now(timezone.utc)
 
                 # Update package status
                 if package_id is not None:

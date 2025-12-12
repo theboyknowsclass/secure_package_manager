@@ -14,6 +14,10 @@ from database.service import DatabaseService
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 
+#define constants
+INTERNAL_SERVER_ERROR_STR = "Internal server error"
+ADMIN_ACCESS_REQUIRED_STR = "Admin access required"
+NOT_CONFIGURED_STR = "Not configured"
 
 # Type assertion helper for authenticated requests
 def get_authenticated_user() -> "User":
@@ -54,7 +58,7 @@ def get_supported_licenses() -> ResponseReturnValue:
         return jsonify({"licenses": [license.to_dict() for license in licenses]})
     except Exception as e:
         logger.error(f"Get supported licenses error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"error": INTERNAL_SERVER_ERROR_STR}), 500
 
 
 @admin_bp.route("/licenses", methods=["POST"])
@@ -63,7 +67,7 @@ def create_supported_license() -> ResponseReturnValue:
     """Create a new supported license."""
     try:
         if not get_authenticated_user().is_admin():
-            return jsonify({"error": "Admin access required"}), 403
+            return jsonify({"error": ADMIN_ACCESS_REQUIRED_STR}), 403
 
         data = request.get_json()
 
@@ -80,7 +84,7 @@ def create_supported_license() -> ResponseReturnValue:
             return jsonify({"error": "License identifier already exists"}), 400
 
         # Create new license
-        license = SupportedLicense(
+        new_license = SupportedLicense(
             name=data["name"],
             identifier=data["identifier"],
             status=data.get("status", "allowed"),
@@ -90,7 +94,7 @@ def create_supported_license() -> ResponseReturnValue:
         db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
         with db_service.get_session() as session:
             license_ops = SupportedLicenseOperations(session)
-            license_ops.create(license)
+            license_ops.create(new_license)
             session.commit()
 
             # Log the action
@@ -98,8 +102,8 @@ def create_supported_license() -> ResponseReturnValue:
                 user_id=get_authenticated_user().id,
                 action="create_license",
                 resource_type="license",
-                resource_id=license.id,
-                details=f"Created license: {license.name} ({license.identifier})",
+                resource_id=new_license.id,
+                details=f"Created license: {new_license.name} ({new_license.identifier})",
             )
             audit_ops = AuditLogOperations(session)
             audit_ops.create(audit_log)
@@ -109,7 +113,7 @@ def create_supported_license() -> ResponseReturnValue:
             jsonify(
                 {
                     "message": "License created successfully",
-                    "license": license.to_dict(),
+                    "license": new_license.to_dict(),
                 }
             ),
             201,
@@ -120,7 +124,7 @@ def create_supported_license() -> ResponseReturnValue:
         db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
         with db_service.get_session() as session:
             session.rollback()
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"error": INTERNAL_SERVER_ERROR_STR}), 500
 
 
 @admin_bp.route("/licenses/<int:license_id>", methods=["PUT"])
@@ -129,21 +133,21 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
     """Update a supported license."""
     try:
         if not get_authenticated_user().is_admin():
-            return jsonify({"error": "Admin access required"}), 403
+            return jsonify({"error": ADMIN_ACCESS_REQUIRED_STR}), 403
 
         db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
         with db_service.get_session() as session:
             license_ops = SupportedLicenseOperations(session)
-            license = license_ops.get_by_id(license_id)
-            if not license:
+            existing_license = license_ops.get_by_id(license_id)
+            if not existing_license:
                 return jsonify({"error": "License not found"}), 404
         data = request.get_json()
 
         # Update fields
         if "name" in data:
-            license.name = data["name"]
+            existing_license.name = data["name"]
         if "status" in data:
-            license.status = data["status"]
+            existing_license.status = data["status"]
 
         db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
         with db_service.get_session() as session:
@@ -154,8 +158,8 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
                 user_id=get_authenticated_user().id,
                 action="update_license",
                 resource_type="license",
-                resource_id=license.id,
-                details=f"Updated license: {license.name} ({license.identifier})",
+                resource_id=existing_license.id,
+                details=f"Updated license: {existing_license.name} ({existing_license.identifier})",
             )
             audit_ops = AuditLogOperations(session)
             audit_ops.create(audit_log)
@@ -164,7 +168,7 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
         return jsonify(
             {
                 "message": "License updated successfully",
-                "license": license.to_dict(),
+                "license": existing_license.to_dict(),
             }
         )
     except Exception as e:
@@ -172,7 +176,7 @@ def update_supported_license(license_id: int) -> ResponseReturnValue:
         db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
         with db_service.get_session() as session:
             session.rollback()
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"error": INTERNAL_SERVER_ERROR_STR}), 500
 
 
 @admin_bp.route("/licenses/<int:license_id>", methods=["DELETE"])
@@ -181,34 +185,34 @@ def delete_supported_license(license_id: int) -> ResponseReturnValue:
     """Delete a supported license."""
     try:
         if not get_authenticated_user().is_admin():
-            return jsonify({"error": "Admin access required"}), 403
+            return jsonify({"error": ADMIN_ACCESS_REQUIRED_STR}), 403
 
         db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
         with db_service.get_session() as session:
             license_ops = SupportedLicenseOperations(session)
-            license = license_ops.get_by_id(license_id)
-            if not license:
+            delete_license = license_ops.get_by_id(license_id)
+            if not delete_license:
                 return jsonify({"error": "License not found"}), 404
 
         # Check if license is being used by any packages
-        if license.identifier is None:
+        if delete_license.identifier is None:
             # Skip licenses without identifier - they can be deleted safely
             package_count = 0
         else:
             db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
             with db_service.get_session() as session:
                 license_ops = SupportedLicenseOperations(session)
-                package_count = license_ops.count_packages_by_license(license.identifier)
+                package_count = license_ops.count_packages_by_license(delete_license.identifier)
         if package_count > 0:
             return (
-                jsonify({"error": (f"Cannot delete license. It is used by " f"{package_count} package(s). Disable it instead.")}),
+                jsonify({"error": (f"Cannot delete license. It is used by{package_count} package(s). Disable it instead.")}),
                 400,
             )
 
         db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
         with db_service.get_session() as session:
             license_ops = SupportedLicenseOperations(session)
-            license_ops.delete(license)
+            license_ops.delete(delete_license)
             session.commit()
 
             # Log the action
@@ -217,7 +221,7 @@ def delete_supported_license(license_id: int) -> ResponseReturnValue:
                 action="delete_license",
                 resource_type="license",
                 resource_id=license_id,
-                details=f"Deleted license: {license.name} ({license.identifier})",
+                details=f"Deleted license: {delete_license.name} ({delete_license.identifier})",
             )
             audit_ops = AuditLogOperations(session)
             audit_ops.create(audit_log)
@@ -229,7 +233,7 @@ def delete_supported_license(license_id: int) -> ResponseReturnValue:
         db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
         with db_service.get_session() as session:
             session.rollback()
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"error": INTERNAL_SERVER_ERROR_STR}), 500
 
 
 # Configuration Route (consolidated from repository-config endpoints)
@@ -270,8 +274,8 @@ def get_config() -> ResponseReturnValue:
             "security": {
                 "jwt_secret_configured": bool(os.getenv("JWT_SECRET")),
                 "flask_secret_configured": bool(os.getenv("FLASK_SECRET_KEY")),
-                "oauth_audience": os.getenv("OAUTH_AUDIENCE", "Not configured"),
-                "oauth_issuer": os.getenv("OAUTH_ISSUER", "Not configured"),
+                "oauth_audience": os.getenv("OAUTH_AUDIENCE", NOT_CONFIGURED_STR),
+                "oauth_issuer": os.getenv("OAUTH_ISSUER", NOT_CONFIGURED_STR),
             },
             "trivy": {
                 "timeout": os.getenv("TRIVY_TIMEOUT", "300"),
@@ -291,20 +295,20 @@ def get_config() -> ResponseReturnValue:
                     "is_complete": is_complete,
                     "missing_keys": missing_keys,
                     "requires_admin_setup": not is_complete,
-                    "note": ("Repository configuration is now managed via " "environment variables"),
+                    "note": ("Repository configuration is now managed via environment variables"),
                 },
             }
         )
 
     except Exception as e:
         logger.error(f"Get config error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"error": INTERNAL_SERVER_ERROR_STR}), 500
 
 
 def _mask_url(url: str) -> str:
     """Mask sensitive parts of URLs for display."""
     if not url:
-        return "Not configured"
+        return NOT_CONFIGURED_STR
 
     # Mask password in database URLs
     if "://" in url and "@" in url:

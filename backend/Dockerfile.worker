@@ -1,19 +1,15 @@
 # Worker-specific Dockerfile for background processing
 FROM python:3.11-slim
 
-# Install system dependencies
+# Install system dependencies, Trivy for security scanning and Install Node.js for npm package handling
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     wget \
     curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Trivy for security scanning
-RUN wget -qO- https://github.com/aquasecurity/trivy/releases/download/v0.50.2/trivy_0.50.2_Linux-64bit.tar.gz | tar -xz -C /usr/local/bin trivy
-
-# Install Node.js for npm package handling
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && rm -rf /var/lib/apt/lists/* \
+    && wget -qO- https://github.com/aquasecurity/trivy/releases/download/v0.50.2/trivy_0.50.2_Linux-64bit.tar.gz | tar -xz -C /usr/local/bin trivy \
+    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs
 
 # Set working directory
@@ -26,11 +22,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create logs directory
-RUN mkdir -p /app/logs
-
-# Create package cache directory
-RUN mkdir -p /app/package_cache
+# Create logs directory and package cache directory
+RUN mkdir -p /app/logs && mkdir -p /app/package_cache
 
 # Set environment variables
 ENV PYTHONPATH=/app
