@@ -19,6 +19,10 @@ from database.service import DatabaseService
 
 logger = logging.getLogger(__name__)
 
+# define constants
+NO_LICENSE_STR = "No License"
+LICENSE_CHECK_FAILED_STR = "Licence Check Failed"
+LICENSE_VALIDATION_FAILED_STR = "License validation failed"
 
 class LicenseService:
     """Service for license validation and management.
@@ -113,7 +117,7 @@ class LicenseService:
 
             # Check if this is a complex license expression
             if self._is_complex_license_expression(license_identifier):
-                return self._validate_complex_license_expression(license_identifier, package_name)
+                return self._validate_complex_license_expression(license_identifier)
 
             # Look up license in database
             license_data = self._lookup_license_in_db(license_identifier)
@@ -172,7 +176,7 @@ class LicenseService:
                     failed_packages.append(
                         {
                             "package": package,
-                            "error": f"License validation failed: {', '.join(license_validation.get('errors', []))}",
+                            "error": f"{LICENSE_VALIDATION_FAILED_STR}: {', '.join(license_validation.get('errors', []))}",
                         }
                     )
                 return successful_packages, failed_packages
@@ -256,7 +260,7 @@ class LicenseService:
         license_groups: dict[str, list[Any]] = {}
 
         for package in packages:
-            license_string = package.license_identifier or "No License"
+            license_string = package.license_identifier or NO_LICENSE_STR
             if license_string not in license_groups:
                 license_groups[license_string] = []
             license_groups[license_string].append(package)
@@ -274,7 +278,7 @@ class LicenseService:
         """
         try:
             # Get the package's license identifier
-            license_identifier = package.license_identifier or "No License"
+            license_identifier = package.license_identifier or NO_LICENSE_STR
 
             # Check if the license is in our cache
             if license_identifier in self._license_cache:
@@ -311,7 +315,7 @@ class LicenseService:
 
                 try:
                     # Update package status to indicate failure
-                    status_ops.update_status(package.id, "Licence Check Failed")
+                    status_ops.update_status(package.id, LICENSE_CHECK_FAILED_STR)
 
                     # Log the failure
                     self.logger.warning(f"Package {package.name}@{package.version} failed license validation: {error}")
@@ -319,7 +323,7 @@ class LicenseService:
                 except Exception as e:
                     self.logger.error(f"Error handling failed package {package.name}@{package.version}: {str(e)}")
 
-    def _validate_complex_license_expression(self, license_identifier: str, package_name: str) -> Dict[str, Any]:
+    def _validate_complex_license_expression(self, license_identifier: str) -> Dict[str, Any]:
         """Validate complex license expressions."""
         # For complex expressions, we'll use a conservative approach
         # and score them based on the most restrictive license found
@@ -424,9 +428,9 @@ class LicenseService:
         return {
             "valid": True,
             "score": 50,
-            "license_identifier": "No License",
+            "license_identifier": NO_LICENSE_STR,
             "license_status": "unknown",
-            "license_name": "No License",
+            "license_name": NO_LICENSE_STR,
             "errors": [],
         }
 
@@ -443,11 +447,11 @@ class LicenseService:
 
     def _validate_license_string(self, license_string: str) -> Dict[str, Any]:
         """Validate a license string."""
-        if not license_string or license_string == "No License":
+        if not license_string or license_string == NO_LICENSE_STR:
             return self._create_no_license_result()
 
         if self._is_complex_license_expression(license_string):
-            return self._validate_complex_license_expression(license_string, "Unknown")
+            return self._validate_complex_license_expression(license_string)
 
         license_data = self._lookup_license_in_db(license_string)
         if not license_data:
@@ -528,11 +532,12 @@ class LicenseService:
 
     def _get_first_error(self, license_validation: Dict[str, Any]) -> str:
         """Extract the first error message from license validation result."""
-        errors = license_validation.get("errors", ["License validation failed"])
+        errors = license_validation.get("errors", [LICENSE_VALIDATION_FAILED_STR])
         if isinstance(errors, list) and errors:
             first_error = errors[0]
-            return str(first_error) if first_error is not None else "License validation failed"
-        return "License validation failed"
+            return str(first_error) if first_error is not None else LICENSE_VALIDATION_FAILED_STR
+        return LICENSE_VALIDATION_FAILED_STR
+
 
     def _update_license_results(
         self, license_results: List[Tuple[Any, Dict[str, Union[str, int]]]]
@@ -548,7 +553,7 @@ class LicenseService:
             for package, result in license_results:
                 try:
                     # Data validation
-                    if not hasattr(package, "id") or not hasattr(package, "name") or not hasattr(package, "version"):
+                    if not all(hasattr(package, attr) for attr in ["id", "name", "version"]):
                         self.logger.error("Invalid package object: missing required attributes")
                         failed_count += 1
                         continue
@@ -559,34 +564,16 @@ class LicenseService:
                         continue
 
                     current_package = package_ops.get_by_id(package.id)
-                    if (
-                        not current_package
-                        or not current_package.package_status
-                        or current_package.package_status.status != "Checking Licence"
-                    ):
+                    if not all([current_package, current_package.package_status,current_package.package_status.status == "Checking Licence"]):
                         continue
 
-                    if result["status"] == "success":
-                        # Validate score is present and numeric
-                        score = result.get("score", 0)
-                        if not isinstance(score, (int, float)):
-                            self.logger.error(f"Invalid score type for package {package.name}@{package.version}: {type(score)}")
-                            score = 0
 
-                        # Check if license score is acceptable (>= 50 means allowed/unknown/always_allowed)
-                        if score >= 50:
-                            status_ops.update_status(package.id, "Licence Checked")
-                            # Update package with license information
-                            status_ops.update_license_info(
-                                package.id,
-                                int(score),
-                                str(result.get("license_status", "unknown")),
-                            )
-                        else:
-                            status_ops.update_status(package.id, "Licence Check Failed")
+                    if result["status"] == "success":
+                        self.fetch_license_score(result, package.name, package.version, package.id, status_ops)
+
                         successful_count += 1
                     else:
-                        status_ops.update_status(package.id, "Licence Check Failed")
+                        status_ops.update_status(package.id, LICENSE_CHECK_FAILED_STR)
                         failed_count += 1
 
                 except Exception as e:
@@ -602,3 +589,21 @@ class LicenseService:
             "failed_packages": failed_count,
             "license_groups_processed": 1,
         }
+    
+    def fetch_license_score(self, result, package_name, package_version, package_id, status_ops):
+        # Validate score is present and numeric
+        score = result.get("score", 0)
+        if not isinstance(score, (int, float)):
+            self.logger.error(f"Invalid score type for package {package_name}@{package_version}: {type(score)}")
+            score = 0
+        
+        if score >= 50:
+            status_ops.update_status(package_id, "Licence Checked")
+            # Update package with license information
+            status_ops.update_license_info(
+                package.id,
+                int(score),
+                str(result.get("license_status", "unknown")),
+            )
+        else:
+            status_ops.update_status(package_id, LICENSE_CHECK_FAILED_STR)

@@ -245,7 +245,7 @@ class AuthService:
                     return auth_result
 
             # Check if user is approver or admin
-            if not (flask_request.user.role in ["approver", "admin"]):  # type: ignore[attr-defined]
+            if flask_request.user.role not in ["approver", "admin"]:  # type: ignore[attr-defined]
                 return (
                     jsonify({"error": "Approver or Admin privileges required"}),
                     403,

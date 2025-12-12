@@ -17,6 +17,9 @@ from database.service import DatabaseService
 
 logger = logging.getLogger(__name__)
 
+# define constants
+PUBLISH_FAILED_STR = "Publish Failed"
+
 
 class PublishingService:
     """Service for publishing packages to secure repository.
@@ -155,7 +158,7 @@ class PublishingService:
                         status_ops.update_status(package.id, "Published")
                         successful_count += 1
                     else:  # failed
-                        status_ops.update_status(package.id, "Publish Failed")
+                        status_ops.update_status(package.id, PUBLISH_FAILED_STR)
                         failed_count += 1
 
                 except Exception as e:
@@ -189,14 +192,14 @@ class PublishingService:
                 approved_count = package_ops.count_packages_by_status("Approved")
                 publishing_count = package_ops.count_packages_by_status("Publishing")
                 published_count = package_ops.count_packages_by_status("Published")
-                publish_failed_count = package_ops.count_packages_by_status("Publish Failed")
+                publish_failed_count = package_ops.count_packages_by_status(PUBLISH_FAILED_STR)
 
                 return {
                     "approved_packages": approved_count,
                     "publishing_packages": publishing_count,
                     "published_packages": published_count,
                     "publish_failed_packages": publish_failed_count,
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp":datetime.now(timezone.utc).isoformat(),
                 }
         except Exception as e:
             self.logger.error(f"Error getting publishing statistics: {str(e)}")
@@ -214,7 +217,7 @@ class PublishingService:
                 status_ops = PackageStatusOperations(session)
 
                 # Find packages that failed publishing
-                failed_packages = package_ops.get_by_status("Publish Failed")
+                failed_packages = package_ops.get_by_status(PUBLISH_FAILED_STR)
 
                 if not failed_packages:
                     return {

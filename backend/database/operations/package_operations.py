@@ -18,6 +18,7 @@ class PackageOperations:
             session: SQLAlchemy session for database operations
         """
         self.session = session
+        self.CHECKING_LICENCE_STR = "Checking Licence"
 
     def get_by_name_version(self, name: str, version: str) -> Optional[Package]:
         """Get package by name and version.
@@ -76,9 +77,9 @@ class PackageOperations:
         Returns:
             List of packages that are stuck in processing
         """
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
-        stuck_threshold = datetime.utcnow() - timedelta(minutes=timeout_minutes)
+        stuck_threshold = datetime.now(timezone.utc) - timedelta(minutes=timeout_minutes)
 
         stmt = (
             select(Package)
@@ -88,7 +89,7 @@ class PackageOperations:
                     PackageStatus.status.in_(
                         [
                             "Downloading",
-                            "Checking Licence",
+                            self.CHECKING_LICENCE_STR,
                             "Security Scanning",
                         ]
                     ),
@@ -99,7 +100,7 @@ class PackageOperations:
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def create_with_status(self, package_data: dict, status: str = "Checking Licence") -> Package:
+    def create_with_status(self, package_data: dict, status: str = self.CHECKING_LICENCE_STR) -> Package:
         """Create a package with initial status.
 
         Args:
@@ -151,7 +152,7 @@ class PackageOperations:
         self.session.flush()
         return True
 
-    def batch_create_with_status(self, packages_data: List[dict], status: str = "Checking Licence") -> List[Package]:
+    def batch_create_with_status(self, packages_data: List[dict], status: str = self.CHECKING_LICENCE_STR) -> List[Package]:
         """Create multiple packages with initial status.
 
         Args:
@@ -350,7 +351,7 @@ class PackageOperations:
         stmt = (
             select(Package)
             .join(PackageStatus)
-            .where(PackageStatus.status == "Checking Licence")
+            .where(PackageStatus.status == self.CHECKING_LICENCE_STR)
             .options(selectinload(Package.package_status))
         )
         if limit:
@@ -371,7 +372,7 @@ class PackageOperations:
             .join(PackageStatus)
             .where(
                 and_(
-                    PackageStatus.status == "Checking Licence",
+                    PackageStatus.status == self.CHECKING_LICENCE_STR,
                     PackageStatus.updated_at < stuck_threshold,
                 )
             )

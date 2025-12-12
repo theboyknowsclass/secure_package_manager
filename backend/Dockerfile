@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies, Trivy, Node.js and npm
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
@@ -11,15 +11,11 @@ RUN apt-get update && apt-get install -y \
     wget \
     lsb-release \
     gnupg \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Trivy
-RUN wget -qO- https://github.com/aquasecurity/trivy/releases/download/v0.50.2/trivy_0.50.2_Linux-64bit.tar.gz | tar -xz -C /usr/local/bin trivy \
-    && chmod +x /usr/local/bin/trivy
-
-# Install Node.js and npm
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs
+    && rm -rf /var/lib/apt/lists/* \
+    && wget -qO- https://github.com/aquasecurity/trivy/releases/download/v0.50.2/trivy_0.50.2_Linux-64bit.tar.gz | tar -xz -C /usr/local/bin trivy \
+    && chmod +x /usr/local/bin/trivy \
+    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && && apt-get install -y nodejs
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .

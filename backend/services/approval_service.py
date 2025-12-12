@@ -17,6 +17,9 @@ from database.service import DatabaseService
 
 logger = logging.getLogger(__name__)
 
+# define constants
+SECURITY_SCANNED_STR = "Security Scanned"
+
 
 class ApprovalService:
     """Service for handling package approval workflow.
@@ -82,7 +85,7 @@ class ApprovalService:
                 package_ops = PackageOperations(session)
 
                 # Get package counts by status
-                security_scanned_count = package_ops.count_packages_by_status("Security Scanned")
+                security_scanned_count = package_ops.count_packages_by_status(SECURITY_SCANNED_STR)
                 pending_approval_count = package_ops.count_packages_by_status("Pending Approval")
                 approved_count = package_ops.count_packages_by_status("Approved")
 
@@ -90,7 +93,7 @@ class ApprovalService:
                     "security_scanned_packages": security_scanned_count,
                     "pending_approval_packages": pending_approval_count,
                     "approved_packages": approved_count,
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                 }
         except Exception as e:
             self.logger.error(f"Error getting approval statistics: {str(e)}")
@@ -107,7 +110,7 @@ class ApprovalService:
             True if transition was successful, False otherwise
         """
         try:
-            if package.package_status and package.package_status.status == "Security Scanned":
+            if package.package_status and package.package_status.status == SECURITY_SCANNED_STR:
                 status_ops.go_to_next_stage(package.id)
                 self.logger.debug(f"Transitioned package {package.name}@{package.version} to Pending Approval")
                 return True
@@ -120,7 +123,7 @@ class ApprovalService:
         """Get packages that need approval transitions (short DB session)."""
         with self.db_service.get_session() as session:
             package_ops = PackageOperations(session)
-            return package_ops.get_by_status("Security Scanned")[:max_packages]
+            return package_ops.get_by_status(SECURITY_SCANNED_STR)[:max_packages]
 
     def _perform_approval_batch(self, packages: List[Any]) -> List[Tuple[Any, Dict[str, Any]]]:
         """Process approval logic without database sessions."""

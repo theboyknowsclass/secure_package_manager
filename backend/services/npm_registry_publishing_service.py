@@ -21,6 +21,8 @@ from database.models import Package
 
 logger = logging.getLogger(__name__)
 
+# define constants
+INDEX_JS_STR = "index.js"
 
 class NpmRegistryPublishingService:
     """Service for publishing packages to secure repository."""
@@ -113,7 +115,7 @@ class NpmRegistryPublishingService:
             "name": package.name,
             "version": package.version,
             "description": f"Secure package {package.name}",
-            "main": "index.js",
+            "main": INDEX_JS_STR,
             "scripts": {"test": 'echo "No tests specified"'},
             "keywords": ["secure", "validated"],
             "author": "Secure Package Manager",
@@ -126,7 +128,7 @@ class NpmRegistryPublishingService:
 
     def _create_index_js(self, package: Package, temp_dir: str) -> None:
         """Create index.js file for the package."""
-        index_js_path = Path(temp_dir) / "index.js"
+        index_js_path = Path(temp_dir) / INDEX_JS_STR
         with open(index_js_path, "w") as f:
             f.write(f"// Secure package {package.name} v{package.version}\n")
             f.write("module.exports = {\n")
@@ -213,7 +215,7 @@ class NpmRegistryPublishingService:
                     "name": package.name,
                     "version": package.version,
                     "description": f"Secure package {package.name}",
-                    "main": "index.js",
+                    "main": INDEX_JS_STR,
                     "scripts": {"test": 'echo "No tests specified"'},
                     "keywords": ["secure", "validated"],
                     "author": "Secure Package Manager",

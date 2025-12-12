@@ -23,6 +23,8 @@ from database.service import DatabaseService
 
 logger = logging.getLogger(__name__)
 
+# define constants
+NODE_MODULES_DIR = "node_modules/"
 
 class PackageLockParsingService:
     """Service for parsing package-lock.json files and extracting packages.
@@ -114,8 +116,6 @@ class PackageLockParsingService:
             request_ops = RequestOperations(session)
             request_package_ops = RequestPackageOperations(session)
             package_ops = PackageOperations(session)
-            package_status_ops = PackageStatusOperations(session)
-            audit_log_ops = AuditLogOperations(session)
 
             for request, result in parsing_results:
                 try:
@@ -130,11 +130,8 @@ class PackageLockParsingService:
                             self._store_parsed_packages(
                                 request.id,
                                 result["packages"],
-                                request_ops,
                                 request_package_ops,
                                 package_ops,
-                                package_status_ops,
-                                audit_log_ops,
                             )
                             total_packages += result.get("total_packages", 0)
 
@@ -226,11 +223,8 @@ class PackageLockParsingService:
         self,
         request_id: int,
         packages: List[Dict[str, Any]],
-        request_ops: Any,
         request_package_ops: Any,
         package_ops: Any,
-        package_status_ops: Any,
-        audit_log_ops: Any,
     ) -> None:
         """Store parsed packages in database."""
         packages_to_process = []
@@ -282,7 +276,7 @@ class PackageLockParsingService:
     def _validate_package_lock_file(self, package_data: Dict[str, Any]) -> None:
         """Validate that the package data is a valid package-lock.json file."""
         if "lockfileVersion" not in package_data:
-            raise ValueError("This file does not appear to be a package-lock.json file. " "Missing 'lockfileVersion' field.")
+            raise ValueError("This file does not appear to be a package-lock.json file. Missing 'lockfileVersion' field.")
 
         lockfile_version = package_data.get("lockfileVersion")
         if lockfile_version is None or lockfile_version < 3:
@@ -311,7 +305,7 @@ class PackageLockParsingService:
             package_version = package_info.get("version")
 
             if not package_name or not package_version:
-                logger.debug(f"Skipping package at path '{package_path}': " f"name='{package_name}', version='{package_version}'")
+                logger.debug(f"Skipping package at path '{package_path}': name='{package_name}', version='{package_version}'")
                 continue
 
             # Use name+version as the key to deduplicate
@@ -325,7 +319,7 @@ class PackageLockParsingService:
                     "info": package_info,
                 }
 
-        logger.info(f"Deduplicated {len(packages)} package entries to " f"{len(unique_packages)} unique packages")
+        logger.info(f"Deduplicated {len(packages)} package entries to {len(unique_packages)} unique packages")
         return unique_packages
 
     def _extract_package_name(self, package_path: str, package_info: Dict[str, Any]) -> Optional[str]:
@@ -343,19 +337,16 @@ class PackageLockParsingService:
             # "node_modules/test-exclude/node_modules/@types/node" -> "@types/node"
 
             # Find the last occurrence of "node_modules/" in the path
-            last_node_modules = package_path.rfind("node_modules/")
+            last_node_modules = package_path.rfind(NODE_MODULES_DIR)
             if last_node_modules != -1:
                 # Get the part after the last "node_modules/"
-                remaining_path = package_path[last_node_modules + len("node_modules/") :]
+                remaining_path = package_path[last_node_modules + len(NODE_MODULES_DIR) :]
                 path_parts = remaining_path.split("/")
 
                 if len(path_parts) >= 1:
-                    if path_parts[0].startswith("@"):
+                    if path_parts[0].startswith("@") and len(path_parts) >= 2:
                         # Scoped package: take both scope and package name
-                        if len(path_parts) >= 2:
-                            package_name = f"{path_parts[0]}/{path_parts[1]}"
-                        else:
-                            package_name = path_parts[0]
+                        package_name = f"{path_parts[0]}/{path_parts[1]}"
                     else:
                         # Regular package: take just the package name
                         package_name = path_parts[0]

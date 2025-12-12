@@ -37,6 +37,11 @@ approver_bp = Blueprint("approver", __name__, url_prefix="/api/approver")
 auth_service = AuthService()
 publishing_service = NpmRegistryPublishingService()
 
+# Define constants
+INTERNAL_SERVER_ERROR_STR = "Internal server error"
+PACKAGE_NOT_FOUND_STR = "Package not found"
+PACKAGE_STATUS_NOT_FOUND_STR = "Package status not found"
+
 
 # Package Approval Routes - Batch Operations Only
 @approver_bp.route("/packages/publish/<int:package_id>", methods=["POST"])
@@ -49,10 +54,10 @@ def publish_package(package_id: int) -> ResponseReturnValue:
             package_ops = PackageOperations(session)
             package = package_ops.get_by_id(package_id)
             if not package:
-                return jsonify({"error": "Package not found"}), 404
+                return jsonify({"error": PACKAGE_NOT_FOUND_STR}), 404
 
         if not package.package_status:
-            return jsonify({"error": "Package status not found"}), 404
+            return jsonify({"error": PACKAGE_STATUS_NOT_FOUND_STR}), 404
 
         if package.package_status.status != "Approved":
             return (
@@ -70,7 +75,7 @@ def publish_package(package_id: int) -> ResponseReturnValue:
                 action="publish_package",
                 resource_type="package",
                 resource_id=package.id,
-                details=(f"Package {package.name}@{package.version} published to " f"secure repo"),
+                details=(f"Package {package.name}@{package.version} published to secure repo"),
             )
             db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
             with db_service.get_session() as session:
@@ -84,7 +89,7 @@ def publish_package(package_id: int) -> ResponseReturnValue:
 
     except Exception as e:
         logger.error(f"Publish package error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"error": INTERNAL_SERVER_ERROR_STR}), 500
 
 
 @approver_bp.route("/packages/batch-approve", methods=["POST"])
@@ -133,16 +138,16 @@ def batch_approve_packages() -> ResponseReturnValue:
 
         # Packages are approved immediately and will be published by the
         # background worker
-        logger.info((f"Batch approval completed: {approved_count} packages approved" f", will be published by background worker"))
+        logger.info((f"Batch approval completed: {approved_count} packages approved will be published by background worker"))
 
         response_data = {
-            "message": (f"Batch approval completed - {approved_count} packages " f"approved"),
+            "message": (f"Batch approval completed - {approved_count} packages approved"),
             "approved_count": approved_count,
             "total_requested": len(package_ids),
             "package_ids": list(package_ids),
             "approved_by": get_authenticated_user().username,
             "note": (
-                "Packages are approved and ready for publishing. Publishing " "can be done separately for better performance."
+                "Packages are approved and ready for publishing. Publishing can be done separately for better performance."
             ),
         }
 
@@ -156,7 +161,7 @@ def batch_approve_packages() -> ResponseReturnValue:
         db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
         with db_service.get_session() as session:
             session.rollback()
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"error": INTERNAL_SERVER_ERROR_STR}), 500
 
 
 @approver_bp.route("/packages/batch-reject", methods=["POST"])
@@ -222,7 +227,7 @@ def batch_reject_packages() -> ResponseReturnValue:
         db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
         with db_service.get_session() as session:
             session.rollback()
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"error": INTERNAL_SERVER_ERROR_STR}), 500
 
 
 @approver_bp.route("/packages/validated", methods=["GET"])
@@ -251,22 +256,10 @@ def get_validated_packages() -> ResponseReturnValue:
                     request_package = request_packages[0] if request_packages else None
                     request_data = None
 
-                    if request_package:
-                        from database.operations.request_operations import (
-                            RequestOperations,
-                        )
-
-                        request_ops = RequestOperations(session)
-                        if request_package.request_id is None:
-                            continue  # Skip request packages without request ID
-                        request_record = request_ops.get_by_id(request_package.request_id)
-                    if request_record:
-                        request_data = {
-                            "id": request_record.id,
-                            "application_name": request_record.application_name,
-                            "version": request_record.version,
-                        }
-
+                    request_data = request_record(request_package=request_package, session=session)
+                    if not request_data:
+                        continue
+                
                 # Get package type from RequestPackage
                 package_type = request_package.package_type if request_package else "new"
 
@@ -297,7 +290,7 @@ def get_validated_packages() -> ResponseReturnValue:
         return jsonify({"packages": package_list})
     except Exception as e:
         logger.error(f"Get validated packages error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"error": INTERNAL_SERVER_ERROR_STR}), 500
 
 
 def _process_package_approval(package_id: int, user: Any, reason: str) -> dict:
@@ -315,7 +308,7 @@ def _process_package_approval(package_id: int, user: Any, reason: str) -> dict:
             if not package:
                 return {
                     "success": False,
-                    "error": {"id": package_id, "error": "Package not found"},
+                    "error": {"id": package_id, "error": PACKAGE_NOT_FOUND_STR},
                 }
 
             if not package.package_status:
@@ -323,7 +316,7 @@ def _process_package_approval(package_id: int, user: Any, reason: str) -> dict:
                     "success": False,
                     "error": {
                         "id": package_id,
-                        "error": "Package status not found",
+                        "error": PACKAGE_STATUS_NOT_FOUND_STR,
                     },
                 }
 
@@ -346,7 +339,7 @@ def _process_package_approval(package_id: int, user: Any, reason: str) -> dict:
                 action="approve_package",
                 resource_type="package",
                 resource_id=package.id,
-                details=(f"Package {package.name}@{package.version} approved: " f"{reason}"),
+                details=(f"Package {package.name}@{package.version} approved: {reason}"),
             )
             audit_ops = AuditLogOperations(session)
             audit_ops.create(audit_log)
@@ -377,7 +370,7 @@ def _process_package_rejection(package_id: int, user: Any, reason: str) -> dict:
             if not package:
                 return {
                     "success": False,
-                    "error": {"id": package_id, "error": "Package not found"},
+                    "error": {"id": package_id, "error": PACKAGE_NOT_FOUND_STR},
                 }
 
             if not package.package_status:
@@ -385,7 +378,7 @@ def _process_package_rejection(package_id: int, user: Any, reason: str) -> dict:
                     "success": False,
                     "error": {
                         "id": package_id,
-                        "error": "Package status not found",
+                        "error": PACKAGE_STATUS_NOT_FOUND_STR,
                     },
                 }
 
@@ -408,7 +401,7 @@ def _process_package_rejection(package_id: int, user: Any, reason: str) -> dict:
                 action="batch_reject_package",
                 resource_type="package",
                 resource_id=package.id,
-                details=(f"Package {package.name}@{package.version} rejected: " f"{reason}"),
+                details=(f"Package {package.name}@{package.version} rejected: {reason}"),
             )
             audit_ops = AuditLogOperations(session)
             audit_ops.create(audit_log)
@@ -422,3 +415,25 @@ def _process_package_rejection(package_id: int, user: Any, reason: str) -> dict:
             "success": False,
             "error": {"id": package_id, "error": str(pkg_error)},
         }
+
+
+
+def request_record(request_package, session):
+    from database.operations.request_operations import RequestOperations
+    request_ops = RequestOperations(session)
+
+    request_data = None
+
+    if request_package.request_id is None:
+        return request_data
+    
+    request_record = request_ops.get_by_id(request_package.request_id)
+    
+    if request_record:
+        request_data = {
+            "id": request_record.id,
+            "application_name": request_record.application_name,
+            "version": request_record.version,
+        }
+
+    return request_data

@@ -63,7 +63,7 @@ def validate_all_required_env() -> None:
     """
     if _missing_env_vars:
         error_msg = "Missing required environment variables:\n" + "\n".join(_missing_env_vars)
-        error_msg += "\n\nPlease set these environment variables before starting " "the application."
+        error_msg += "\n\nPlease set these environment variables before startingthe application."
         error_msg += "\nSee env.example for reference values."
         raise ValueError(error_msg)
 
@@ -92,9 +92,9 @@ def validate_env_vars(*names: str, context: Optional[str] = None) -> None:
         local_errors = list(_missing_env_vars)
 
     if local_errors:
-        header = f"Missing required environment variables" f"{f' for {context}' if context else ''}:\n"
+        header = f"Missing required environment variables{f' for {context}' if context else ''}:\n"
         error_msg = header + "\n".join(local_errors)
-        error_msg += "\n\nPlease set these environment variables before starting " "this component."
+        error_msg += "\n\nPlease set these environment variables before starting this component."
         error_msg += "\nSee env.example for reference values."
         raise ValueError(error_msg)
 

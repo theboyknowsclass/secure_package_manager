@@ -46,7 +46,7 @@ class PublishWorker(BaseWorker):
             if result["success"]:
                 if result["processed_count"] > 0:
                     logger.info(
-                        f"Publishing complete: {result['successful_packages']} successful, " f"{result['failed_packages']} failed"
+                        f"Publishing complete: {result['successful_packages']} successful, {result['failed_packages']} failed"
                     )
                 else:
                     logger.info("PublishWorker heartbeat: No packages found for publishing")

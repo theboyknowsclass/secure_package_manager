@@ -132,30 +132,21 @@ class PackageCacheService:
                     # Parse package name and version from directory name
                     # Format: package-name-version or @scope-package-version
                     item_name = item.name
+                    parts = item_name.split("-")
+
                     if item_name.startswith("@"):
-                        # Scoped package: @scope-package-version
-                        parts = item_name.split("-")
-                        if len(parts) >= 3:
-                            scope = parts[0]
-                            package_name = parts[1]
-                            version = "-".join(parts[2:])
-                            full_name = f"{scope}/{package_name}"
-                        else:
-                            continue
+                        formatted_package = self.format_scoped_package_name(parts)
+
                     else:
-                        # Regular package: package-name-version
-                        parts = item_name.split("-")
-                        if len(parts) >= 2:
-                            package_name = parts[0]
-                            version = "-".join(parts[1:])
-                            full_name = package_name
-                        else:
-                            continue
+                        formatted_package = self.format_regular_package_name(parts)
+                            
+                    if not formatted_package:
+                        continue
 
                     cached_packages.append(
                         {
-                            "name": full_name,
-                            "version": version,
+                            "name": formatted_package[1],
+                            "version": formatted_package[0],
                             "path": str(item),
                         }
                     )
@@ -180,3 +171,27 @@ class PackageCacheService:
             safe_package_name = package.name
 
         return self.package_cache_dir / f"{safe_package_name}-{package.version}"
+
+
+    def format_scoped_package_name(self, parts: str):
+        # Scoped package: @scope-package-version
+        if len(parts) >= 3:
+            scope = parts[0]
+            package_name = parts[1]
+            version = "-".join(parts[2:])
+            full_name = f"{scope}/{package_name}"
+
+            return version, full_name
+        else:
+            return False
+    
+    def format_regular_package_name(self, parts: str):
+        # Regular package: package-name-version
+        if len(parts) >= 2:
+            package_name = parts[0]
+            version = "-".join(parts[1:])
+            full_name = package_name
+
+            return version, full_name
+        else:
+            return False
