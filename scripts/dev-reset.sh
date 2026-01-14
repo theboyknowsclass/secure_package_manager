@@ -9,7 +9,7 @@ docker context use default
 
 # Stop and remove all containers and volumes
 echo "📦 Stopping containers and removing volumes..."
-docker compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml down -v
+docker-compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml down -v
 
 # Remove any dangling images and build cache
 echo "🧹 Cleaning up Docker resources..."

@@ -100,7 +100,7 @@ class PackageOperations:
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def create_with_status(self, package_data: dict, status: str = self.CHECKING_LICENCE_STR) -> Package:
+    def create_with_status(self, package_data: dict, status: str = None) -> Package:
         """Create a package with initial status.
 
         Args:
@@ -110,6 +110,9 @@ class PackageOperations:
         Returns:
             The created package
         """
+        if status is None:
+            status = self.CHECKING_LICENCE_STR
+
         package = Package(**package_data)
         self.session.add(package)
         self.session.flush()  # Get package ID
@@ -152,7 +155,7 @@ class PackageOperations:
         self.session.flush()
         return True
 
-    def batch_create_with_status(self, packages_data: List[dict], status: str = self.CHECKING_LICENCE_STR) -> List[Package]:
+    def batch_create_with_status(self, packages_data: List[dict], status: str = None) -> List[Package]:
         """Create multiple packages with initial status.
 
         Args:
@@ -162,6 +165,9 @@ class PackageOperations:
         Returns:
             List of created packages
         """
+        if status is None:
+            status = self.CHECKING_LICENCE_STR
+
         packages = []
         for package_data in packages_data:
             package = self.create_with_status(package_data, status)

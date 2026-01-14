@@ -3,6 +3,15 @@
 # Usage: ./dev-start.sh [service_name]
 # If no service is specified, starts all services
 
+# set the IP address for a env var called "localhost" so we can dynamically set the ip for various env vars
+# if no IP found, set the env var "localhost" to "localhost"
+ip_address=$(hostname -I | awk '{print $1}')
+
+if [ -z "${ip_address}" ]; then
+   ip_address="localhost"
+fi
+export localhost=${ip_address}
+
 SERVICE=${1:-""}
 
 if [ -n "$SERVICE" ]; then
@@ -18,12 +27,12 @@ docker context use default
 if [ -n "$SERVICE" ]; then
     # Single service mode - just start the specified service
     echo "🔄 Starting service: $SERVICE..."
-    docker compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml up --build -d "$SERVICE"
+    docker-compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml up --build -d "$SERVICE"
 else
     # Full environment mode - fresh start with clean database
     # Stop and remove all containers
     echo "📦 Stopping existing containers..."
-    docker compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml down -v
+    docker-compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml down -v
 
     # Remove any existing database volumes to ensure fresh start
     echo "🗑️  Removing database volumes..."
@@ -32,7 +41,7 @@ else
 
     # Start services with dev configuration
     echo "🔄 Starting services..."
-    docker compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml up --build -d
+    docker-compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml up --build -d
 fi
 
 # Wait for services to be healthy
@@ -44,20 +53,20 @@ echo "🔍 Checking service status..."
 
 if [ -n "$SERVICE" ]; then
     # Check single service status
-    service_status=$(docker compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml ps "$SERVICE" --format "table {{.Service}}\t{{.Status}}")
+    service_status=$(docker-compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml ps "$SERVICE" --format "table {{.Service}}\t{{.Status}}")
     if echo "$service_status" | grep -q "Up"; then
         echo "✅ Service '$SERVICE' started successfully!"
         echo "📋 Service status:"
         echo "$service_status"
     else
         echo "❌ Service '$SERVICE' failed to start. Check logs with:"
-        echo "   docker compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml logs $SERVICE"
+        echo "   docker-compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml logs $SERVICE"
         exit 1
     fi
 else
     # Check all services status
-    services=$(docker compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml ps --services | wc -l)
-    running=$(docker compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml ps --services --filter "status=running" | wc -l)
+    services=$(docker-compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml ps --services | wc -l)
+    running=$(docker-compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml ps --services --filter "status=running" | wc -l)
 
     if [ "$services" -eq "$running" ]; then
         echo "✅ Development environment started successfully!"
@@ -69,7 +78,7 @@ else
         echo "📦 Mock NPM Registry: http://localhost:8080"
     else
         echo "❌ Some services failed to start. Check logs with:"
-        echo "   docker compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml logs"
+        echo "   docker-compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml logs"
         exit 1
     fi
 fi
