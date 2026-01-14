@@ -7,7 +7,7 @@ const OAUTH_CONFIG = {
   redirectUri: `${window.location.origin}/oauth/callback`,
   scope: "openid profile email",
   responseType: "code",
-  idpBaseUrl: "http://localhost:8081",
+  idpBaseUrl: `http://192.168.30.105:8081`,
 };
 
 export class OAuthService {
