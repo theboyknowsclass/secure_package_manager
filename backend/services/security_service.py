@@ -247,7 +247,7 @@ class SecurityService:
                 info_count=scan_data.get("info_count", 0),
                 scan_duration_ms=scan_data.get("scan_duration_ms", 0),
                 trivy_version=scan_data.get("trivy_version", "unknown"),
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(),
             )
 
             security_scan_ops.create(security_scan)

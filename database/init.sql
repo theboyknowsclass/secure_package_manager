@@ -90,7 +90,8 @@ CREATE TABLE IF NOT EXISTS package_status (
         'Security Scan Failed',
         'Pending Approval', 
         'Approved', 
-        'Rejected'
+        'Rejected',
+        'Published'
     )),
     CONSTRAINT package_status_security_scan_status_check CHECK (security_scan_status IN ('pending', 'running', 'completed', 'failed', 'skipped')),
     CONSTRAINT package_status_license_status_check CHECK (license_status IN ('always_allowed', 'allowed', 'avoid', 'blocked', 'unknown')),
