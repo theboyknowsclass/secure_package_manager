@@ -45,19 +45,12 @@ class NpmRegistryPublishingService:
 
             logger.info(f"Publishing {package.name}@{package.version} to repository at {self.target_repo_url}")
 
-            # Create package tarball
-            tarball_path = self._create_package_tarball(package)
-            if not tarball_path:
+            # Create package tarball and upload to registry
+            success = self._create_package_tarball(package)
+            if not success:
                 return False
 
-            # Upload to registry
-            success = self._upload_to_registry(package, tarball_path)
-
-            # Clean up temporary file
-            tarball_file = Path(tarball_path)
-            if tarball_file.exists():
-                tarball_file.unlink()
-
+            logger.info(f"Was the {package.name}@{package.version} upload successful? {success}")
             return success
 
         except Exception as e:
@@ -73,6 +66,9 @@ class NpmRegistryPublishingService:
         Returns:
             Path to created tarball or None if failed
         """
+        if not package:
+            logger.error("Invalid package provided for tarball creation")
+            return False
         try:
             # Create a temporary directory for the package
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -98,12 +94,9 @@ class NpmRegistryPublishingService:
                         arcname="package",
                         filter=lambda tarinfo: (None if tarinfo.name == tarball_path.name else tarinfo),
                     )
-
-                # Move tarball to a permanent location
-                permanent_path = Path(temp_dir) / f"{safe_name}-{package.version}.tgz"
-                tarball_path.rename(permanent_path)
-
-                return str(permanent_path)
+                
+                success = self._upload_to_registry(package, tarball_path)
+                return success
 
         except Exception as e:
             logger.error(f"Error creating tarball for {package.name}@{package.version}: {str(e)}")
@@ -159,11 +152,15 @@ class NpmRegistryPublishingService:
         Returns:
             True if successful, False otherwise
         """
+        logger.info(f"The tarball path is: {tarball_path}")
         try:
             # Read the tarball as base64
             with open(tarball_path, "rb") as f:
                 tarball_data = f.read()
             tarball_b64 = base64.b64encode(tarball_data).decode("ascii")
+
+            logger.info(f"Uploading {package.name}@{package.version} to registry at {self.target_repo_url}")
+            logger.info(f"Tarball size (bytes): {len(tarball_data)}")
 
             # URL encode the package name for scoped packages like @babel/core
             encoded_package_name = quote(package.name, safe="")

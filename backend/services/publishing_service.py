@@ -153,7 +153,8 @@ class PublishingService:
                         or current_package.package_status.status != "Approved"
                     ):
                         continue  # Skip if status changed
-
+                    
+                    logger.info(f"The status of result is {result['status']} for package {package.name}@{package.version}")
                     if result["status"] == "success":
                         status_ops.update_status(package.id, "Published")
                         successful_count += 1
@@ -161,10 +162,11 @@ class PublishingService:
                         status_ops.update_status(package.id, PUBLISH_FAILED_STR)
                         failed_count += 1
 
+                    logger.info(f"The successful count is {successful_count} and failed count is {failed_count}")
                 except Exception as e:
                     self.logger.error(f"Error updating package {package.name}@{package.version}: {str(e)}")
                     failed_count += 1
-
+            logger.info(f"The final successful count is {successful_count} and failed count is {failed_count}")
             session.commit()
 
         # Log batch summary

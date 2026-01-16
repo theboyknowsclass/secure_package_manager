@@ -74,12 +74,28 @@ export const useAuditData = () => {
   return useQuery<AuditDataItem[]>(
     "auditData",
     async () => {
-      const response = await api.get(endpoints.packages.audit);
-      return response.data.audit_data;
+      try {
+        const response = await api.get(endpoints.packages.audit);
+        console.log("Fetched audit data:", response.data.audit_data);
+        console.log("Response status:", response.status);
+        return response.data.audit_data;
+      } catch (error) {
+        console.error("Error fetching audit data:", error);
+        throw error;
+      }
     },
     {
       refetchInterval: 30000, // Refetch every 30 seconds
       refetchIntervalInBackground: true,
+      staleTime: 10000, // Consider data fresh for 10 seconds
+      cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+      retry: (failureCount, error) => {
+        console.log(`Audit data fetch failed (attempt ${failureCount + 1}):`, error);
+        return failureCount < 3; // Retry up to 3 times
+      },
+      onError: (error) => {
+        console.error("Final error fetching audit data:", error);
+      },
     }
   );
 };

@@ -229,8 +229,11 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                 return jsonify({"error": ACCESS_DENIED_STR}), 403
 
             # Get packages for this request with their creation context and scan results
+            logger.info(f"Fetching packages for request ID: {request_id}")
             package_ops = PackageOperations(session)
             packages_with_context = package_ops.get_packages_with_context_and_scans(request_id)
+            logger.info(f"The output of packages with context: {packages_with_context}")
+            logger.info(f"Found {len(packages_with_context)} packages for request ID: {request_id}")
 
             # Get request status from status manager using the same session
             from services.package_request_status_manager import (
@@ -253,13 +256,18 @@ def get_package_request(request_id: int) -> ResponseReturnValue:
                         # Handle both tuple and single object cases
                         if isinstance(item, tuple) and len(item) >= 3:
                             pkg, rp, scan = item[0], item[1], item[2]
+                        
+                        logger.info(f"Processing package item: {pkg}, RequestPackage: {rp}, Scan: {scan}")
 
-                        packages_list = create_package_list_for_package_request(pkg, rp, scan)
+                        packages_list = create_package_list_for_package_request(pkg, rp, scan, packages_list)
 
                     except Exception as e:
                         logger.error(f"Error processing package item: {e}")
                         logger.error(f"Item type: {type(item)}, Item: {item}")
                         continue
+            
+            logger.info(f"The output of packages list: {packages_list}")
+            logger.info(f"Packages list constructed with {len(packages_list)} items")
 
             return (
                 jsonify(
@@ -613,7 +621,7 @@ def retry_failed_packages() -> ResponseReturnValue:
 @package_bp.route("/audit", methods=["GET"])
 @auth_service.require_auth
 def get_audit_data() -> ResponseReturnValue:
-    """Get audit data for approved packages."""
+    """Get audit data for approved and published packages."""
     try:
         # Only admins and approvers can view audit data
         if not (get_authenticated_user().is_admin() or get_authenticated_user().is_approver()):
@@ -621,11 +629,11 @@ def get_audit_data() -> ResponseReturnValue:
 
         db_service = DatabaseService(os.getenv("DATABASE_URL", ""))
         with db_service.get_session() as session:
-            # Query for approved packages with their approval information
+            # Query for approved and published packages with their approval information
             from database.models import User
             from sqlalchemy.orm import joinedload
 
-            # Get all approved packages with their relationships
+            # Get all approved OR published packages with their relationships
             approved_packages = (
                 session.query(Package)
                 .join(PackageStatus, Package.id == PackageStatus.package_id)
@@ -636,7 +644,7 @@ def get_audit_data() -> ResponseReturnValue:
                     joinedload(Package.package_status),
                     joinedload(Package.request_packages).joinedload(RequestPackage.request),
                 )
-                .filter(PackageStatus.status == "Approved")
+                .filter(PackageStatus.status.in_(["Approved", "Published"]))
                 .all()
             )
 
@@ -712,7 +720,7 @@ def approved_packages_metadata(approved_packages, session):
 
 # def create_package_ create pacjakge list for package create
 
-def create_package_list_for_package_request(pkg, rp, scan):
+def create_package_list_for_package_request(pkg, rp, scan, packages_list=[]):
     packages_list.append(
         {
             "id": pkg.id,
@@ -743,3 +751,5 @@ def create_package_list_for_package_request(pkg, rp, scan):
             ),
         }
     )
+
+    return packages_list

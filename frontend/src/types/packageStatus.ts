@@ -14,6 +14,7 @@ export const PACKAGE_STATUS = {
   SECURITY_SCANNED: "Security Scanned",
   SECURITY_SCAN_FAILED: "Security Scan Failed",
   PENDING_APPROVAL: "Pending Approval",
+  PROCESSING: "Processing",
   APPROVED: "Approved",
   REJECTED: "Rejected",
 } as const;

@@ -3,13 +3,15 @@ import { Tooltip, Chip } from "@mui/material";
 import { PACKAGE_STATUS, type PackageStatus } from "../../types/packageStatus";
 
 export interface PackageStatusChipProps {
-  status: PackageStatus;
+  status: PackageStatus | string;
   showTooltip?: boolean;
   size?: "small" | "medium";
   variant?: "filled" | "outlined";
 }
 
-const getPackageStatusColor = (status: PackageStatus) => {
+const getPackageStatusColor = (status: PackageStatus | string) => {
+  // status column on the status page
+  console.log("getPackageStatusColor: status =", status);
   switch (status) {
     case PACKAGE_STATUS.APPROVED:
       return "success";
@@ -17,12 +19,25 @@ const getPackageStatusColor = (status: PackageStatus) => {
       return "error";
     case PACKAGE_STATUS.PENDING_APPROVAL:
       return "info";
+    case PACKAGE_STATUS.PROCESSING:
+      return "info";
+    // Handle request status strings returned by backend
+    case "pending_approval":
+      return "info";
+    case "processing":
+      return "info";
+    case "approved":
+      return "success";
+    case "rejected":
+      return "error";
     default:
       return "warning";
   }
 };
 
-const getPackageStatusLabel = (status: PackageStatus): string => {
+const getPackageStatusLabel = (status: PackageStatus | string): string => {
+  // status inside the panel for the status column
+  console.log("getPackageStatusLabel: status =", status);
   switch (status) {
     case PACKAGE_STATUS.SUBMITTED:
       return "Submitted";
@@ -46,6 +61,8 @@ const getPackageStatusLabel = (status: PackageStatus): string => {
       return "Approved";
     case PACKAGE_STATUS.REJECTED:
       return "Rejected";
+    case PACKAGE_STATUS.PROCESSING:
+      return "Processing";
     default:
       return status;
   }
@@ -59,7 +76,8 @@ export const PackageStatusChip: React.FC<PackageStatusChipProps> = React.memo(
     const chip = (
       <Chip label={label} color={color} size={size} variant={variant} />
     );
-
+    
+    // hovering over the status label on the status page
     if (showTooltip) {
       return <Tooltip title={`Status: ${label}`}>{chip}</Tooltip>;
     }

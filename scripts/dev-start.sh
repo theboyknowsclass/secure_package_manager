@@ -70,12 +70,13 @@ else
 
     if [ "$services" -eq "$running" ]; then
         echo "✅ Development environment started successfully!"
-        echo "🌐 Frontend: http://localhost:3000"
-        echo "🔧 API: http://localhost:5000"
-        echo "🗄️  Database: localhost:5432"
-        echo "🔍 Trivy: http://localhost:4954"
-        echo "🔐 Mock IDP: http://localhost:8081"
-        echo "📦 Mock NPM Registry: http://localhost:8080"
+        echo "🌐 Frontend: http://${localhost}:3000"
+        echo "🔧 API: http://${localhost}:5000"
+        echo "🗄️  Database: ${localhost}:5432"
+        echo "🔍 Trivy: http://${localhost}:4954"
+        echo "🔐 Mock IDP: http://${localhost}:8081"
+        echo "📦 Mock NPM Registry: http://${localhost}:8080"
+        echo "📦 PGAdmin4: http://${localhost}:5050"
     else
         echo "❌ Some services failed to start. Check logs with:"
         echo "   docker-compose --env-file example.env.development -f docker-compose.base.yml -f docker-compose.dev.yml logs"

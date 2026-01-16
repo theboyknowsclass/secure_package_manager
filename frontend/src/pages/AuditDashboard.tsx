@@ -7,6 +7,10 @@ import { AuditDataItem } from "../types/package";
 export default function AuditDashboard() {
   const { data: auditData, isLoading, error } = useAuditData();
 
+  console.log("AuditDashboard: auditData =", auditData);
+  console.log("AuditDashboard: isLoading =", isLoading);
+  console.log("AuditDashboard: error =", error);
+
   // Memoized cell components to prevent re-renders
   const PackageNameCell = React.memo(({ value }: { value: string }) => (
     <Typography variant="body2" sx={{ fontWeight: "medium" }}>
@@ -221,7 +225,7 @@ export default function AuditDashboard() {
         Audit Dashboard
       </Typography>
       <Typography variant="body1" color="textSecondary" paragraph>
-        View all approved packages with their approval history and original
+        View all approved and published packages with their approval history and original
         request information.
       </Typography>
 
@@ -258,10 +262,10 @@ export default function AuditDashboard() {
       ) : (
         <Box sx={{ p: 3, textAlign: "center" }}>
           <Typography variant="h6" color="textSecondary">
-            No approved packages found
+            No approved or published packages found
           </Typography>
           <Typography variant="body2" color="textSecondary">
-            Approved packages will appear here once they have been approved by
+            Approved and published packages will appear here once they have been approved by
             an approver.
           </Typography>
         </Box>

@@ -32,7 +32,7 @@ def create_app() -> Flask:
     # Initialize extensions with explicit CORS configuration
     CORS(
         app,
-        origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+        origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://192.168.30.105:3000"],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
         supports_credentials=True,
